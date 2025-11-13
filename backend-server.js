@@ -8,9 +8,18 @@
 import express from 'express';
 import cors from 'cors';
 import Anthropic from "@anthropic-ai/sdk";
+import 'dotenv/config';
+
+// Validate required environment variables
+if (!process.env.ANTHROPIC_API_KEY) {
+  console.error('ERROR: ANTHROPIC_API_KEY environment variable is required');
+  process.exit(1);
+}
 
 const app = express();
-const client = new Anthropic();
+const client = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY
+});
 
 app.use(cors());
 app.use(express.json());
@@ -60,7 +69,7 @@ app.post('/api/netsuite/sync', async (req, res) => {
 
     // Call ns_getRecord via Claude MCP
     const response = await client.messages.create({
-      model: "claude-opus-4-1",
+      model: "claude-3-5-sonnet-20241022",
       max_tokens: 2048,
       tools: [
         {
@@ -132,8 +141,11 @@ app.post('/api/netsuite/projects', async (req, res) => {
 
     console.log(`Fetching projects for customer ${customerId}...`);
 
+    // Sanitize customerId to prevent SQL injection
+    const sanitizedCustomerId = String(customerId).replace(/['"\\]/g, '');
+    
     const response = await client.messages.create({
-      model: "claude-opus-4-1",
+      model: "claude-3-5-sonnet-20241022",
       max_tokens: 2048,
       tools: [
         {
@@ -144,10 +156,11 @@ app.post('/api/netsuite/projects', async (req, res) => {
             sqlQuery: `
               SELECT id, entityid, companyname, startdate, enddate, status, projectedtotalvalue
               FROM job
-              WHERE customer = '${customerId}' AND isinactive = 'F'
+              WHERE customer = ? AND isinactive = 'F'
               ORDER BY startdate DESC
             `,
-            description: `Fetch projects for customer ${customerId}`,
+            parameters: [sanitizedCustomerId],
+            description: `Fetch projects for customer ${sanitizedCustomerId}`,
             pageSize: 20
           }
         }
@@ -210,7 +223,7 @@ app.post('/api/netsuite/create-project', async (req, res) => {
     };
 
     const response = await client.messages.create({
-      model: "claude-opus-4-1",
+      model: "claude-3-5-sonnet-20241022",
       max_tokens: 1024,
       tools: [
         {
@@ -265,6 +278,19 @@ app.post('/api/netsuite/scenarios', async (req, res) => {
       timeEntriesPerProject = 15
     } = req.body;
 
+    // Input validation
+    if (!['standard', 'enterprise', 'consulting'].includes(scenarioType)) {
+      return res.status(400).json({ error: 'Invalid scenarioType. Must be: standard, enterprise, or consulting' });
+    }
+    
+    if (customerCount < 1 || customerCount > 10) {
+      return res.status(400).json({ error: 'customerCount must be between 1 and 10' });
+    }
+    
+    if (projectsPerCustomer < 1 || projectsPerCustomer > 5) {
+      return res.status(400).json({ error: 'projectsPerCustomer must be between 1 and 5' });
+    }
+
     console.log(`Building ${scenarioType} scenario with ${customerCount} customers...`);
 
     const scenarios = {
@@ -295,6 +321,20 @@ app.post('/api/netsuite/scenarios', async (req, res) => {
           'Compliance Management System',
           'Enterprise Architecture Review',
           'Digital Workforce Planning'
+        ]
+      },
+      consulting: {
+        customers: [
+          { entityid: 'RETAIL001', companyname: 'Premier Retail Group', industry: 'Retail' },
+          { entityid: 'FINANCE002', companyname: 'Regional Credit Union', industry: 'Financial Services' },
+          { entityid: 'STARTUP003', companyname: 'TechStart Innovations', industry: 'Technology Startup' }
+        ],
+        projects: [
+          'Strategic Planning & Roadmap',
+          'Change Management Initiative',
+          'Process Improvement Analysis',
+          'Market Research Study',
+          'Digital Marketing Strategy'
         ]
       }
     };
@@ -424,7 +464,7 @@ app.post('/api/netsuite/create-time-entries', async (req, res) => {
 
       try {
         const response = await client.messages.create({
-          model: "claude-opus-4-1",
+          model: "claude-3-5-sonnet-20241022",
           max_tokens: 512,
           tools: [
             {
@@ -484,7 +524,7 @@ app.get('/api/netsuite/customers', async (req, res) => {
     console.log('Fetching all customers...');
 
     const response = await client.messages.create({
-      model: "claude-opus-4-1",
+      model: "claude-3-5-sonnet-20241022",
       max_tokens: 4096,
       tools: [
         {
