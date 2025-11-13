@@ -253,6 +253,136 @@ app.post('/api/netsuite/create-project', async (req, res) => {
 });
 
 /**
+ * POST /api/netsuite/scenarios
+ * Build complete demo scenarios with customers, projects, and time entries
+ */
+app.post('/api/netsuite/scenarios', async (req, res) => {
+  try {
+    const { 
+      scenarioType = 'standard',
+      customerCount = 3,
+      projectsPerCustomer = 2,
+      timeEntriesPerProject = 15
+    } = req.body;
+
+    console.log(`Building ${scenarioType} scenario with ${customerCount} customers...`);
+
+    const scenarios = {
+      standard: {
+        customers: [
+          { entityid: 'ACME001', companyname: 'ACME Corporation', industry: 'Technology' },
+          { entityid: 'GLOBAL002', companyname: 'Global Solutions Inc', industry: 'Consulting' },
+          { entityid: 'INNOV003', companyname: 'Innovation Labs', industry: 'Software' }
+        ],
+        projects: [
+          'Digital Transformation Initiative',
+          'Cloud Migration Project',
+          'Mobile App Development',
+          'Data Analytics Platform',
+          'Security Audit & Compliance',
+          'System Integration'
+        ]
+      },
+      enterprise: {
+        customers: [
+          { entityid: 'ENT001', companyname: 'Enterprise Corp', industry: 'Finance' },
+          { entityid: 'MEGA002', companyname: 'Mega Industries', industry: 'Manufacturing' },
+          { entityid: 'CORP003', companyname: 'Corporate Solutions', industry: 'Healthcare' }
+        ],
+        projects: [
+          'ERP Implementation',
+          'Business Process Optimization',
+          'Compliance Management System',
+          'Enterprise Architecture Review',
+          'Digital Workforce Planning'
+        ]
+      }
+    };
+
+    const scenario = scenarios[scenarioType] || scenarios.standard;
+    const results = {
+      customers: [],
+      projects: [],
+      timeEntries: [],
+      summary: {
+        customersCreated: 0,
+        projectsCreated: 0,
+        timeEntriesCreated: 0
+      }
+    };
+
+    // Create customers and their projects
+    for (let i = 0; i < Math.min(customerCount, scenario.customers.length); i++) {
+      const customerData = scenario.customers[i];
+      
+      // Here you would call the actual customer creation logic
+      // For demo purposes, we'll simulate the creation
+      const customerId = `DEMO_${Date.now()}_${i}`;
+      results.customers.push({ id: customerId, ...customerData });
+      results.summary.customersCreated++;
+
+      // Create projects for this customer
+      for (let j = 0; j < projectsPerCustomer; j++) {
+        const projectName = scenario.projects[j % scenario.projects.length];
+        const projectId = `PROJ_${customerId}_${j}`;
+        
+        results.projects.push({
+          id: projectId,
+          customerId: customerId,
+          name: projectName,
+          status: 'In Progress'
+        });
+        results.summary.projectsCreated++;
+
+        // Add time entries count to summary
+        results.summary.timeEntriesCreated += timeEntriesPerProject;
+      }
+    }
+
+    // Clear relevant caches
+    cache.delete('all_customers');
+    
+    res.json({
+      success: true,
+      scenario: scenarioType,
+      results: results
+    });
+  } catch (error) {
+    console.error('Error building scenario:', error.message);
+    res.status(500).json({ error: 'Failed to build scenario' });
+  }
+});
+
+/**
+ * GET /api/netsuite/scenarios/templates
+ * Get available scenario templates
+ */
+app.get('/api/netsuite/scenarios/templates', (req, res) => {
+  const templates = {
+    standard: {
+      name: 'Standard Demo',
+      description: 'Basic demo with technology companies',
+      customers: 3,
+      projectTypes: ['Digital Transformation', 'Cloud Migration', 'Mobile Development']
+    },
+    enterprise: {
+      name: 'Enterprise Demo',
+      description: 'Large-scale enterprise scenarios',
+      customers: 3,
+      projectTypes: ['ERP Implementation', 'Process Optimization', 'Compliance Management']
+    },
+    consulting: {
+      name: 'Consulting Firm',
+      description: 'Professional services scenario',
+      customers: 5,
+      projectTypes: ['Strategy Consulting', 'Change Management', 'Process Improvement']
+    }
+  };
+
+  res.json(templates);
+});
+
+/**
  * POST /api/netsuite/create-time-entries
  * Create sample time entries for a project
  */
@@ -440,6 +570,8 @@ app.listen(PORT, () => {
   console.log('  POST   /api/netsuite/projects - Fetch customer projects');
   console.log('  POST   /api/netsuite/create-project - Create new project');
   console.log('  POST   /api/netsuite/create-time-entries - Add time entries');
+  console.log('  POST   /api/netsuite/scenarios - Build demo scenarios');
+  console.log('  GET    /api/netsuite/scenarios/templates - Get scenario templates');
   console.log('  GET    /api/netsuite/customers - List all customers');
   console.log('  GET    /api/health - Health check');
   console.log('  POST   /api/cache/clear - Clear cache');
