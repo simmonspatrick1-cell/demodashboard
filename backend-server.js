@@ -7,7 +7,7 @@
 
 import express from 'express';
 import cors from 'cors';
-import Anthropic from "@anthropic-sdk/sdk";
+import Anthropic from "@anthropic-ai/sdk";
 
 const app = express();
 const client = new Anthropic();
