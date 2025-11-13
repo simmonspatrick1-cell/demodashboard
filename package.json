@@ -1,0 +1,34 @@
+{
+  "name": "demo-dashboard-backend",
+  "version": "1.0.0",
+  "description": "NetSuite API backend for Demo Dashboard",
+  "type": "module",
+  "main": "backend-server.js",
+  "scripts": {
+    "start": "node backend-server.js",
+    "dev": "nodemon backend-server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "netsuite",
+    "api",
+    "demo",
+    "dashboard",
+    "anthropic",
+    "mcp"
+  ],
+  "author": "Pat - NetSuite Solution Consultant",
+  "license": "MIT",
+  "dependencies": {
+    "@anthropic-sdk/sdk": "^0.28.0",
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "dotenv": "^16.0.3"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
