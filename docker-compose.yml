@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  netsuite-demo:
+    build: .
+    ports:
+      - "3001:3001"
+    environment:
+      - NETSUITE_ACCOUNT_ID=${NETSUITE_ACCOUNT_ID}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - PORT=3001
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
