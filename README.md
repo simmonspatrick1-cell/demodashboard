@@ -401,3 +401,4 @@ Either way, you'll have a working dashboard to accelerate your demo prep.
 **Status:** ✅ Ready to deploy and use
 
 Questions? Check the docs. Feature request? Let me know!
+# Deployment ready with environment variables
