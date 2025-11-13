@@ -1,3 +1,5 @@
+📌 Start here: [START_HERE.md](START_HERE.md) • Quick start: [QUICK_START.md](QUICK_START.md)
+
 # Demo Dashboard - Complete NetSuite Integration
 
 Your fully-wired dashboard is ready to sync **real data** from your NetSuite account.
