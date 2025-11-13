@@ -1,0 +1,18 @@
+{
+  "version": 2,
+  "functions": {
+    "backend-server.js": {
+      "runtime": "nodejs18.x"
+    }
+  },
+  "env": {
+    "NETSUITE_ACCOUNT_ID": "td3049589",
+    "ANTHROPIC_API_KEY": "your_actual_anthropic_api_key_here"
+  },
+  "build": {
+    "env": {
+      "NETSUITE_ACCOUNT_ID": "td3049589",
+      "ANTHROPIC_API_KEY": "your_actual_anthropic_api_key_here"
+    }
+  }
+}
