@@ -1,15 +1,6 @@
 {
   "version": 2,
-  "builds": [
-    {
-      "src": "backend-server.js",
-      "use": "@vercel/node"
-    }
-  ],
-  "routes": [
-    {
-      "src": "/(.*)",
-      "dest": "/backend-server.js"
-    }
-  ]
+  "env": {
+    "NETSUITE_ACCOUNT_ID": "td3049589"
+  }
 }
