@@ -1,7 +1,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Search, Settings, User, Users, Zap, ChevronRight, Copy, Check, BookOpen, ChevronDown, Target, Building2, Mail, Phone, MoreVertical, Play, Plus, FileText, Clock, TrendingUp, AlertCircle, Loader, RefreshCw } from 'lucide-react';
-// Import the NetSuite service
+import { Search, Settings, User, Users, Zap, ChevronRight, Copy, Check, BookOpen, ChevronDown, Target, Building2, Mail, Phone, MoreVertical, Play, Plus, FileText, Clock, TrendingUp, AlertCircle, Loader, RefreshCw, Wand2 } from 'lucide-react';
+// Import the NetSuite service and AI components
 // import NetSuiteService from './netsuite-service';
+import ScenarioGenerator from './ScenarioGenerator.jsx';
 
 export default function DemoDashboard() {
   // ============ STATE MANAGEMENT ============
@@ -20,6 +21,8 @@ export default function DemoDashboard() {
   const [customFieldsData, setCustomFieldsData] = useState({});
   const [actionStatus, setActionStatus] = useState(null);
   const [nsData, setNsData] = useState({}); // Store NetSuite API responses
+  const [showScenarioGenerator, setShowScenarioGenerator] = useState(false);
+  const [dynamicCustomers, setDynamicCustomers] = useState([]);
 
   // ============ DATA SOURCES ============
   const accounts = [
@@ -74,13 +77,18 @@ export default function DemoDashboard() {
   ];
 
   // ============ CUSTOMER FILTERING & SEARCH ============
+  // Combine static and dynamic customers
+  const allCustomers = useMemo(() => {
+    return [...keyProspects, ...dynamicCustomers];
+  }, [dynamicCustomers]);
+
   const filteredCustomers = useMemo(() => {
-    return keyProspects.filter(cust =>
+    return allCustomers.filter(cust =>
       cust.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       cust.industry.toLowerCase().includes(searchQuery.toLowerCase()) ||
       cust.entityid.toLowerCase().includes(searchQuery.toLowerCase())
     );
-  }, [searchQuery]);
+  }, [searchQuery, allCustomers]);
 
   const filteredPrompts = useMemo(() => {
     if (!promptSearch) return promptCategories;
@@ -91,6 +99,23 @@ export default function DemoDashboard() {
   }, [promptSearch]);
 
   // ============ HELPER FUNCTIONS ============
+  const handleScenarioGenerated = (newScenario) => {
+    // Add the new AI-generated scenario to the dynamic customers list
+    setDynamicCustomers(prev => [newScenario, ...prev]);
+    
+    // Auto-select the new scenario
+    setSelectedCustomer(newScenario.id);
+    
+    // Show success message
+    setActionStatus({
+      type: 'success',
+      message: `AI scenario "${newScenario.name}" generated successfully!`
+    });
+    
+    // Clear success message after 5 seconds
+    setTimeout(() => setActionStatus(null), 5000);
+  };
+
   const copyToClipboard = (text, index) => {
     navigator.clipboard.writeText(text);
     setCopiedIndex(index);
@@ -327,7 +352,7 @@ export default function DemoDashboard() {
         </div>
         
         <div className="p-3 border-b">
-          <div className="relative">
+          <div className="relative mb-3">
             <Search size={16} className="absolute left-2 top-2.5 text-gray-400" />
             <input
               type="text"
@@ -337,6 +362,13 @@ export default function DemoDashboard() {
               className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
+          <button
+            onClick={() => setShowScenarioGenerator(true)}
+            className="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white px-3 py-2 rounded-lg text-sm font-medium hover:from-blue-600 hover:to-purple-700 transition-all duration-200 flex items-center justify-center gap-2 shadow-sm"
+          >
+            <Wand2 size={16} />
+            Generate AI Scenario
+          </button>
         </div>
 
         <div className="flex-1 overflow-y-auto">
@@ -592,6 +624,16 @@ export default function DemoDashboard() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {activeTab === 'context' ? <CustomerContextPanel /> : <PromptLibrary />}
       </div>
+
+      {/* AI Scenario Generator Modal */}
+      {showScenarioGenerator && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <ScenarioGenerator
+            onScenarioGenerated={handleScenarioGenerated}
+            onClose={() => setShowScenarioGenerator(false)}
+          />
+        </div>
+      )}
     </div>
   );
 }

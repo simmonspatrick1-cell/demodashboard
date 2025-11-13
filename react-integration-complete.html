@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>React Integration Test - NetSuite Demo Dashboard</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f7;
+        }
+        .test-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 28px;
+            font-weight: 300;
+        }
+        .header p {
+            margin: 10px 0 0 0;
+            opacity: 0.9;
+        }
+        .content {
+            padding: 30px;
+        }
+        .demo-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+        .demo-section {
+            border: 1px solid #e1e5e9;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .demo-header {
+            background-color: #f8f9fa;
+            padding: 15px 20px;
+            border-bottom: 1px solid #e1e5e9;
+            font-weight: 600;
+            color: #495057;
+        }
+        .demo-body {
+            padding: 20px;
+        }
+        .status-bar {
+            background-color: #e3f2fd;
+            border: 1px solid #bbdefb;
+            border-radius: 6px;
+            padding: 12px 16px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background-color: #4caf50;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        .test-results {
+            background-color: #f8f9fa;
+            border-radius: 6px;
+            padding: 20px;
+            margin-top: 20px;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .success { color: #28a745; }
+        .error { color: #dc3545; }
+        .info { color: #17a2b8; }
+        .warning { color: #ffc107; }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <div class="header">
+            <h1>🚀 React Integration Test Suite</h1>
+            <p>NetSuite Demo Dashboard with AI Scenario Generation</p>
+        </div>
+        
+        <div class="content">
+            <div class="status-bar">
+                <div class="status-indicator"></div>
+                <span><strong>Live Integration Test:</strong> Serverless API + React Components + AI Generation</span>
+            </div>
+
+            <div class="demo-grid">
+                <!-- API Integration Test -->
+                <div class="demo-section">
+                    <div class="demo-header">
+                        🔌 API Integration Test
+                    </div>
+                    <div class="demo-body">
+                        <div id="api-test-root"></div>
+                    </div>
+                </div>
+
+                <!-- React Component Test -->
+                <div class="demo-section">
+                    <div class="demo-header">
+                        ⚛️ React Component Test
+                    </div>
+                    <div class="demo-body">
+                        <div id="react-test-root"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Full Dashboard Preview -->
+            <div class="demo-section">
+                <div class="demo-header">
+                    🎯 Dashboard Preview (Simplified)
+                </div>
+                <div class="demo-body">
+                    <div id="dashboard-preview-root"></div>
+                </div>
+            </div>
+
+            <!-- Test Results -->
+            <div class="test-results" id="testResults">
+                <div class="info">🔄 Initializing React Integration Test Suite...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- React Components -->
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+                const API_BASE = 'https://demodashboard-2uuy2211s-pat-simmons-projects.vercel.app/api';
+
+        // Simplified API Service for Testing
+        class TestAPIService {
+            static async checkHealth() {
+                const response = await fetch(`${API_BASE}/health`);
+                return await response.json();
+            }
+
+            static async getScenarioTemplates() {
+                const response = await fetch(`${API_BASE}/scenarios`);
+                return await response.json();
+            }
+
+            static async generateScenario(params) {
+                const response = await fetch(`${API_BASE}/scenarios`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(params)
+                });
+                return await response.json();
+            }
+        }
+
+        // API Integration Test Component
+        function APIIntegrationTest() {
+            const [status, setStatus] = useState('Testing...');
+            const [results, setResults] = useState([]);
+
+            const addResult = (message, type = 'info') => {
+                setResults(prev => [...prev, { message, type, timestamp: new Date().toLocaleTimeString() }]);
+            };
+
+            useEffect(() => {
+                runAPITests();
+            }, []);
+
+            const runAPITests = async () => {
+                addResult('🏃 Starting API Integration Tests', 'info');
+                
+                try {
+                    // Test 1: Health Check
+                    addResult('1️⃣ Testing Health Check...', 'info');
+                    const health = await TestAPIService.checkHealth();
+                    addResult(`✅ Health: ${health.status} (${health.message})`, 'success');
+
+                    // Test 2: Templates
+                    addResult('2️⃣ Testing Templates...', 'info');
+                    const templates = await TestAPIService.getScenarioTemplates();
+                    addResult(`✅ Templates: Found ${templates.templates?.length || 0} templates`, 'success');
+
+                    // Test 3: Quick Scenario
+                    addResult('3️⃣ Testing AI Generation...', 'warning');
+                    const scenario = await TestAPIService.generateScenario({
+                        template: 'professional-services',
+                        companyName: 'Test Integration Corp',
+                        industry: 'Professional Services',
+                        customization: 'React integration test'
+                    });
+                    addResult(`✅ AI Generation: Successfully generated scenario for ${scenario.scenario?.companyOverview?.name}`, 'success');
+
+                    setStatus('✅ All Tests Passed!');
+                } catch (error) {
+                    addResult(`❌ Test Failed: ${error.message}`, 'error');
+                    setStatus('❌ Tests Failed');
+                }
+            };
+
+            return (
+                <div>
+                    <div style={{marginBottom: '15px', fontWeight: 'bold', color: status.includes('✅') ? '#28a745' : '#dc3545'}}>
+                        {status}
+                    </div>
+                    <div style={{maxHeight: '200px', overflow: 'auto', fontSize: '12px'}}>
+                        {results.map((result, i) => (
+                            <div key={i} className={result.type} style={{marginBottom: '5px'}}>
+                                <span style={{opacity: 0.7}}>[{result.timestamp}]</span> {result.message}
+                            </div>
+                        ))}
+                    </div>
+                    <button 
+                        onClick={runAPITests}
+                        style={{
+                            marginTop: '10px',
+                            padding: '8px 16px',
+                            backgroundColor: '#007bff',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '4px',
+                            cursor: 'pointer'
+                        }}
+                    >
+                        Re-run Tests
+                    </button>
+                </div>
+            );
+        }
+
+        // React Component Test
+        function ReactComponentTest() {
+            const [templates, setTemplates] = useState([]);
+            const [selectedTemplate, setSelectedTemplate] = useState('');
+            const [isGenerating, setIsGenerating] = useState(false);
+            const [result, setResult] = useState(null);
+
+            useEffect(() => {
+                loadTemplates();
+            }, []);
+
+            const loadTemplates = async () => {
+                try {
+                    const response = await TestAPIService.getScenarioTemplates();
+                    setTemplates(response.templates || []);
+                } catch (error) {
+                    console.error('Failed to load templates:', error);
+                }
+            };
+
+            const generateScenario = async () => {
+                if (!selectedTemplate) return;
+
+                setIsGenerating(true);
+                setResult(null);
+
+                try {
+                    const scenario = await TestAPIService.generateScenario({
+                        template: selectedTemplate,
+                        companyName: 'React Test Company',
+                        industry: 'Technology',
+                        customization: 'Component integration test'
+                    });
+
+                    setResult({
+                        type: 'success',
+                        data: scenario.scenario
+                    });
+                } catch (error) {
+                    setResult({
+                        type: 'error',
+                        message: error.message
+                    });
+                } finally {
+                    setIsGenerating(false);
+                }
+            };
+
+            return (
+                <div>
+                    <div style={{marginBottom: '15px'}}>
+                        <label style={{display: 'block', marginBottom: '5px', fontWeight: '500'}}>
+                            Select Template:
+                        </label>
+                        <select
+                            value={selectedTemplate}
+                            onChange={(e) => setSelectedTemplate(e.target.value)}
+                            style={{
+                                width: '100%',
+                                padding: '8px',
+                                border: '1px solid #ddd',
+                                borderRadius: '4px'
+                            }}
+                        >
+                            <option value="">Choose template...</option>
+                            {templates.map(template => (
+                                <option key={template.id} value={template.id}>
+                                    {template.name}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <button
+                        onClick={generateScenario}
+                        disabled={!selectedTemplate || isGenerating}
+                        style={{
+                            width: '100%',
+                            padding: '10px',
+                            backgroundColor: isGenerating ? '#6c757d' : '#28a745',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '4px',
+                            cursor: isGenerating ? 'not-allowed' : 'pointer'
+                        }}
+                    >
+                        {isGenerating ? '🤖 Generating...' : '🚀 Generate Test Scenario'}
+                    </button>
+
+                    {result && (
+                        <div style={{
+                            marginTop: '15px',
+                            padding: '10px',
+                            backgroundColor: result.type === 'success' ? '#d4edda' : '#f8d7da',
+                            border: `1px solid ${result.type === 'success' ? '#c3e6cb' : '#f5c6cb'}`,
+                            borderRadius: '4px',
+                            fontSize: '12px'
+                        }}>
+                            {result.type === 'success' ? (
+                                <div>
+                                    <strong>✅ Generated:</strong> {result.data?.companyOverview?.name}<br/>
+                                    <strong>Industry:</strong> {result.data?.companyOverview?.industry}<br/>
+                                    <strong>Features:</strong> {result.data?.keyFeatures?.slice(0,2).join(', ')}
+                                </div>
+                            ) : (
+                                <div><strong>❌ Error:</strong> {result.message}</div>
+                            )}
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        // Dashboard Preview Component
+        function DashboardPreview() {
+            const [customers, setCustomers] = useState([
+                { id: 1, name: 'AdvisorHR', industry: 'PEO Services', status: 'Hot', aiGenerated: false },
+                { id: 2, name: 'GSB Group', industry: 'Consulting', status: 'Active', aiGenerated: false }
+            ]);
+            const [showGenerator, setShowGenerator] = useState(false);
+
+            const handleScenarioGenerated = (scenario) => {
+                const newCustomer = {
+                    id: Date.now(),
+                    name: scenario.companyOverview?.name || 'Generated Company',
+                    industry: scenario.companyOverview?.industry || 'Professional Services',
+                    status: 'AI Generated',
+                    aiGenerated: true
+                };
+                setCustomers(prev => [newCustomer, ...prev]);
+                setShowGenerator(false);
+            };
+
+            const generateQuickScenario = async () => {
+                try {
+                    const scenario = await TestAPIService.generateScenario({
+                        template: 'professional-services',
+                        companyName: 'QuickGen Solutions',
+                        industry: 'Professional Services',
+                        customization: 'Dashboard preview test'
+                    });
+                    handleScenarioGenerated(scenario.scenario);
+                } catch (error) {
+                    alert('Generation failed: ' + error.message);
+                }
+            };
+
+            return (
+                <div>
+                    <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px'}}>
+                        <h4 style={{margin: 0}}>Customer List</h4>
+                        <button
+                            onClick={generateQuickScenario}
+                            style={{
+                                padding: '6px 12px',
+                                backgroundColor: '#6f42c1',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '4px',
+                                fontSize: '12px',
+                                cursor: 'pointer'
+                            }}
+                        >
+                            ✨ Quick Generate
+                        </button>
+                    </div>
+
+                    <div style={{display: 'grid', gap: '8px'}}>
+                        {customers.map(customer => (
+                            <div key={customer.id} style={{
+                                padding: '12px',
+                                border: '1px solid #e1e5e9',
+                                borderRadius: '6px',
+                                backgroundColor: customer.aiGenerated ? '#f0f8ff' : '#fff',
+                                borderLeft: customer.aiGenerated ? '4px solid #6f42c1' : '4px solid #007bff'
+                            }}>
+                                <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                                    <div>
+                                        <div style={{fontWeight: '600', fontSize: '14px'}}>
+                                            {customer.aiGenerated ? '🤖 ' : ''}{customer.name}
+                                        </div>
+                                        <div style={{fontSize: '12px', color: '#666'}}>
+                                            {customer.industry}
+                                        </div>
+                                    </div>
+                                    <span style={{
+                                        fontSize: '11px',
+                                        padding: '2px 8px',
+                                        borderRadius: '12px',
+                                        backgroundColor: customer.aiGenerated ? '#6f42c1' : '#28a745',
+                                        color: 'white'
+                                    }}>
+                                        {customer.status}
+                                    </span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        }
+
+        // Render all components
+        ReactDOM.render(<APIIntegrationTest />, document.getElementById('api-test-root'));
+        ReactDOM.render(<ReactComponentTest />, document.getElementById('react-test-root'));
+        ReactDOM.render(<DashboardPreview />, document.getElementById('dashboard-preview-root'));
+
+        // Update test results
+        setTimeout(() => {
+            document.getElementById('testResults').innerHTML = `
+                <div class="success">✅ React Integration Test Suite Loaded Successfully</div>
+                <div class="info">🔌 API Base URL: ${API_BASE}</div>
+                <div class="info">⚛️ React Version: ${React.version}</div>
+                <div class="info">🧪 Components: API Test, React Test, Dashboard Preview</div>
+                <div class="warning">🤖 AI Generation: Ready (requires Anthropic API key)</div>
+            `;
+        }, 1000);
+    </script>
+</body>
+</html>

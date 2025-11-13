@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Serverless API Test - NetSuite Demo Dashboard</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background-color: #f9f9f9;
+        }
+        .test-section h3 {
+            color: #34495e;
+            margin-top: 0;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        button:disabled {
+            background-color: #bdc3c7;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .loading {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+        }
+        .scenario-form {
+            display: grid;
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+        .form-group label {
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        .form-group select, .form-group input, .form-group textarea {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .stat-card {
+            background: #ecf0f1;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .stat-card h4 {
+            margin: 0 0 10px 0;
+            color: #2c3e50;
+        }
+        .stat-card .value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #3498db;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 NetSuite Demo Dashboard - Serverless API Test</h1>
+        
+        <div class="stats">
+            <div class="stat-card">
+                <h4>API Status</h4>
+                <div class="value" id="apiStatus">🔄 Testing...</div>
+            </div>
+            <div class="stat-card">
+                <h4>Response Time</h4>
+                <div class="value" id="responseTime">-</div>
+            </div>
+            <div class="stat-card">
+                <h4>Last Test</h4>
+                <div class="value" id="lastTest">-</div>
+            </div>
+        </div>
+
+        <!-- Health Check Test -->
+        <div class="test-section">
+            <h3>🏥 Health Check</h3>
+            <p>Test the basic API connectivity and health status</p>
+            <button onclick="testHealth()">Test Health Endpoint</button>
+            <div id="healthResult" class="result" style="display: none;"></div>
+        </div>
+
+        <!-- Templates Test -->
+        <div class="test-section">
+            <h3>📋 Scenario Templates</h3>
+            <p>Fetch available scenario templates for demo generation</p>
+            <button onclick="testTemplates()">Get Templates</button>
+            <div id="templatesResult" class="result" style="display: none;"></div>
+        </div>
+
+        <!-- Scenario Generation Test -->
+        <div class="test-section">
+            <h3>🎯 Scenario Generation (AI-Powered)</h3>
+            <p>Generate a complete NetSuite demo scenario using Claude AI</p>
+            
+            <div class="scenario-form">
+                <div class="form-group">
+                    <label for="templateSelect">Scenario Template:</label>
+                    <select id="templateSelect">
+                        <option value="">Loading templates...</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="companyName">Company Name:</label>
+                    <input type="text" id="companyName" placeholder="e.g., Acme Manufacturing Inc." value="TechFlow Solutions">
+                </div>
+                
+                <div class="form-group">
+                    <label for="industry">Industry:</label>
+                    <input type="text" id="industry" placeholder="e.g., Manufacturing, Services, Retail" value="Professional Services">
+                </div>
+                
+                <div class="form-group">
+                    <label for="customization">Special Requirements:</label>
+                    <textarea id="customization" placeholder="Any specific requirements or focus areas for the demo..." rows="3">Focus on project management and resource allocation workflows</textarea>
+                </div>
+            </div>
+            
+            <button onclick="generateScenario()" id="generateBtn">🤖 Generate AI Scenario</button>
+            <div id="scenarioResult" class="result" style="display: none;"></div>
+        </div>
+
+        <!-- Batch Test -->
+        <div class="test-section">
+            <h3>⚡ Run All Tests</h3>
+            <p>Execute all API tests in sequence</p>
+            <button onclick="runAllTests()">Run Complete Test Suite</button>
+            <div id="batchResult" class="result" style="display: none;"></div>
+        </div>
+    </div>
+
+    <script>
+                const API_BASE = 'https://demodashboard-2uuy2211s-pat-simmons-projects.vercel.app/api';
+        
+        function updateStats(status, responseTime) {
+            document.getElementById('apiStatus').textContent = status;
+            document.getElementById('responseTime').textContent = responseTime ? `${responseTime}ms` : '-';
+            document.getElementById('lastTest').textContent = new Date().toLocaleTimeString();
+        }
+
+        async function testHealth() {
+            const resultDiv = document.getElementById('healthResult');
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'result loading';
+            resultDiv.textContent = '🔄 Testing health endpoint...';
+
+            const startTime = Date.now();
+            try {
+                const response = await fetch(`${API_BASE}/health`);
+                const responseTime = Date.now() - startTime;
+                const data = await response.json();
+                
+                resultDiv.className = 'result success';
+                resultDiv.textContent = `✅ SUCCESS (${response.status})\nResponse Time: ${responseTime}ms\n\n${JSON.stringify(data, null, 2)}`;
+                updateStats('✅ Healthy', responseTime);
+            } catch (error) {
+                const responseTime = Date.now() - startTime;
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `❌ ERROR\nResponse Time: ${responseTime}ms\n\n${error.message}`;
+                updateStats('❌ Error', responseTime);
+            }
+        }
+
+        async function testTemplates() {
+            const resultDiv = document.getElementById('templatesResult');
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'result loading';
+            resultDiv.textContent = '🔄 Fetching templates...';
+
+            const startTime = Date.now();
+            try {
+                const response = await fetch(`${API_BASE}/scenarios`);
+                const responseTime = Date.now() - startTime;
+                const data = await response.json();
+                
+                resultDiv.className = 'result success';
+                resultDiv.textContent = `✅ SUCCESS (${response.status})\nResponse Time: ${responseTime}ms\nTemplates Found: ${data.templates?.length || 0}\n\n${JSON.stringify(data, null, 2)}`;
+                
+                // Populate template dropdown
+                const select = document.getElementById('templateSelect');
+                select.innerHTML = '<option value="">Select a template...</option>';
+                if (data.templates) {
+                    data.templates.forEach(template => {
+                        const option = document.createElement('option');
+                        option.value = template.id;
+                        option.textContent = `${template.name} - ${template.description}`;
+                        select.appendChild(option);
+                    });
+                }
+                
+                updateStats('✅ Healthy', responseTime);
+            } catch (error) {
+                const responseTime = Date.now() - startTime;
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `❌ ERROR\nResponse Time: ${responseTime}ms\n\n${error.message}`;
+                updateStats('❌ Error', responseTime);
+            }
+        }
+
+        async function generateScenario() {
+            const resultDiv = document.getElementById('scenarioResult');
+            const generateBtn = document.getElementById('generateBtn');
+            
+            const template = document.getElementById('templateSelect').value;
+            const companyName = document.getElementById('companyName').value;
+            const industry = document.getElementById('industry').value;
+            const customization = document.getElementById('customization').value;
+
+            if (!template) {
+                alert('Please select a template first. Click "Get Templates" to load available options.');
+                return;
+            }
+
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'result loading';
+            resultDiv.textContent = '🤖 Generating AI scenario... This may take 10-30 seconds...';
+            
+            generateBtn.disabled = true;
+            generateBtn.textContent = '🔄 Generating...';
+
+            const startTime = Date.now();
+            try {
+                const response = await fetch(`${API_BASE}/scenarios`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        template,
+                        companyName,
+                        industry,
+                        customization
+                    })
+                });
+
+                const responseTime = Date.now() - startTime;
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.className = 'result success';
+                    resultDiv.textContent = `✅ AI SCENARIO GENERATED! (${response.status})\nResponse Time: ${responseTime}ms\nGeneration Time: ${(responseTime/1000).toFixed(1)}s\n\n${JSON.stringify(data, null, 2)}`;
+                    updateStats('🤖 AI Ready', responseTime);
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = `❌ API ERROR (${response.status})\nResponse Time: ${responseTime}ms\n\n${JSON.stringify(data, null, 2)}`;
+                    updateStats('❌ Error', responseTime);
+                }
+            } catch (error) {
+                const responseTime = Date.now() - startTime;
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `❌ NETWORK ERROR\nResponse Time: ${responseTime}ms\n\n${error.message}`;
+                updateStats('❌ Error', responseTime);
+            } finally {
+                generateBtn.disabled = false;
+                generateBtn.textContent = '🤖 Generate AI Scenario';
+            }
+        }
+
+        async function runAllTests() {
+            const resultDiv = document.getElementById('batchResult');
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'result loading';
+            resultDiv.textContent = '🔄 Running complete test suite...\n\n';
+
+            let output = '';
+            
+            // Test 1: Health
+            output += '1️⃣ Testing Health Endpoint...\n';
+            resultDiv.textContent = output + '   🔄 In progress...';
+            
+            try {
+                const healthStart = Date.now();
+                const healthResponse = await fetch(`${API_BASE}/health`);
+                const healthTime = Date.now() - healthStart;
+                const healthData = await healthResponse.json();
+                output += `   ✅ Health: ${healthResponse.status} (${healthTime}ms)\n\n`;
+            } catch (error) {
+                output += `   ❌ Health: Error - ${error.message}\n\n`;
+            }
+
+            // Test 2: Templates
+            output += '2️⃣ Testing Templates Endpoint...\n';
+            resultDiv.textContent = output + '   🔄 In progress...';
+            
+            try {
+                const templatesStart = Date.now();
+                const templatesResponse = await fetch(`${API_BASE}/scenarios`);
+                const templatesTime = Date.now() - templatesStart;
+                const templatesData = await templatesResponse.json();
+                output += `   ✅ Templates: ${templatesResponse.status} (${templatesTime}ms) - Found ${templatesData.templates?.length || 0} templates\n\n`;
+            } catch (error) {
+                output += `   ❌ Templates: Error - ${error.message}\n\n`;
+            }
+
+            // Test 3: Quick Scenario Generation
+            output += '3️⃣ Testing AI Scenario Generation...\n';
+            resultDiv.textContent = output + '   🤖 Generating scenario...';
+            
+            try {
+                const scenarioStart = Date.now();
+                const scenarioResponse = await fetch(`${API_BASE}/scenarios`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        template: 'professional-services',
+                        companyName: 'Test Company Inc',
+                        industry: 'Professional Services',
+                        customization: 'Quick test scenario'
+                    })
+                });
+                const scenarioTime = Date.now() - scenarioStart;
+                const scenarioData = await scenarioResponse.json();
+                
+                if (scenarioResponse.ok) {
+                    output += `   ✅ Scenario: ${scenarioResponse.status} (${scenarioTime}ms) - AI Generated Successfully\n\n`;
+                } else {
+                    output += `   ❌ Scenario: ${scenarioResponse.status} - ${scenarioData.error || 'Unknown error'}\n\n`;
+                }
+            } catch (error) {
+                output += `   ❌ Scenario: Error - ${error.message}\n\n`;
+            }
+
+            output += '🏁 TEST SUITE COMPLETE\n';
+            output += `Completed at: ${new Date().toLocaleString()}\n`;
+            
+            resultDiv.className = 'result success';
+            resultDiv.textContent = output;
+            updateStats('✅ Suite Complete', '-');
+        }
+
+        // Load templates on page load
+        window.addEventListener('load', function() {
+            testTemplates();
+        });
+    </script>
+</body>
+</html>

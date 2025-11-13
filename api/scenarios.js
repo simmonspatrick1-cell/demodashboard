@@ -16,8 +16,8 @@ const NETSUITE_ACCOUNT = process.env.NETSUITE_ACCOUNT_ID || "td3049589";
 // Available scenario templates
 const SCENARIO_TEMPLATES = [
   {
-    id: 1,
-    name: "Professional Services Firm",
+    id: "professional-services",
+    name: "Professional Services Firm", 
     description: "Multi-project consulting firm with resource allocation challenges",
     industry: "Professional Services",
     complexity: "High",
@@ -25,7 +25,7 @@ const SCENARIO_TEMPLATES = [
     resources: 25
   },
   {
-    id: 2,
+    id: "software-development",
     name: "Software Development Agency",
     description: "Agile development team with multiple client projects",
     industry: "Technology",
@@ -44,23 +44,28 @@ const SCENARIO_TEMPLATES = [
   }
 ];
 
-// Generate demo scenarios using Claude AI or fallback data
-async function generateScenarioWithAI(template) {
-  const prompt = `Generate realistic demo data for a ${template.industry} company scenario.
+// Generate scenario using Claude AI
+async function generateScenarioWithAI(template, options = {}) {
+  const { companyName, industry, customization } = options;
   
-  Company: ${template.name}
+  const prompt = `Generate realistic NetSuite demo data for a ${industry || template.industry} company.
+  
+  Company: ${companyName || template.name}
   Description: ${template.description}
+  ${customization ? `Special Requirements: ${customization}` : ''}
   Expected Projects: ${template.projects}
   Expected Resources: ${template.resources}
   
   Please provide realistic data in this exact JSON structure:
   {
-    "company_info": {
+    "companyOverview": {
       "name": "string",
       "industry": "string", 
-      "size": "string",
+      "employeeCount": number,
+      "annualRevenue": "string",
       "description": "string"
     },
+    "keyFeatures": ["feature1", "feature2", "feature3"],
     "projects": [
       {
         "id": number,
@@ -179,32 +184,42 @@ export default async function handler(req, res) {
     });
   }
 
-  // POST /api/scenarios - generate scenario
+  // POST /api/scenarios - generate scenario  
   if (req.method === 'POST') {
     try {
-      const { templateId, customizations } = req.body || {};
+      const { template, templateId, companyName, industry, customization } = req.body || {};
       
-      if (!templateId) {
+      // Support both 'template' and 'templateId' field names
+      const requestedTemplateId = template || templateId;
+      
+      if (!requestedTemplateId) {
         return res.status(400).json({ error: 'Template ID is required' });
       }
       
-      const template = SCENARIO_TEMPLATES.find(t => t.id === parseInt(templateId));
-      if (!template) {
-        return res.status(404).json({ error: 'Template not found' });
+      // Find template by string ID (new format) or fallback to integer (old format)
+      const foundTemplate = SCENARIO_TEMPLATES.find(t => 
+        t.id === requestedTemplateId || t.id === parseInt(requestedTemplateId)
+      );
+      
+      if (!foundTemplate) {
+        return res.status(404).json({ 
+          error: 'Template not found',
+          available_templates: SCENARIO_TEMPLATES.map(t => t.id)
+        });
       }
       
-      console.log(`Generating scenario for template: ${template.name}`);
+      console.log(`Generating scenario for template: ${foundTemplate.name}`);
       
       let scenarioData;
       if (process.env.ANTHROPIC_API_KEY) {
-        scenarioData = await generateScenarioWithAI(template);
+        scenarioData = await generateScenarioWithAI(foundTemplate, { companyName, industry, customization });
       } else {
-        scenarioData = generateFallbackScenario(template);
+        scenarioData = generateFallbackScenario(foundTemplate);
       }
       
       const response = {
         success: true,
-        template: template,
+        template: foundTemplate,
         scenario: scenarioData,
         generated_at: new Date().toISOString(),
         netsuite_account: NETSUITE_ACCOUNT,
