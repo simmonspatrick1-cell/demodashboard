@@ -7,10 +7,19 @@
 
 import express from 'express';
 import cors from 'cors';
-import Anthropic from "@anthropic-sdk/sdk";
+import Anthropic from "@anthropic-ai/sdk";
+import 'dotenv/config';
+
+// Validate required environment variables
+if (!process.env.ANTHROPIC_API_KEY) {
+  console.error('ERROR: ANTHROPIC_API_KEY environment variable is required');
+  process.exit(1);
+}
 
 const app = express();
-const client = new Anthropic();
+const client = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY
+});
 
 app.use(cors());
 app.use(express.json());
