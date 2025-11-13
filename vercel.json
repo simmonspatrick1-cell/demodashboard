@@ -11,9 +11,5 @@
       "src": "/(.*)",
       "dest": "/backend-server.js"
     }
-  ],
-  "env": {
-    "NETSUITE_ACCOUNT_ID": "@netsuite-account-id",
-    "ANTHROPIC_API_KEY": "@anthropic-api-key"
-  }
+  ]
 }
