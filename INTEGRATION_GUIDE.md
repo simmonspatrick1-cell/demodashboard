@@ -243,7 +243,7 @@ NETSUITE_TOKEN_ID=your_token_id_here
 NETSUITE_TOKEN_SECRET=your_token_secret_here
 
 # API Configuration
-API_BASE_URL=http://localhost:3000/api
+API_BASE_URL=http://localhost:3004/api
 ```
 
 ---
@@ -370,7 +370,7 @@ const syncWithRetry = async (customerId, maxRetries = 3) => {
 **Solution**: Configure CORS in your backend
 ```javascript
 app.use(cors({
-  origin: 'http://localhost:3000',
+  origin: 'http://localhost:3004',
   credentials: true
 }));
 ```

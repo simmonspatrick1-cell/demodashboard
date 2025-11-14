@@ -1,17 +1,55 @@
 version: '3.8'
 
 services:
-  netsuite-demo:
-    build: .
+  # Backend API Server
+  backend:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: netsuite-backend
     ports:
       - "3001:3001"
     environment:
-      - NETSUITE_ACCOUNT_ID=${NETSUITE_ACCOUNT_ID}
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - NODE_ENV=production
       - PORT=3001
+      - NETSUITE_ACCOUNT_ID=${NETSUITE_ACCOUNT_ID:-demo}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+    volumes:
+      - ./logs:/app/logs
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3001/api/health"]
+      test: ["CMD-SHELL", "curl -f http://localhost:3001/api/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 40s
+    networks:
+      - netsuite-network
+
+  # Frontend React App
+  frontend:
+    build:
+      context: ./netsuite-dashboard
+      dockerfile: Dockerfile
+    container_name: netsuite-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - netsuite-network
+
+networks:
+  netsuite-network:
+    driver: bridge
+
+volumes:
+  logs:
+    driver: local

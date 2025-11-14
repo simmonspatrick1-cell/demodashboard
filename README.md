@@ -29,25 +29,41 @@ Your fully-wired dashboard is ready to sync **real data** from your NetSuite acc
 
 ## 🚀 Get Started (Choose Your Path)
 
-### Path 1: Try It Now (Demo Mode - 2 minutes)
-Perfect for exploring the UI without backend setup.
+### Path 1: Development Mode (Fastest - 2 minutes)
+Perfect for development with hot reload.
 
-1. Copy `DemoDashboard.jsx` into your React app
-2. Open http://localhost:3000
-3. Select a customer → click "Sync NetSuite Data"
-4. Watch mock data populate
-5. Try copying prompts to clipboard
+```bash
+# One-command development setup
+./dev.sh
+```
 
-**What works:** UI, customer context, quick action prompt copies
-**What doesn't:** Real NetSuite data syncing
+**Features:** React dev server with hot reload, Node.js backend, automatic dependency installation
+**URLs:** Frontend: http://localhost:3004, Backend: http://localhost:3001
 
-### Path 2: Full Setup (Real Data - 10 minutes)
-Get live NetSuite data flowing to your dashboard.
+### Path 2: Production Build (5 minutes)
+Production-ready deployment with optimized builds.
 
-1. Follow **QUICK_START.md** → Option 2 (Full Setup)
-2. Set up backend server
-3. Connect dashboard to backend API
-4. See real customer data from NetSuite
+```bash
+# Production deployment
+./deploy.sh
+```
+
+**Features:** Optimized React build, production backend, single command deployment
+**URLs:** Frontend: http://localhost:3004, Backend: http://localhost:3001
+
+### Path 3: Docker Deployment (If Available - 3 minutes)
+Containerized deployment for consistent environments.
+
+```bash
+# Docker setup (if Docker is available)
+docker-compose up --build
+```
+
+**Features:** Multi-service containers, Nginx reverse proxy, health checks
+**URLs:** Frontend: http://localhost:80, Backend: http://localhost:3001
+
+### Path 4: Manual Setup (Advanced - 10 minutes)
+Follow **QUICK_START.md** for detailed manual setup instructions.
 5. Create actual demo projects
 
 **What works:** Everything, including real data sync and project creation
@@ -145,7 +161,7 @@ cp DemoDashboard.jsx src/App.jsx
 # Run React
 npm start
 
-# Open http://localhost:3000
+# Open http://localhost:3004
 # Click "Sync NetSuite Data" button - it works immediately!
 ```
 
@@ -155,11 +171,11 @@ npm start
 cd demo-backend
 npm install
 npm start
-# Runs on http://localhost:3001
+# Runs on http://localhost:3004
 
 # Terminal 2 - Frontend
 npm start
-# Runs on http://localhost:3000
+# Runs on http://localhost:3004
 ```
 
 See **QUICK_START.md** for detailed step-by-step instructions.
@@ -186,12 +202,12 @@ See **QUICK_START.md** for detailed step-by-step instructions.
 
 ```env
 # Backend
-PORT=3001
+PORT=3004
 NETSUITE_ACCOUNT_ID=td3049589
 ANTHROPIC_API_KEY=sk-ant-xxxxx
 
 # Frontend (in dashboard)
-REACT_APP_API_URL=http://localhost:3001
+REACT_APP_API_URL=http://localhost:3004
 ```
 
 ### NetSuite Account Details
@@ -207,12 +223,12 @@ Your account configuration:
 
 ### Health Check
 ```bash
-curl http://localhost:3001/api/health
+curl http://localhost:3004/api/health
 ```
 
 ### Sync Customer Data
 ```bash
-curl -X POST http://localhost:3001/api/netsuite/sync \
+curl -X POST http://localhost:3004/api/netsuite/sync \
   -H "Content-Type: application/json" \
   -d '{"customerId": 3161, "account": "services"}'
 ```
@@ -220,12 +236,12 @@ curl -X POST http://localhost:3001/api/netsuite/sync \
 ### Test in Browser Console
 ```javascript
 // Check backend connection
-fetch('http://localhost:3001/api/health')
+fetch('http://localhost:3004/api/health')
   .then(r => r.json())
   .then(console.log)
 
 // Manually sync a customer
-fetch('http://localhost:3001/api/netsuite/sync', {
+fetch('http://localhost:3004/api/netsuite/sync', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({ customerId: 3161 })
@@ -290,11 +306,11 @@ npm install express cors @anthropic-sdk/sdk dotenv
 ### Dashboard can't connect to backend
 ```bash
 # Check backend is running:
-curl http://localhost:3001/api/health
+curl http://localhost:3004/api/health
 
 # Check CORS is enabled in backend-server.js
 
-# Check dashboard is calling correct URL (3001, not 3000)
+# Check dashboard is calling correct URL (3004, not 3000)
 ```
 
 ### Sync returns "not populated"

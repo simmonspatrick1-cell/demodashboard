@@ -1,13 +1,24 @@
 {
   "version": 2,
+  "builds": [
+    {
+      "src": "backend-server.js",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/backend-server.js"
+    },
+    {
+      "src": "/(.*)",
+      "status": 404,
+      "dest": "/backend-server.js"
+    }
+  ],
   "env": {
     "NETSUITE_ACCOUNT_ID": "td3049589",
     "ANTHROPIC_API_KEY": "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"
-  },
-  "build": {
-    "env": {
-      "NETSUITE_ACCOUNT_ID": "td3049589",
-      "ANTHROPIC_API_KEY": "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"
-    }
   }
 }

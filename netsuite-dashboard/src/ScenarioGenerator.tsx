@@ -1,35 +1,140 @@
-import React, { useState, useEffect } from 'react';
-import { Zap, Loader, CheckCircle, AlertCircle, Wand2, RefreshCw } from 'lucide-react';
-import APIService from './api-service.js';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Zap, Loader, CheckCircle, AlertCircle, Wand2, RefreshCw, Info } from 'lucide-react';
+import APIService from './api-service';
 
-export default function ScenarioGenerator({ onScenarioGenerated, onClose }) {
-  const [templates, setTemplates] = useState([]);
-  const [selectedTemplate, setSelectedTemplate] = useState('');
-  const [companyName, setCompanyName] = useState('');
-  const [industry, setIndustry] = useState('');
-  const [customization, setCustomization] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [loadingTemplates, setLoadingTemplates] = useState(true);
-  const [error, setError] = useState(null);
-  const [success, setSuccess] = useState(false);
+interface ScenarioGeneratorProps {
+  onScenarioGenerated: (scenario: any) => void;
+  onClose: () => void;
+}
+
+interface ScenarioTemplate {
+  id: string;
+  name: string;
+  description: string;
+  industry: string;
+  focusAreas: string[];
+  budgetRange: string;
+  suggestedSize: string;
+  prompt: string;
+  defaultStatus?: string;
+}
+
+const FALLBACK_TEMPLATES: ScenarioTemplate[] = [
+  {
+    id: 'services-scale',
+    name: 'Services Scale-Up',
+    description: 'Multi-entity professional services org preparing for PSA roll-out.',
+    industry: 'Professional Services',
+    focusAreas: ['Resource Planning', 'Billing Automation', 'Utilization'],
+    budgetRange: '$250K-$450K',
+    suggestedSize: '250-400 employees',
+    prompt: 'Create PSA scenario with 3 delivery pods, cross-entity billing, and utilization dashboards.',
+    defaultStatus: 'Active'
+  },
+  {
+    id: 'saas-expansion',
+    name: 'SaaS Expansion Playbook',
+    description: 'Subscription-based services group expanding into new markets.',
+    industry: 'SaaS & Subscription',
+    focusAreas: ['Revenue Forecasting', 'Subscriptions', 'Project Financials'],
+    budgetRange: '$180K-$320K',
+    suggestedSize: '150-220 employees',
+    prompt: 'Model ARR growth, project delivery, and subscription renewals with SuiteProjects.',
+    defaultStatus: 'Hot'
+  },
+  {
+    id: 'energy-field',
+    name: 'Energy Field Services',
+    description: 'Field operations with heavy resource scheduling and compliance tracking.',
+    industry: 'Energy & Utilities',
+    focusAreas: ['Resource Scheduling', 'Compliance', 'Multi-Subsidiary Billing'],
+    budgetRange: '$300K-$600K',
+    suggestedSize: '300-500 employees',
+    prompt: 'Create multi-subsidiary field operations scenario with crews, compliance costs, and asset billing.',
+    defaultStatus: 'Qualified'
+  }
+];
+
+export default function ScenarioGenerator({ onScenarioGenerated, onClose }: ScenarioGeneratorProps) {
+  const [templates, setTemplates] = useState<ScenarioTemplate[]>(FALLBACK_TEMPLATES);
+  const [selectedTemplate, setSelectedTemplate] = useState<string>('');
+  const [companyName, setCompanyName] = useState<string>('');
+  const [industry, setIndustry] = useState<string>('');
+  const [customization, setCustomization] = useState<string>('');
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [loadingTemplates, setLoadingTemplates] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<boolean>(false);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+
+  const normalizeTemplate = (template: any, idx: number): ScenarioTemplate => ({
+    id: template?.id || template?.templateId || `template-${idx}`,
+    name: template?.name || template?.title || `Custom Scenario ${idx + 1}`,
+    description: template?.description || 'Imported template',
+    industry: template?.industry || template?.category || 'Professional Services',
+    focusAreas: template?.focusAreas || template?.focus || ['Resource Planning', 'Billing'],
+    budgetRange: template?.budgetRange || template?.budget || '$150K-$300K',
+    suggestedSize: template?.suggestedSize || template?.size || '150-250 employees',
+    prompt: template?.prompt || template?.instructions || 'Design a NetSuite PSA scenario highlighting utilization and billing.',
+    defaultStatus: template?.defaultStatus || undefined
+  });
+
+  const loadTemplates = useCallback(async () => {
+    try {
+      setLoadingTemplates(true);
+      const response = await APIService.getTemplates();
+      const templatePayload = Array.isArray(response?.templates)
+        ? response.templates
+        : Array.isArray(response)
+          ? response
+          : [];
+      if (templatePayload.length > 0) {
+        setTemplates(templatePayload.map((tpl: any, idx: number) => normalizeTemplate(tpl, idx)));
+        setStatusMessage(null);
+      } else {
+        setTemplates(FALLBACK_TEMPLATES);
+        setStatusMessage('Loaded offline template pack (no templates returned from API).');
+      }
+      setError(null);
+    } catch (err) {
+      console.error('Failed to load templates:', err);
+      setTemplates(FALLBACK_TEMPLATES);
+      setStatusMessage('Live template service is unavailable. Showing offline presets instead.');
+      setError(null);
+    } finally {
+      setLoadingTemplates(false);
+    }
+  }, []);
 
   // Load templates on component mount
   useEffect(() => {
     loadTemplates();
-  }, []);
+  }, [loadTemplates]);
 
-  const loadTemplates = async () => {
-    try {
-      setLoadingTemplates(true);
-      const response = await APIService.getScenarioTemplates();
-      setTemplates(response.templates || []);
-      setError(null);
-    } catch (err) {
-      console.error('Failed to load templates:', err);
-      setError('Failed to load scenario templates. Please check your connection.');
-    } finally {
-      setLoadingTemplates(false);
-    }
+  const normalizeScenario = (data: any, templateMeta?: ScenarioTemplate) => {
+    const now = new Date();
+    const sanitizedName = companyName?.trim() || data?.name || 'AI Scenario Company';
+    return {
+      id: data?.id || now.getTime(),
+      name: data?.name || sanitizedName,
+      entityid:
+        data?.entityid ||
+        `${sanitizedName.replace(/\s+/g, '-').toUpperCase().slice(0, 12)}-${now.getFullYear()}`,
+      industry: data?.industry || industry || templateMeta?.industry || 'Professional Services',
+      size: data?.size || templateMeta?.suggestedSize || '150-250 employees',
+      status: data?.status || templateMeta?.defaultStatus || 'AI Generated',
+      demoDate: data?.demoDate || now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      focus: data?.focus || templateMeta?.focusAreas || ['Resource Planning', 'Billing'],
+      budget: data?.budget || templateMeta?.budgetRange || '$200K-$350K',
+      nsId: data?.nsId || Math.floor(Math.random() * 4000) + 2000,
+      aiGenerated: true,
+      createdAt: now,
+      description: data?.description || templateMeta?.description,
+      prompt: data?.prompt || templateMeta?.prompt,
+      category: data?.category || templateMeta?.industry || 'AI Scenario',
+      companyName: sanitizedName,
+      customization: customization || 'Standard professional services demo scenario'
+    };
   };
 
   const handleGenerate = async () => {
@@ -38,6 +143,7 @@ export default function ScenarioGenerator({ onScenarioGenerated, onClose }) {
       return;
     }
 
+    const templateMeta = templates.find((tpl) => tpl.id === selectedTemplate);
     setIsLoading(true);
     setError(null);
     setSuccess(false);
@@ -50,9 +156,9 @@ export default function ScenarioGenerator({ onScenarioGenerated, onClose }) {
         customization: customization || 'Standard professional services demo scenario'
       });
 
-      // Transform the scenario data for the dashboard
-      const transformedScenario = APIService.transformScenarioData(scenarioData);
-      
+      const transformedScenario = normalizeScenario(scenarioData, templateMeta);
+      setStatusMessage(null);
+
       if (transformedScenario) {
         setSuccess(true);
         // Call the parent callback with the new scenario
@@ -67,9 +173,17 @@ export default function ScenarioGenerator({ onScenarioGenerated, onClose }) {
       } else {
         throw new Error('Invalid scenario data received');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Scenario generation failed:', err);
-      setError(err.message || 'Failed to generate scenario. Please try again.');
+      const fallbackScenario = normalizeScenario(null, templateMeta);
+      setStatusMessage('Live generator unreachable. Created scenario with offline template.');
+      setSuccess(true);
+      if (onScenarioGenerated) {
+        onScenarioGenerated(fallbackScenario);
+      }
+      setTimeout(() => {
+        if (onClose) onClose();
+      }, 2000);
     } finally {
       setIsLoading(false);
     }
@@ -103,6 +217,13 @@ export default function ScenarioGenerator({ onScenarioGenerated, onClose }) {
         <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-700">
           <AlertCircle className="w-4 h-4" />
           <span className="text-sm">{error}</span>
+        </div>
+      )}
+
+      {statusMessage && (
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-2 text-blue-700">
+          <Info className="w-4 h-4" />
+          <span className="text-sm">{statusMessage}</span>
         </div>
       )}
 

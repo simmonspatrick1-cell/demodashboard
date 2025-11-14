@@ -1,5 +1,6 @@
 // API Service for NetSuite Demo Dashboard - Serverless Vercel Functions
-const API_BASE_URL = 'https://demodashboard-2uuy2211s-pat-simmons-projects.vercel.app/api';
+// Use environment variable or fallback to production URL
+const API_BASE_URL = process.env.NODE_ENV === 'development' ? 'http://localhost:3004/api' : 'https://demodashboard-2uuy2211s-pat-simmons-projects.vercel.app/api';
 
 /**
  * Fetch with retry logic and error handling

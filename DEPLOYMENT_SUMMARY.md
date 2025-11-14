@@ -61,7 +61,7 @@
 Commands:
 1. cp DemoDashboard.jsx src/App.jsx
 2. npm start
-3. Open http://localhost:3000
+3. Open http://localhost:3004
 Done! Click "Sync NetSuite Data" - works immediately.
 ```
 
@@ -83,7 +83,7 @@ Terminal 1 (Backend):
 
 Terminal 2 (Frontend):
   1. Copy DemoDashboard.jsx to src/App.jsx
-  2. Update sync function to call http://localhost:3001
+  2. Update sync function to call http://localhost:3004
   3. npm start
 
 Both running = full integration ready!
@@ -148,7 +148,7 @@ cp ../DemoDashboard/../backend-server.js .
 # Create .env
 echo "NETSUITE_ACCOUNT_ID=td3049589" > .env
 echo "ANTHROPIC_API_KEY=your_key_here" >> .env
-echo "PORT=3001" >> .env
+echo "PORT=3004" >> .env
 
 # Start server
 npm start
@@ -161,7 +161,7 @@ npm start
 ### Step 3: Test Full Integration
 ```bash
 # In browser console:
-fetch('http://localhost:3001/api/health')
+fetch('http://localhost:3004/api/health')
   .then(r => r.json())
   .then(console.log)
 
@@ -259,7 +259,7 @@ Modify them in the `quickActions` array to match your style.
 | Backend returns 500 error | Check .env file has ANTHROPIC_API_KEY |
 | No custom fields showing | Sync them from NetSuite or use demo fallback |
 | Slow initial load | Normal - first sync without cache takes 3-5 sec |
-| Can't connect backend | Check backend on 3001, test with `curl http://localhost:3001/api/health` |
+| Can't connect backend | Check backend on 3004, test with `curl http://localhost:3004/api/health` |
 
 ---
 
