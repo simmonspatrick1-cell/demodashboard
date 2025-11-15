@@ -158,6 +158,15 @@ class StorageService {
     this.setItem(config.storage.demoNotes, notes);
   }
 
+  // Prospect persistence
+  getProspects(): any[] {
+    return this.getItem(config.storage.prospects, []);
+  }
+
+  saveProspects(prospects: any[]): void {
+    this.setItem(config.storage.prospects, prospects);
+  }
+
   // Recent Items Management
   getRecentItems(): RecentItem[] {
     return this.getItem(config.storage.recentItems, []);

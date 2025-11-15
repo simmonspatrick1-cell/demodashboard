@@ -244,6 +244,18 @@ body {
   box-shadow: 0 12px 25px rgba(0, 166, 211, 0.3);
 }
 
+body.theme-light .switcher-pill {
+  background: #f4f7fc;
+  border-color: #d8e1f2;
+  color: #122642;
+}
+
+body.theme-light .switcher-pill.is-active {
+  background: linear-gradient(120deg, #0a7bff, #36b6ff);
+  color: #fff;
+  box-shadow: 0 12px 25px rgba(8, 122, 255, 0.35);
+}
+
 .prompt-toolbar {
   background: #fff;
   border: 1px solid #dfe6f3;
@@ -662,6 +674,10 @@ body {
   margin-bottom: 12px;
 }
 
+.quick-create-grid__full {
+  grid-column: 1 / -1;
+}
+
 .quick-create-grid label {
   display: flex;
   flex-direction: column;
@@ -678,10 +694,101 @@ body {
   font-size: 13px;
 }
 
+.focus-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.focus-preview span {
+  border-radius: 999px;
+  padding: 6px 12px;
+  background: #eef4ff;
+  border: 1px solid #d3e1ff;
+  font-size: 12px;
+  color: #0b2d59;
+}
+
 .quick-create-actions {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
+}
+
+@keyframes floatUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.toast-stack {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 80;
+}
+
+.toast {
+  min-width: 220px;
+  padding: 12px 18px;
+  border-radius: 14px;
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
+}
+
+.toast--success {
+  background: linear-gradient(120deg, #11c26d, #0a9d58);
+}
+
+.toast--error {
+  background: linear-gradient(120deg, #ff6b6b, #da3b4a);
+}
+
+.toast--info {
+  background: linear-gradient(120deg, #4c8dff, #1f5bd3);
+}
+
+.skeleton-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.skeleton-box {
+  height: 70px;
+  border-radius: 16px;
+  background: linear-gradient(90deg, #e6edf7 25%, #f5f8fd 50%, #e6edf7 75%);
+  background-size: 400% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 0% 0;
+  }
+  100% {
+    background-position: -135% 0;
+  }
+}
+@keyframes floatUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }
 
 .customer-row {
@@ -976,4 +1083,91 @@ body {
   font-weight: 600;
   color: #0d2b52;
   text-decoration: none;
+}
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(2, 11, 29, 0.65);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 60;
+  padding: 20px;
+}
+
+.quick-create-modal {
+  width: min(700px, 100%);
+  border-radius: 28px;
+  background: #fff;
+  padding: 28px;
+  box-shadow: 0 35px 80px rgba(1, 12, 32, 0.35);
+  animation: floatUp 0.25s ease;
+}
+
+.quick-create-hero {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.quick-create-hero h4 {
+  margin: 4px 0;
+  font-size: 20px;
+  color: #081a32;
+}
+
+.quick-create-hero p {
+  margin: 0;
+  color: #5a6986;
+  font-size: 14px;
+}
+:root {
+  --shell-dark: linear-gradient(180deg, rgba(6, 24, 49, 0.97) 0%, rgba(6, 24, 49, 0.9) 260px, rgba(239, 243, 248, 1) 260px, #f6f8fb 100%);
+  --shell-light: linear-gradient(180deg, #f8fbff 0%, #eef2f7 200px, #ffffff 100%);
+}
+
+body.theme-light {
+  background: #eef2f7;
+  color: #0f1f33;
+}
+
+body.theme-dark {
+  background: #020b1a;
+  color: #f5f7ff;
+}
+
+.dashboard-shell.is-dark {
+  background: var(--shell-dark);
+}
+
+.dashboard-shell.is-light {
+  background: var(--shell-light);
+  color: #182843;
+}
+
+.dashboard-header.is-light {
+  background: rgba(255, 255, 255, 0.88);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  color: #071b33;
+}
+
+body.theme-light .dashboard-tabs {
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
+body.theme-light .dashboard-tab {
+  color: #51607a;
+}
+
+body.theme-light .dashboard-tab.is-active {
+  color: #0069d2;
+  border-bottom-color: #0069d2;
+}
+
+body.theme-light .customer-panel,
+body.theme-light .context-panel {
+  background: #fff;
+  border-color: #dfe6f3;
 }
