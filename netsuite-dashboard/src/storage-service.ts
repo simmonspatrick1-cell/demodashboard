@@ -10,6 +10,8 @@ export interface UserPreferences {
   compactMode: boolean;
   favoriteCategories: string[];
   recentSearches: string[];
+  lastCustomerId?: number | null;
+  lastAccountId?: string | null;
 }
 
 export interface DemoNote {
@@ -76,13 +78,37 @@ class StorageService {
       showNotifications: true,
       compactMode: false,
       favoriteCategories: [],
-      recentSearches: []
+      recentSearches: [],
+      lastCustomerId: null,
+      lastAccountId: 'services'
     });
   }
 
   setPreferences(preferences: Partial<UserPreferences>): void {
     const current = this.getPreferences();
     this.setItem(config.storage.preferences, { ...current, ...preferences });
+  }
+
+  // Note drafts (quick notes)
+  getNoteDrafts(): Record<number, string> {
+    return this.getItem(config.storage.noteDrafts, {});
+  }
+
+  saveNoteDraft(customerId: number, content: string): void {
+    const drafts = this.getNoteDrafts();
+    if (!content.trim()) {
+      if (drafts[customerId]) {
+        delete drafts[customerId];
+        this.setItem(config.storage.noteDrafts, drafts);
+      }
+      return;
+    }
+    drafts[customerId] = content;
+    this.setItem(config.storage.noteDrafts, drafts);
+  }
+
+  clearNoteDrafts(): void {
+    this.removeItem(config.storage.noteDrafts);
   }
 
   // Favorites Management
@@ -258,6 +284,7 @@ class StorageService {
     this.removeItem(config.storage.favorites);
     this.removeItem(config.storage.demoNotes);
     this.removeItem(config.storage.recentItems);
+    this.removeItem(config.storage.noteDrafts);
   }
 }
 

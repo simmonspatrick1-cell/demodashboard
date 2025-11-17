@@ -35,7 +35,8 @@ export const config = {
     favorites: 'netsuite_dashboard_favorites',
     recentItems: 'netsuite_dashboard_recent',
     demoNotes: 'netsuite_dashboard_notes',
-    prospects: 'netsuite_dashboard_prospects'
+    prospects: 'netsuite_dashboard_prospects',
+    noteDrafts: 'netsuite_dashboard_note_drafts'
   },
   
   // Chart Configuration
