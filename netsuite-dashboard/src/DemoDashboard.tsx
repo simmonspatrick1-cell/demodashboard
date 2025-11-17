@@ -186,6 +186,36 @@ const DemoDashboard: React.FC = () => {
   }, [selectedCustomer]);
 
   useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'c') {
+        e.preventDefault();
+        setShowClipboardPanel((prev) => !prev);
+        return;
+      }
+
+      if (e.key === '/' && !e.metaKey && !e.ctrlKey) {
+        const input = document.querySelector<HTMLInputElement>('input[placeholder="Search prospects or industries"]');
+        if (input) {
+          e.preventDefault();
+          input.focus();
+        }
+        return;
+      }
+
+      if ((e.key === 'n' || e.key === 'N') && !e.metaKey && !e.ctrlKey) {
+        const active = document.activeElement;
+        if (active && ['INPUT', 'TEXTAREA'].includes(active.tagName)) return;
+        e.preventDefault();
+        setShowQuickCreate(true);
+        return;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  useEffect(() => {
     if (showQuickCreate) {
       focusFirstElement(quickCreateRef.current);
     }
@@ -506,7 +536,11 @@ const DemoDashboard: React.FC = () => {
               ))}
             </div>
             <div className="flex items-center gap-2">
-              <button className="flex-1 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700" onClick={() => setShowClipboardPanel(true)}>
+              <button
+                className="flex-1 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700"
+                onClick={() => setShowClipboardPanel(true)}
+                aria-label="Open clipboard history"
+              >
                 Clipboard ({clipboardHistory.length})
               </button>
               <button className="flex-1 px-4 py-2 rounded-lg bg-blue-600 text-white" onClick={() => setShowQuickCreate(true)}>
@@ -815,7 +849,7 @@ const DemoDashboard: React.FC = () => {
                 <h3 className="text-xl font-semibold">Create New Prospect</h3>
                 <p className="text-sm text-gray-500">Capture discovery context so you can build demos faster.</p>
               </div>
-              <button className="p-2" onClick={() => setShowQuickCreate(false)}>
+              <button className="p-2" onClick={() => setShowQuickCreate(false)} aria-label="Close quick create modal">
                 <X size={18} />
               </button>
             </div>
@@ -841,6 +875,13 @@ const DemoDashboard: React.FC = () => {
             tabIndex={-1}
             className="bg-white dark:bg-gray-900 rounded-2xl p-4 max-w-3xl w-full shadow-2xl"
           >
+            <button
+              className="ml-auto mb-2 p-2 text-gray-500 hover:text-gray-700"
+              onClick={() => setShowScenarioGenerator(false)}
+              aria-label="Close scenario generator"
+            >
+              <X size={18} />
+            </button>
             <ScenarioGenerator onScenarioGenerated={handleScenarioGenerated} onClose={() => setShowScenarioGenerator(false)} />
           </div>
         </div>
@@ -1035,7 +1076,7 @@ const ClipboardHistoryPanel: React.FC<ClipboardHistoryProps> = ({ show, history,
                 Clear
               </button>
             )}
-            <button className="p-1" onClick={onClose}>
+            <button className="p-1" onClick={onClose} aria-label="Close clipboard history">
               <X size={16} />
             </button>
           </div>
