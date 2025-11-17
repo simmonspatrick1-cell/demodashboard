@@ -208,11 +208,13 @@ export default function DataExport({ data = [], className = '', onExportComplete
         <button
           onClick={() => setShowOptions(!showOptions)}
           disabled={isExporting || data.length === 0}
+          aria-expanded={showOptions}
+          aria-controls="export-options-panel"
           className={`
-            inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium
+            inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-sm font-medium
             ${data.length === 0 
-              ? 'text-gray-400 bg-gray-100 cursor-not-allowed' 
-              : 'text-gray-700 bg-white hover:bg-gray-50 focus:ring-2 focus:ring-blue-500'
+              ? 'text-gray-400 bg-gray-100 dark:bg-gray-800 dark:text-gray-500 cursor-not-allowed' 
+              : 'text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:ring-2 focus:ring-blue-500'
             }
             transition-colors
           `}
@@ -224,7 +226,7 @@ export default function DataExport({ data = [], className = '', onExportComplete
           )}
           {isExporting ? 'Exporting...' : 'Export'}
           {data.length > 0 && !isExporting && (
-            <span className="ml-2 px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
+            <span className="ml-2 px-2 py-1 bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200 text-xs rounded-full">
               {data.length}
             </span>
           )}
@@ -232,12 +234,13 @@ export default function DataExport({ data = [], className = '', onExportComplete
 
         {/* Export Options Panel */}
         {showOptions && (
-          <div className="absolute right-0 top-full mt-2 w-80 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
+          <div id="export-options-panel" className="absolute right-0 top-full mt-2 w-80 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-10">
             <div className="p-4 space-y-4">
               <div className="flex items-center justify-between">
                 <h4 className="font-medium text-gray-900">Export Options</h4>
                 <button
                   onClick={() => setShowOptions(false)}
+                  aria-label="Close export options"
                   className="text-gray-400 hover:text-gray-600"
                 >
                   ×
@@ -255,8 +258,8 @@ export default function DataExport({ data = [], className = '', onExportComplete
                       className={`
                         p-3 text-left border rounded-lg transition-colors
                         ${exportOptions.format === action.format
-                          ? 'border-blue-500 bg-blue-50'
-                          : 'border-gray-200 hover:border-gray-300'
+                          ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                          : 'border-gray-200 hover:border-gray-300 dark:border-gray-700 dark:hover:border-gray-600'
                         }
                       `}
                     >
@@ -292,9 +295,9 @@ export default function DataExport({ data = [], className = '', onExportComplete
                         type="checkbox"
                         checked={selectedFields.includes(field.id)}
                         onChange={() => toggleField(field.id)}
-                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        className="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
                       />
-                      <span className="ml-2 text-sm text-gray-700">{field.label}</span>
+                      <span className="ml-2 text-sm text-gray-700 dark:text-gray-200">{field.label}</span>
                     </label>
                   ))}
                 </div>
@@ -316,7 +319,7 @@ export default function DataExport({ data = [], className = '', onExportComplete
                         start: e.target.value ? new Date(e.target.value) : undefined
                       }
                     })}
-                    className="border-gray-300 rounded"
+                    className="border-gray-300 rounded dark:bg-gray-800 dark:border-gray-600 dark:text-white"
                   />
                   <span className="text-gray-500">to</span>
                   <input
@@ -328,13 +331,13 @@ export default function DataExport({ data = [], className = '', onExportComplete
                         end: e.target.value ? new Date(e.target.value) : undefined
                       }
                     })}
-                    className="border-gray-300 rounded"
+                    className="border-gray-300 rounded dark:bg-gray-800 dark:border-gray-600 dark:text-white"
                   />
                 </div>
               </div>
 
               {/* Export Summary */}
-              <div className="bg-gray-50 rounded p-3 text-sm">
+              <div className="bg-gray-50 dark:bg-gray-700 dark:text-gray-200 rounded p-3 text-sm">
                 <div className="flex justify-between items-center">
                   <span className="text-gray-600">Records to export:</span>
                   <span className="font-medium">{data.length}</span>
@@ -356,7 +359,7 @@ export default function DataExport({ data = [], className = '', onExportComplete
                 className={`
                   w-full py-2 px-4 rounded-lg font-medium transition-colors
                   ${selectedFields.length === 0
-                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    ? 'bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-500 cursor-not-allowed'
                     : 'bg-blue-600 text-white hover:bg-blue-700'
                   }
                 `}

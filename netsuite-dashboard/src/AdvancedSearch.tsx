@@ -141,20 +141,22 @@ export default function AdvancedSearch({
             onChange={(e) => handleSearchChange(e.target.value)}
             onFocus={() => setShowSearchSuggestions(true)}
             onBlur={() => setTimeout(() => setShowSearchSuggestions(false), 200)}
-            className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="input pl-10 pr-12 py-3"
           />
           <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex items-center space-x-2">
             {filters.query && (
               <button
                 onClick={() => handleSearchChange('')}
-                className="text-gray-400 hover:text-gray-600"
+                className="btn-ghost p-1"
               >
                 <X className="w-4 h-4" />
               </button>
             )}
             <button
+              aria-label="Toggle filters"
+              title="Toggle filters (F)"
               onClick={() => setShowFilters(!showFilters)}
-              className={`p-1 rounded ${activeFilterCount > 0 ? 'text-blue-600 bg-blue-50' : 'text-gray-400'} hover:text-blue-600`}
+              className={`relative btn-ghost p-1 ${activeFilterCount > 0 ? 'text-blue-600 bg-blue-50' : 'text-gray-400'} hover:text-blue-600`}
             >
               <Filter className="w-4 h-4" />
               {activeFilterCount > 0 && (
@@ -168,13 +170,13 @@ export default function AdvancedSearch({
 
         {/* Search Suggestions */}
         {showSearchSuggestions && (filters.query || recentSearches.length > 0) && (
-          <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg">
+          <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg dark:bg-gray-800 dark:border-gray-700">
             {filters.query && (
               <div className="p-2 border-b">
                 <div className="text-xs font-medium text-gray-500 mb-1">Search for:</div>
                 <button
                   onClick={() => setShowSearchSuggestions(false)}
-                  className="w-full text-left px-2 py-1 hover:bg-gray-50 rounded text-sm"
+                  className="w-full text-left px-2 py-1 hover:bg-gray-50 dark:hover:bg-gray-700 rounded text-sm"
                 >
                   "{filters.query}"
                 </button>
@@ -190,7 +192,7 @@ export default function AdvancedSearch({
                       handleSearchChange(search);
                       setShowSearchSuggestions(false);
                     }}
-                    className="w-full text-left px-2 py-1 hover:bg-gray-50 rounded text-sm flex items-center"
+                    className="w-full text-left px-2 py-1 hover:bg-gray-50 dark:hover:bg-gray-700 rounded text-sm flex items-center"
                   >
                     <Clock className="w-3 h-3 mr-2 text-gray-400" />
                     {search}
@@ -208,7 +210,7 @@ export default function AdvancedSearch({
           <button
             key={index}
             onClick={filter.action}
-            className="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded-full hover:bg-gray-200 transition-colors"
+            className="btn-secondary px-3 py-1 text-sm rounded-full"
           >
             {filter.label}
           </button>
@@ -226,7 +228,7 @@ export default function AdvancedSearch({
 
       {/* Advanced Filters Panel */}
       {showFilters && (
-        <div className="bg-gray-50 rounded-lg p-4 space-y-4 border">
+        <div className="bg-gray-50 rounded-lg p-4 space-y-4 border dark:bg-gray-800 dark:border-gray-700">
           <div className="flex items-center justify-between">
             <h4 className="font-medium text-gray-900">Advanced Filters</h4>
             <button
@@ -324,7 +326,7 @@ export default function AdvancedSearch({
                 onChange={(e) => updateFilters({
                   dateRange: { ...filters.dateRange, start: e.target.value ? new Date(e.target.value) : null }
                 })}
-                className="border-gray-300 rounded text-sm"
+                className="select text-sm w-auto"
               />
               <span className="text-gray-500">to</span>
               <input
@@ -333,7 +335,7 @@ export default function AdvancedSearch({
                 onChange={(e) => updateFilters({
                   dateRange: { ...filters.dateRange, end: e.target.value ? new Date(e.target.value) : null }
                 })}
-                className="border-gray-300 rounded text-sm"
+                className="input text-sm w-auto"
               />
             </div>
           </div>
@@ -365,7 +367,7 @@ export default function AdvancedSearch({
             <select
               value={filters.sortBy}
               onChange={(e) => updateFilters({ sortBy: e.target.value as any })}
-              className="border-gray-300 rounded text-sm"
+                className="input text-sm w-auto"
             >
               <option value="relevance">Relevance</option>
               <option value="name">Name</option>
@@ -374,7 +376,7 @@ export default function AdvancedSearch({
             </select>
             <button
               onClick={() => updateFilters({ sortOrder: filters.sortOrder === 'asc' ? 'desc' : 'asc' })}
-              className="p-1 text-gray-600 hover:text-gray-800"
+              className="p-1 text-gray-600 hover:text-gray-800 dark:text-gray-300 dark:hover:text-white"
               title={`Sort ${filters.sortOrder === 'asc' ? 'Descending' : 'Ascending'}`}
             >
               {filters.sortOrder === 'asc' ? <SortAsc className="w-4 h-4" /> : <SortDesc className="w-4 h-4" />}
