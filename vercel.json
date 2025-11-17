@@ -1,0 +1,6 @@
+{
+  "version": 2,
+  "env": {
+    "NETSUITE_ACCOUNT_ID": "td3049589"
+  }
+}
