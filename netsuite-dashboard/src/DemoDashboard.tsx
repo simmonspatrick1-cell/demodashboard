@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { Search, Menu, X, Building2, Check, BookOpen, ChevronDown, ChevronRight, Zap, Target, Users, Clock, FileText, TrendingUp, Loader, Wand2, BarChart3, Download, ListChecks, AlertTriangle, Info } from 'lucide-react';  // Import all needed icons
+import { Search, Menu, X, Building2, Check, BookOpen, ChevronDown, ChevronRight, Zap, Target, Users, Clock, FileText, TrendingUp, Loader, BarChart3, Download, ListChecks, AlertCircle, Plus, Copy, User } from 'lucide-react';  // Import all needed icons
 import ScenarioGenerator from './ScenarioGenerator';
 import DataVisualization from './DataVisualization';
 import AdvancedSearch from './AdvancedSearch';
@@ -7,13 +7,13 @@ import DataExport from './DataExport';
 import storageService from './storage-service';
 
 const KEY_PROSPECTS = [
-  { id: 1, name: 'AdvisorHR', entityid: 'AdvisorHR-Demo', industry: 'PEO Services', size: '500-1000', status: 'Hot', demoDate: 'Oct 30', focus: ['Resource Planning', 'Multi-Entity', 'Billing'], budget: '$200K-500K', nsId: 3161 },
-  { id: 2, name: 'GSB Group', entityid: 'GSB-Demo', industry: 'Consulting', size: '50-100', status: 'Active', demoDate: 'Nov 5', focus: ['Project Accounting', 'PSA'], budget: '$100K-200K', nsId: 1834 },
-  { id: 3, name: 'Innovatia Technical', entityid: 'Innovatia-Demo', industry: 'Tech Consulting', size: '200-300', status: 'Active', demoDate: 'Nov 8', focus: ['Resource Utilization', 'Forecasting'], budget: '$150K-300K', nsId: 1938 },
-  { id: 4, name: 'Marabou Midstream', entityid: 'Marabou-Demo', industry: 'Energy', size: '100-150', status: 'Proposal', demoDate: 'Pending', focus: ['Pipeline Management', 'Multi-Entity', 'Consolidation'], budget: '$250K+', nsId: 2662 },
-  { id: 5, name: 'Lovse Surveys', entityid: 'Lovse-Demo', industry: 'Professional Services', size: '75-100', status: 'Qualified', demoDate: 'Nov 15', focus: ['Time & Expense', 'Billing'], budget: '$100K-150K', nsId: 1938 },
-  { id: 6, name: 'nFront Consulting', entityid: 'nFront-Demo', industry: 'Energy Consulting', size: '150-200', status: 'Active', demoDate: 'Nov 20', focus: ['Resource Planning', 'Project Accounting', 'Multi-Entity'], budget: '$5.2M', nsId: 4285 },
-  { id: 7, name: 'Formative Group', entityid: 'Formative-Demo', industry: 'Salesforce Consulting', size: '80-120', status: 'Active', demoDate: 'Nov 25', focus: ['Scaling Operations', 'Acquisitions', 'Resource Mgmt'], budget: '$200K-400K', nsId: 1938 },
+  { id: 1, name: 'AdvisorHR', entityid: 'AdvisorHR-Demo', industry: 'PEO Services', size: '500-1000', status: 'Hot', demoDate: 'Oct 30', focus: ['Resource Planning', 'Multi-Entity', 'Billing'], budget: '$200K-500K', nsId: 3161, website: 'https://advisorhr.com' },
+  { id: 2, name: 'GSB Group', entityid: 'GSB-Demo', industry: 'Consulting', size: '50-100', status: 'Active', demoDate: 'Nov 5', focus: ['Project Accounting', 'PSA'], budget: '$100K-200K', nsId: 1834, website: 'https://gsbgroup.com' },
+  { id: 3, name: 'Innovatia Technical', entityid: 'Innovatia-Demo', industry: 'Tech Consulting', size: '200-300', status: 'Active', demoDate: 'Nov 8', focus: ['Resource Utilization', 'Forecasting'], budget: '$150K-300K', nsId: 1938, website: 'https://innovatia.tech' },
+  { id: 4, name: 'Marabou Midstream', entityid: 'Marabou-Demo', industry: 'Energy', size: '100-150', status: 'Proposal', demoDate: 'Pending', focus: ['Pipeline Management', 'Multi-Entity', 'Consolidation'], budget: '$250K+', nsId: 2662, website: 'https://marabou-midstream.com' },
+  { id: 5, name: 'Lovse Surveys', entityid: 'Lovse-Demo', industry: 'Professional Services', size: '75-100', status: 'Qualified', demoDate: 'Nov 15', focus: ['Time & Expense', 'Billing'], budget: '$100K-150K', nsId: 1938, website: 'https://lovse.com' },
+  { id: 6, name: 'nFront Consulting', entityid: 'nFront-Demo', industry: 'Energy Consulting', size: '150-200', status: 'Active', demoDate: 'Nov 20', focus: ['Resource Planning', 'Project Accounting', 'Multi-Entity'], budget: '$5.2M', nsId: 4285, website: 'https://nfront.com' },
+  { id: 7, name: 'Formative Group', entityid: 'Formative-Demo', industry: 'Salesforce Consulting', size: '80-120', status: 'Active', demoDate: 'Nov 25', focus: ['Scaling Operations', 'Acquisitions', 'Resource Mgmt'], budget: '$200K-400K', nsId: 1938, website: 'https://formativegroup.com' },
 ];
 
 const PROMPT_CATEGORIES = [
@@ -62,7 +62,7 @@ export default function DemoDashboard() {
   // State management
   const [activeTab, setActiveTab] = useState('context');
   const [selectedAccount, setSelectedAccount] = useState('services');
-  const [analyticsData] = useState(null);
+  const [analyticsData] = useState<any>(undefined);
   const [selectedCustomer, setSelectedCustomer] = useState<number | null>(null);
   const [globalSearchQuery, setGlobalSearchQuery] = useState('');
   const [promptSearch, setPromptSearch] = useState('');
@@ -90,8 +90,19 @@ export default function DemoDashboard() {
     budget: '$150K+',
     focusText: 'Resource Planning',
     nsId: '',
-    demoDate: 'TBD'
+    demoDate: 'TBD',
+    website: ''
   });
+
+  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const [showClipboardPanel, setShowClipboardPanel] = useState(true);
+
+  const accounts = [
+    { id: 'services', name: 'Services', instance: 'td3049589' },
+    { id: 'demo', name: 'Demo Sandbox', instance: 'td3049589' }
+  ];
 
   // Data sources
   useEffect(() => {
@@ -224,21 +235,29 @@ export default function DemoDashboard() {
   }, []);
 
   const copyToClipboard = useCallback((text: string, index: string, label: string = 'Copied') => {
-    navigator.clipboard.writeText(text);
-    setCopiedIndex(index);
-    setClipboardHistory((prev: any) => {
-      const entry = { id: `${index}-${Date.now()}`, label, text, timestamp: new Date() };
-      return [entry, ...prev].slice(0, 6);
-    });
-  }, []);
+    navigator.clipboard.writeText(text)
+      .then(() => {
+        setCopiedIndex(index);
+        setClipboardHistory((prev: any) => {
+          const entry = { id: `${index}-${Date.now()}`, label, text, timestamp: new Date() };
+          return [entry, ...prev].slice(0, 10);
+        });
+        setTimeout(() => setCopiedIndex(null), 2000);
+        pushToast('✓ Copied to clipboard', 'success');
+      })
+      .catch((err) => {
+        console.error('Failed to copy to clipboard:', err);
+        pushToast('Failed to copy to clipboard', 'error');
+      });
+  }, [pushToast]);
 
-  const toggleFavorite = (prompt: string) => {
+  const toggleFavorite = useCallback((prompt: string) => {
     setFavorites((prev: string[]) =>
       prev.includes(prompt) ? prev.filter((p: string) => p !== prompt) : [...prev, prompt]
     );
-  };
+  }, []);
 
-  const syncNetsuiteFields = async () => {
+  const syncNetsuiteFields = useCallback(async () => {
     if (!selectedCustData) return;
     setSyncLoading(true);
     setActionStatus('Syncing from NetSuite...');
@@ -291,15 +310,16 @@ export default function DemoDashboard() {
       setSyncLoading(false);
       setTimeout(() => setActionStatus(null), 3000);
     }
-  };
+  }, [selectedCustData, selectedAccount, pushToast]);
 
-  const quickActions = [
+  const quickActions = useMemo(() => [
     {
       id: 'create-project',
       label: 'Create Demo Project',
       icon: Plus,
       action: () => {
-        const prompt = `Create a project for ${selectedCustData?.name} titled "[Demo Project Name]" with entity ID [PRJ-DEMO-####]. Add 3-5 task estimates for typical ${selectedCustData?.industry} workflows.`;
+        if (!selectedCustData) return;
+        const prompt = `Create a project for ${selectedCustData.name} titled "[Demo Project Name]" with entity ID [PRJ-DEMO-####]. Add 3-5 task estimates for typical ${selectedCustData.industry} workflows.`;
         copyToClipboard(prompt, 'action-project', 'Project creation prompt');
         setActionStatus('✓ Project prompt copied');
         setTimeout(() => setActionStatus(null), 2000);
@@ -310,7 +330,8 @@ export default function DemoDashboard() {
       label: 'Add Sample Time Entries',
       icon: Clock,
       action: () => {
-        const prompt = `Create 10 approved time entries for the demo project for ${selectedCustData?.name} across 3 different team members. Include billable hours, task assignments, and realistic dates spread across ${new Date().getFullYear()}.`;
+        if (!selectedCustData) return;
+        const prompt = `Create 10 approved time entries for the demo project for ${selectedCustData.name} across 3 different team members. Include billable hours, task assignments, and realistic dates spread across ${new Date().getFullYear()}.`;
         copyToClipboard(prompt, 'action-time', 'Time entry prompt');
         setActionStatus('✓ Time entry prompt copied');
         setTimeout(() => setActionStatus(null), 2000);
@@ -321,7 +342,8 @@ export default function DemoDashboard() {
       label: 'Generate Estimate',
       icon: FileText,
       action: () => {
-        const prompt = `Create an estimate for ${selectedCustData?.name} from the demo project. Include line items for: Professional Services (60%), Travel & Expenses (20%), Software Licensing (20%). Set total value to ${selectedCustData?.budget?.split('-')[0]}.`;
+        if (!selectedCustData) return;
+        const prompt = `Create an estimate for ${selectedCustData.name} from the demo project. Include line items for: Professional Services (60%), Travel & Expenses (20%), Software Licensing (20%). Set total value to ${selectedCustData.budget?.split('-')[0]}.`;
         copyToClipboard(prompt, 'action-estimate', 'Estimate prompt');
         setActionStatus('✓ Estimate prompt copied');
         setTimeout(() => setActionStatus(null), 2000);
@@ -332,7 +354,8 @@ export default function DemoDashboard() {
       label: 'Resource Allocation',
       icon: TrendingUp,
       action: () => {
-        const prompt = `Create resource allocation forecast for ${selectedCustData?.name} demo project with these roles: ${selectedCustData?.focus.join(', ')}. Include 10-15 team members with varied utilization rates (60-100%) across 12 weeks.`;
+        if (!selectedCustData) return;
+        const prompt = `Create resource allocation forecast for ${selectedCustData.name} demo project with these roles: ${selectedCustData.focus.join(', ')}. Include 10-15 team members with varied utilization rates (60-100%) across 12 weeks.`;
         copyToClipboard(prompt, 'action-resource', 'Resource allocation prompt');
         setActionStatus('✓ Resource prompt copied');
         setTimeout(() => setActionStatus(null), 2000);
@@ -344,10 +367,10 @@ export default function DemoDashboard() {
       icon: Loader,
       action: syncNetsuiteFields
     }
-  ];
+  ], [selectedCustData, copyToClipboard, syncNetsuiteFields]);
 
   // Component: Global Search
-  const GlobalSearch = () => (
+  const GlobalSearch = React.memo(() => (
     <div className="global-search mb-6">
       <AdvancedSearch
         onFiltersChange={(filters: SearchFilters) => {
@@ -358,154 +381,226 @@ export default function DemoDashboard() {
         showAdvancedFilters={true}
       />
     </div>
-  );
+  ));
 
   // Component: Quick Create Form
-  const QuickCreateForm = () => (
-    <div className="modal-backdrop fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" role="dialog" aria-modal="true" aria-label="Quick prospect">
-      <div className="quick-create-modal bg-white rounded-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
-        <div className="quick-create-hero p-6 border-b">
-          <div className="flex justify-between items-center">
-            <h3 className="text-lg font-semibold">Quick Prospect</h3>
-            <button onClick={() => setShowQuickCreate(false)} aria-label="Close quick prospect" className="text-gray-400 hover:text-gray-600">
-              <X size={24} />
-            </button>
-          </div>
-        </div>
-        <div className="p-6 space-y-4">
-          <div className="quick-create-grid grid grid-cols-1 gap-4">
-            <label className="block">
-              <span className="text-sm font-medium text-gray-700 mb-1 block">Name</span>
-              <input
-                value={quickProspect.name}
-                onChange={(e) => setQuickProspect((prev: any) => ({ ...prev, name: e.target.value }))}
-                placeholder="e.g., Horizon Labs"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </label>
-            <label className="block">
-              <span className="text-sm font-medium text-gray-700 mb-1 block">Industry</span>
-              <input
-                value={quickProspect.industry}
-                onChange={(e) => setQuickProspect((prev: any) => ({ ...prev, industry: e.target.value }))}
-                placeholder="Industry"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </label>
-            <label className="block">
-              <span className="text-sm font-medium text-gray-700 mb-1 block">Status</span>
-              <select
-                value={quickProspect.status}
-                onChange={(e) => setQuickProspect((prev: any) => ({ ...prev, status: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+  const QuickCreateForm = () => {
+    const isFormValid = quickProspect.name.trim() && quickProspect.industry.trim();
+
+    return (
+      <div className="modal-backdrop fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" role="dialog" aria-modal="true" aria-label="Quick prospect">
+        <div className="quick-create-modal bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+          <div className="quick-create-hero p-6 border-b bg-gradient-to-r from-blue-600 to-indigo-600">
+            <div className="flex justify-between items-center">
+              <div>
+                <h3 className="text-xl font-bold text-white">Create New Prospect</h3>
+                <p className="text-blue-100 text-sm mt-1">Add a custom demo scenario to your workspace</p>
+              </div>
+              <button
+                onClick={() => setShowQuickCreate(false)}
+                aria-label="Close quick prospect"
+                className="text-white hover:bg-white/20 rounded-lg p-2 transition-colors"
               >
-                <option value="Hot">Hot</option>
-                <option value="Active">Active</option>
-                <option value="Qualified">Qualified</option>
-                <option value="Proposal">Proposal</option>
-              </select>
-            </label>
-            <label className="block">
-              <span className="text-sm font-medium text-gray-700 mb-1 block">Company Size</span>
-              <input
-                value={quickProspect.size}
-                onChange={(e) => setQuickProspect((prev: any) => ({ ...prev, size: e.target.value }))}
-                placeholder="100-200"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </label>
-            <label className="block">
-              <span className="text-sm font-medium text-gray-700 mb-1 block">Budget</span>
-              <input
-                value={quickProspect.budget}
-                onChange={(e) => setQuickProspect((prev: any) => ({ ...prev, budget: e.target.value }))}
-                placeholder="$150K+"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </label>
-            <label className="block">
-              <span className="text-sm font-medium text-gray-700 mb-1 block">NS Internal ID (optional)</span>
-              <input
-                value={quickProspect.nsId}
-                onChange={(e) => setQuickProspect((prev: any) => ({ ...prev, nsId: e.target.value }))}
-                placeholder="3161"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </label>
-            <label className="block">
-              <span className="text-sm font-medium text-gray-700 mb-1 block">Focus Areas (comma separated)</span>
-              <input
-                value={quickProspect.focusText}
-                onChange={(e) => setQuickProspect((prev: any) => ({ ...prev, focusText: e.target.value }))}
-                placeholder="Resource Planning, Billing Automation"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </label>
+                <X size={24} />
+              </button>
+            </div>
           </div>
-          <div className="focus-preview flex flex-wrap gap-2 p-3 bg-gray-50 rounded-lg">
-            {quickProspect.focusText
-              .split(',')
-              .map((item: string) => item.trim())
-              .filter(Boolean)
-              .map((chip: string, idx: number) => (
-                <span key={idx} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
-                  {chip}
-                </span>
-              ))}
-          </div>
-          <div className="quick-create-actions flex gap-3 pt-4">
-            <button
-              className="flex-1 bg-gray-300 text-gray-700 rounded-lg py-2 px-4 hover:bg-gray-400 transition-colors"
-              onClick={() => {
-                setShowQuickCreate(false);
-                const nowId = Date.now();
-                const focusList = quickProspect.focusText
-                  .split(',')
-                  .map((item: string) => item.trim())
-                  .filter(Boolean);
-                const newProspect = {
-                  id: nowId,
-                  name: quickProspect.name.trim(),
-                  entityid: `${quickProspect.name.trim().replace(/\s+/g, '-')}-Demo`,
-                  industry: quickProspect.industry || 'General',
-                  size: quickProspect.size || '100',
-                  status: quickProspect.status,
-                  demoDate: quickProspect.demoDate,
-                  focus: focusList.length ? focusList : ['Resource Planning'],
-                  budget: quickProspect.budget || '$150K+',
-                  nsId: quickProspect.nsId ? Number(quickProspect.nsId) : Math.floor(Math.random() * 4000) + 2000
-                };
-                setDynamicCustomers((prev: any) => [newProspect, ...prev]);
-                setQuickProspect({
-                  name: '',
-                  industry: '',
-                  status: 'Active',
-                  size: '100-200',
-                  budget: '$150K+',
-                  focusText: 'Resource Planning',
-                  nsId: '',
-                  demoDate: 'TBD'
-                });
-                setSelectedCustomer(newProspect.id);
-                pushToast('Prospect saved to workspace', 'success');
-              }}
-            >
-              Save Prospect
-            </button>
-            <button
-              className="flex-1 bg-red-600 text-white rounded-lg py-2 px-4 hover:bg-red-700 transition-colors"
-              onClick={() => setShowQuickCreate(false)}
-            >
-              Cancel
-            </button>
+          <div className="p-6 space-y-5">
+            {/* Required Fields Section */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <h4 className="text-sm font-semibold text-blue-900 mb-3 flex items-center gap-2">
+                <AlertCircle size={16} />
+                Required Information
+              </h4>
+              <div className="space-y-4">
+                <label className="block">
+                  <span className="text-sm font-semibold text-gray-700 mb-1.5 block flex items-center gap-1">
+                    Company Name <span className="text-red-500">*</span>
+                  </span>
+                  <input
+                    value={quickProspect.name}
+                    onChange={(e) => setQuickProspect((prev: any) => ({ ...prev, name: e.target.value }))}
+                    placeholder="e.g., Horizon Labs, TechCorp Solutions"
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-sm font-semibold text-gray-700 mb-1.5 block flex items-center gap-1">
+                    Industry <span className="text-red-500">*</span>
+                  </span>
+                  <input
+                    value={quickProspect.industry}
+                    onChange={(e) => setQuickProspect((prev: any) => ({ ...prev, industry: e.target.value }))}
+                    placeholder="e.g., Professional Services, Tech Consulting"
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                  />
+                </label>
+              </div>
+            </div>
+
+            {/* Optional Fields Section */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <label className="block">
+                <span className="text-sm font-semibold text-gray-700 mb-1.5 block">Status</span>
+                <select
+                  value={quickProspect.status}
+                  onChange={(e) => setQuickProspect((prev: any) => ({ ...prev, status: e.target.value }))}
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                >
+                  <option value="Hot">🔥 Hot</option>
+                  <option value="Active">✅ Active</option>
+                  <option value="Qualified">⭐ Qualified</option>
+                  <option value="Proposal">📋 Proposal</option>
+                </select>
+              </label>
+              <label className="block">
+                <span className="text-sm font-semibold text-gray-700 mb-1.5 block">Company Size</span>
+                <input
+                  value={quickProspect.size}
+                  onChange={(e) => setQuickProspect((prev: any) => ({ ...prev, size: e.target.value }))}
+                  placeholder="e.g., 100-200"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                />
+              </label>
+              <label className="block">
+                <span className="text-sm font-semibold text-gray-700 mb-1.5 block">Budget Range</span>
+                <input
+                  value={quickProspect.budget}
+                  onChange={(e) => setQuickProspect((prev: any) => ({ ...prev, budget: e.target.value }))}
+                  placeholder="e.g., $150K-$300K"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                />
+              </label>
+              <label className="block">
+                <span className="text-sm font-semibold text-gray-700 mb-1.5 block">NetSuite ID (optional)</span>
+                <input
+                  value={quickProspect.nsId}
+                  onChange={(e) => setQuickProspect((prev: any) => ({ ...prev, nsId: e.target.value }))}
+                  placeholder="e.g., 3161"
+                  type="number"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                />
+              </label>
+            </div>
+
+            {/* Website URL */}
+            <div>
+              <label className="block">
+                <span className="text-sm font-semibold text-gray-700 mb-1.5 block">Company Website</span>
+                <input
+                  type="url"
+                  value={quickProspect.website}
+                  onChange={(e) => setQuickProspect((prev: any) => ({ ...prev, website: e.target.value }))}
+                  placeholder="https://company-website.com"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                />
+                <p className="text-xs text-gray-500 mt-1">Used for generating tailored demo scenarios in Demo Builder</p>
+              </label>
+            </div>
+
+            {/* Focus Areas */}
+            <div>
+              <label className="block">
+                <span className="text-sm font-semibold text-gray-700 mb-1.5 block">Demo Focus Areas</span>
+                <input
+                  value={quickProspect.focusText}
+                  onChange={(e) => setQuickProspect((prev: any) => ({ ...prev, focusText: e.target.value }))}
+                  placeholder="Resource Planning, Billing Automation, Multi-Entity"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                />
+                <p className="text-xs text-gray-500 mt-1">Separate multiple areas with commas</p>
+              </label>
+            </div>
+            {/* Focus Areas Preview */}
+            {quickProspect.focusText.trim() && (
+              <div className="bg-gradient-to-br from-purple-50 to-blue-50 border border-purple-200 rounded-lg p-4">
+                <p className="text-sm font-semibold text-gray-700 mb-2">Focus Areas Preview:</p>
+                <div className="flex flex-wrap gap-2">
+                  {quickProspect.focusText
+                    .split(',')
+                    .map((item: string) => item.trim())
+                    .filter(Boolean)
+                    .map((chip: string, idx: number) => (
+                      <span key={idx} className="px-3 py-1.5 bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-sm rounded-full font-medium shadow-sm">
+                        {chip}
+                      </span>
+                    ))}
+                </div>
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="flex gap-3 pt-2 border-t">
+              <button
+                disabled={!isFormValid}
+                className={`flex-1 rounded-lg py-3 px-6 font-semibold transition-all shadow-sm ${
+                  isFormValid
+                    ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 hover:shadow-md'
+                    : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                }`}
+                onClick={() => {
+                  if (!isFormValid) return;
+                  setShowQuickCreate(false);
+                  const nowId = Date.now();
+                  const focusList = quickProspect.focusText
+                    .split(',')
+                    .map((item: string) => item.trim())
+                    .filter(Boolean);
+                  const newProspect = {
+                    id: nowId,
+                    name: quickProspect.name.trim(),
+                    entityid: `${quickProspect.name.trim().replace(/\s+/g, '-')}-Demo`,
+                    industry: quickProspect.industry || 'General',
+                    size: quickProspect.size || '100',
+                    status: quickProspect.status,
+                    demoDate: quickProspect.demoDate,
+                    focus: focusList.length ? focusList : ['Resource Planning'],
+                    budget: quickProspect.budget || '$150K+',
+                    nsId: quickProspect.nsId ? Number(quickProspect.nsId) : Math.floor(Math.random() * 4000) + 2000,
+                    website: quickProspect.website || ''
+                  };
+                  setDynamicCustomers((prev: any) => [newProspect, ...prev]);
+                  setQuickProspect({
+                    name: '',
+                    industry: '',
+                    status: 'Active',
+                    size: '100-200',
+                    budget: '$150K+',
+                    focusText: 'Resource Planning',
+                    nsId: '',
+                    demoDate: 'TBD',
+                    website: ''
+                  });
+                  setSelectedCustomer(newProspect.id);
+                  pushToast(`✓ ${newProspect.name} added to workspace`, 'success');
+                }}
+              >
+                <div className="flex items-center justify-center gap-2">
+                  <Check size={18} />
+                  Create Prospect
+                </div>
+              </button>
+              <button
+                className="px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition-all"
+                onClick={() => setShowQuickCreate(false)}
+              >
+                Cancel
+              </button>
+            </div>
+
+            {!isFormValid && (
+              <p className="text-xs text-red-600 text-center -mt-2">
+                Please fill in all required fields (marked with *)
+              </p>
+            )}
           </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   // Component: Toast Stack
-  const ToastStack = () => (
+  const ToastStack = React.memo(() => (
     <div className="toast-stack fixed top-4 right-4 space-y-2 z-50" aria-live="polite">
       {toasts.map((toast: ToastMessage) => (
         <div key={toast.id} className={`toast toast--${toast.type} p-4 rounded-lg shadow-lg max-w-sm`}>
@@ -513,10 +608,111 @@ export default function DemoDashboard() {
         </div>
       ))}
     </div>
+  ));
+
+  // Component: Clipboard History Panel
+  const ClipboardHistoryPanel = () => (
+    <div className={`clipboard-panel fixed right-0 top-0 h-full bg-white border-l-2 border-blue-200 shadow-2xl transition-transform duration-300 z-40 ${showClipboardPanel ? 'translate-x-0' : 'translate-x-full'}`} style={{ width: '420px' }}>
+      {/* Header */}
+      <div className="clipboard-header sticky top-0 bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-4 border-b border-blue-700">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <Copy size={20} />
+            <h3 className="text-lg font-bold">Clipboard History</h3>
+          </div>
+          <button
+            onClick={() => setShowClipboardPanel(false)}
+            className="p-1.5 hover:bg-white/20 rounded-lg transition-colors"
+            aria-label="Close clipboard panel"
+          >
+            <X size={20} />
+          </button>
+        </div>
+        <p className="text-blue-100 text-xs">Recently copied prompts and text</p>
+        <div className="mt-3 flex items-center justify-between text-sm">
+          <span className="text-blue-200">{clipboardHistory.length} items</span>
+          {clipboardHistory.length > 0 && (
+            <button
+              onClick={() => setClipboardHistory([])}
+              className="text-blue-100 hover:text-white text-xs underline"
+            >
+              Clear all
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Clipboard Items */}
+      <div className="clipboard-content overflow-y-auto" style={{ height: 'calc(100vh - 140px)' }}>
+        {clipboardHistory.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full text-center p-8">
+            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+              <Copy size={32} className="text-gray-400" />
+            </div>
+            <h4 className="text-gray-700 font-semibold mb-2">No items yet</h4>
+            <p className="text-gray-500 text-sm">
+              Copied prompts will appear here
+            </p>
+          </div>
+        ) : (
+          <div className="p-4 space-y-3">
+            {clipboardHistory.map((item: any, idx: number) => (
+              <div
+                key={item.id}
+                className="clipboard-item bg-gradient-to-br from-gray-50 to-blue-50 border border-gray-200 rounded-xl p-4 hover:shadow-md transition-all"
+              >
+                {/* Item Header */}
+                <div className="flex items-start justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs font-bold">
+                      {idx + 1}
+                    </div>
+                    <span className="text-xs font-semibold text-blue-700">{item.label}</span>
+                  </div>
+                  <span className="text-xs text-gray-500">
+                    {new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </div>
+
+                {/* Item Content */}
+                <div className="bg-white rounded-lg p-3 mb-3 border border-gray-200">
+                  <p className="text-sm text-gray-700 whitespace-pre-wrap break-words leading-relaxed">
+                    {item.text}
+                  </p>
+                </div>
+
+                {/* Item Actions */}
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(item.text);
+                      pushToast('✓ Re-copied to clipboard', 'success');
+                    }}
+                    className="flex-1 flex items-center justify-center gap-1 px-3 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors text-xs font-medium"
+                  >
+                    <Copy size={14} />
+                    Copy Again
+                  </button>
+                  <button
+                    onClick={() => {
+                      setClipboardHistory((prev: any) => prev.filter((i: any) => i.id !== item.id));
+                    }}
+                    className="px-3 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors text-xs"
+                    aria-label="Remove item"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
   );
 
   // Component: Account Switcher
-  const AccountSwitcher = () => (
+  const AccountSwitcher = React.memo(() => (
     <div className="account-switcher">
       {accounts.map((account: any) => (
         <button
@@ -530,10 +726,10 @@ export default function DemoDashboard() {
         </button>
       ))}
     </div>
-  );
+  ));
 
   // Component: Summary Highlights
-  const SummaryHighlights = () => (
+  const SummaryHighlights = React.memo(() => (
     <div className="summary-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
       {[
         { label: 'Active Prospects', value: allCustomers.length, icon: Zap, accent: '#13a0d8' },
@@ -552,136 +748,291 @@ export default function DemoDashboard() {
         </div>
       ))}
     </div>
+  ));
+
+  // Industry-specific prompts helper
+  const getIndustryPrompts = (industry: string) => {
+    const industryMap: Record<string, string[]> = {
+      'PEO Services': [
+        'Set up multi-entity payroll processing with 250+ employees',
+        'Create compliance tracking dashboard for HR operations',
+        'Build employee onboarding workflow with automated provisioning'
+      ],
+      'Consulting': [
+        'Create project-based billing with milestone tracking',
+        'Set up resource allocation across multiple client engagements',
+        'Build time & expense tracking with approval workflows'
+      ],
+      'Tech Consulting': [
+        'Configure agile project management with sprint tracking',
+        'Set up utilization dashboard showing billable vs non-billable hours',
+        'Create technical resource planning with skill-based allocation'
+      ],
+      'Energy': [
+        'Build pipeline segment tracking across multiple states',
+        'Set up equipment inventory with maintenance scheduling',
+        'Create environmental compliance tracking and reporting'
+      ],
+      'Professional Services': [
+        'Configure project accounting with WIP and revenue recognition',
+        'Set up client billing with retainer and hourly rate options',
+        'Build resource forecasting with capacity planning'
+      ]
+    };
+
+    return industryMap[industry] || [
+      'Create demo project with sample tasks and milestones',
+      'Set up time tracking and expense management',
+      'Configure billing and invoicing workflows'
+    ];
+  };
+
+  // Component: Prospect Selector
+  const ProspectSelector = () => (
+    <div className="prospect-selector-card bg-gradient-to-br from-white to-blue-50 rounded-2xl border-2 border-blue-200 p-6 shadow-lg mb-6">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <h3 className="text-lg font-bold text-gray-900 mb-1">Select Your Prospect</h3>
+          <p className="text-sm text-gray-600">Choose an existing prospect or create a new one to get started</p>
+        </div>
+        <button
+          onClick={() => setShowQuickCreate(true)}
+          className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all shadow-md hover:shadow-lg font-semibold"
+        >
+          <Plus size={20} />
+          New Prospect
+        </button>
+      </div>
+
+      {/* Prospect Grid */}
+      <div className="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-[400px] overflow-y-auto">
+        {filteredCustomers.map((prospect: any) => (
+          <button
+            key={prospect.id}
+            onClick={() => setSelectedCustomer(prospect.id)}
+            className={`text-left p-4 rounded-xl border-2 transition-all ${
+              selectedCustomer === prospect.id
+                ? 'border-blue-500 bg-blue-50 shadow-md'
+                : 'border-gray-200 bg-white hover:border-blue-300 hover:shadow-sm'
+            }`}
+          >
+            <div className="flex items-start justify-between mb-2">
+              <h4 className="font-semibold text-gray-900 text-sm">{prospect.name}</h4>
+              {selectedCustomer === prospect.id && (
+                <Check size={18} className="text-blue-600 flex-shrink-0" />
+              )}
+            </div>
+            <p className="text-xs text-gray-600 mb-2">{prospect.industry}</p>
+            <div className="flex items-center gap-2">
+              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                prospect.status === 'Hot' ? 'bg-red-100 text-red-700' :
+                prospect.status === 'Active' ? 'bg-green-100 text-green-700' :
+                prospect.status === 'Qualified' ? 'bg-yellow-100 text-yellow-700' :
+                'bg-gray-100 text-gray-700'
+              }`}>
+                {prospect.status}
+              </span>
+              <span className="text-xs text-gray-500">{prospect.budget}</span>
+            </div>
+          </button>
+        ))}
+      </div>
+    </div>
   );
 
   // Component: Customer Context Panel
   const CustomerContextPanel = () => (
     <div className="customer-context">
       <SummaryHighlights />
-      <div className="customer-layout grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Quick Actions */}
-        <div className="quick-actions-panel lg:col-span-1">
-          <div className="panel-header flex items-center justify-between mb-4">
-            <h4 className="text-sm font-semibold">Quick Actions</h4>
-          </div>
-          <div className="space-y-2">
-            {quickActions.map((action) => {
-              const Icon = action.icon;
-              const isLoading = syncLoading && action.id === 'sync-netsuite';
-              return (
-                <button
-                  key={action.id}
-                  onClick={action.action}
-                  disabled={isLoading}
-                  className={`quick-actions-panel__button ${isLoading ? 'is-loading' : ''} w-full p-3 rounded-lg border shadow-sm hover:shadow-md transition-shadow`}
-                >
-                  {isLoading ? (
-                    <Loader size={18} className="animate-spin" />
-                  ) : (
-                    <Icon size={18} />
-                  )}
-                  <span className="text-center leading-tight">{action.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
 
-        {/* Customer Details */}
-        <div className="context-panel lg:col-span-2">
-          {selectedCustData ? (
-            <>
-              {/* Header */}
-              <div className="context-hero">
-                <div>
-                  <h2>{selectedCustData.name}</h2>
-                  <p>{selectedCustData.industry}</p>
+      {/* Prospect Selector */}
+      <ProspectSelector />
+
+      {selectedCustData ? (
+        <div className="customer-layout grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Industry-Specific Prompts */}
+          <div className="industry-prompts-panel lg:col-span-1">
+            <div className="bg-white rounded-xl border shadow-sm p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="p-2 bg-purple-100 rounded-lg">
+                  <Zap size={18} className="text-purple-600" />
                 </div>
-                <span>{selectedCustData.status}</span>
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-900">Industry Prompts</h4>
+                  <p className="text-xs text-gray-500">{selectedCustData.industry}</p>
+                </div>
+              </div>
+              <div className="space-y-2">
+                {getIndustryPrompts(selectedCustData.industry).map((prompt, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => {
+                      const fullPrompt = `For ${selectedCustData.name}: ${prompt}`;
+                      copyToClipboard(fullPrompt, `industry-${idx}`, 'Industry prompt');
+                      pushToast('Industry prompt copied!', 'success');
+                    }}
+                    className="w-full text-left p-3 rounded-lg border border-purple-200 bg-purple-50 hover:bg-purple-100 transition-colors group"
+                  >
+                    <p className="text-sm text-gray-700 mb-2">{prompt}</p>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-purple-600 font-medium">Click to copy</span>
+                      <Copy size={14} className="text-purple-400 group-hover:text-purple-600" />
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Quick Actions */}
+          <div className="quick-actions-panel lg:col-span-1">
+            <div className="bg-white rounded-xl border shadow-sm p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="p-2 bg-blue-100 rounded-lg">
+                  <Target size={18} className="text-blue-600" />
+                </div>
+                <h4 className="text-sm font-semibold text-gray-900">Quick Actions</h4>
               </div>
 
-              {/* Quick Actions + Checklist */}
-              <div className="context-grid">
-                <QuickActionsPanel />
-                <DemoChecklist />
+              <div className="space-y-2">
+                {quickActions.map((action) => {
+                  const Icon = action.icon;
+                  const isLoading = syncLoading && action.id === 'sync-netsuite';
+                  const isDisabled = !selectedCustData || isLoading;
+                  return (
+                    <button
+                      key={action.id}
+                      onClick={action.action}
+                      disabled={isDisabled}
+                      className={`quick-actions-panel__button ${isLoading ? 'is-loading' : ''} ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''} w-full p-3 rounded-lg border shadow-sm hover:shadow-md transition-shadow`}
+                      title={!selectedCustData ? 'Select a prospect first' : ''}
+                    >
+                      {isLoading ? (
+                        <Loader size={18} className="animate-spin" />
+                      ) : (
+                        <Icon size={18} />
+                      )}
+                      <span className="text-center leading-tight">{action.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Customer Details */}
+          <div className="context-panel lg:col-span-1">
+            <div className="bg-white rounded-xl border shadow-sm p-5">
+              {/* Header */}
+              <div className="flex items-center gap-3 mb-4 pb-4 border-b">
+                <div className="p-2 bg-green-100 rounded-lg">
+                  <User size={18} className="text-green-600" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-gray-900">{selectedCustData.name}</h3>
+                  <p className="text-sm text-gray-600">{selectedCustData.industry}</p>
+                </div>
               </div>
 
               {/* Key Details Grid */}
-              <div className="detail-grid">
+              <div className="space-y-3 mb-4">
                 {[
                   { label: 'Entity ID', value: selectedCustData.entityid },
                   { label: 'Company Size', value: `${selectedCustData.size} employees` },
                   { label: 'Budget Range', value: selectedCustData.budget },
-                  { label: 'Demo Date', value: selectedCustData.demoDate }
+                  { label: 'Demo Date', value: selectedCustData.demoDate },
+                  { label: 'Status', value: selectedCustData.status }
                 ].map((info: any) => (
-                  <div key={info.label} className="detail-card">
-                    <p>{info.label}</p>
-                    <strong>{info.value}</strong>
+                  <div key={info.label} className="flex justify-between items-center text-sm">
+                    <span className="text-gray-600">{info.label}:</span>
+                    <strong className="text-gray-900">{info.value}</strong>
                   </div>
                 ))}
-              </div>
-
-              {/* Custom Fields from NetSuite */}
-              <div>
-                <p className="section-label">Synced NetSuite Fields</p>
-                <CustomFieldsPanel />
+                {selectedCustData.website && (
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-gray-600">Website:</span>
+                    <a
+                      href={selectedCustData.website}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:text-blue-800 underline font-medium"
+                    >
+                      Visit Site
+                    </a>
+                  </div>
+                )}
               </div>
 
               {/* Focus Areas */}
-              <div className="detail-card focus-card">
-                <p className="section-label">Demo Focus Areas</p>
-                <div className="focus-chips">
+              <div className="mb-4">
+                <p className="text-sm font-semibold text-gray-700 mb-2">Focus Areas:</p>
+                <div className="flex flex-wrap gap-2">
                   {selectedCustData.focus.map((area: string, idx: number) => (
-                    <span key={idx}>{area}</span>
+                    <span key={idx} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
+                      {area}
+                    </span>
                   ))}
                 </div>
               </div>
 
-              {/* Quick Notes - Fixed to prevent jump */}
-              <div className="detail-card note-card bg-white rounded-xl p-4 border shadow-sm">
-                <p className="section-label text-sm font-semibold text-gray-700 mb-3">Quick Notes</p>
-                <div className="relative">
-                  <textarea
-                    value={demoNotes[selectedCustData.id] || ''}
-                    onChange={(e) => setDemoNotes({...demoNotes, [selectedCustData.id]: e.target.value})}
-                    placeholder="Add demo notes, pain points, or follow-up items..."
-                    className="w-full min-h-[96px] p-3 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base leading-relaxed"
-                    rows={3}
-                    style={{ height: '96px' }}  // Fixed height to prevent layout jump
-                  />
-                </div>
+              {/* Quick Notes */}
+              <div className="mb-4">
+                <p className="text-sm font-semibold text-gray-700 mb-2">Quick Notes</p>
+                <textarea
+                  value={demoNotes[selectedCustData.id] || ''}
+                  onChange={(e) => {
+                    const customerId = selectedCustData.id;
+                    const newValue = e.target.value;
+                    setDemoNotes((prev) => ({...prev, [customerId]: newValue}));
+                  }}
+                  placeholder="Add demo notes, pain points, or follow-up items..."
+                  className="w-full h-[80px] p-3 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  rows={3}
+                />
               </div>
 
-              {/* NetSuite Link */}
-              <div className="primary-link-group">
+              {/* NetSuite Links */}
+              <div className="space-y-2">
                 <a
                   href={`https://${currentAccount?.instance}.app.netsuite.com/app/common/entity/customer.nl?id=${selectedCustData.nsId}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="primary-link flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors w-full"
+                  className="flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors w-full text-sm font-medium"
                 >
                   <Target size={16} />
                   Open in NetSuite
                   <ChevronRight size={16} />
                 </a>
-                <a
-                  href="https://td3049589.app.netsuite.com/app/login/secure/enterpriselogin.nl?c=TD2892895"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="secondary-link flex items-center justify-center gap-2 px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors w-full"
+                <button
+                  onClick={syncNetsuiteFields}
+                  disabled={syncLoading}
+                  className="flex items-center justify-center gap-2 px-4 py-2.5 border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 transition-colors w-full text-sm font-medium"
                 >
-                  Sign In Again
-                </a>
+                  {syncLoading ? (
+                    <Loader size={16} className="animate-spin" />
+                  ) : (
+                    <Loader size={16} />
+                  )}
+                  {syncLoading ? 'Syncing...' : 'Sync NetSuite Data'}
+                </button>
               </div>
-            </>
-          ) : (
-            <div className="panel-empty flex flex-col items-center justify-center py-12 text-center">
-              <Users size={48} className="text-gray-400 mb-4" />
-              <p className="text-gray-500">Select a prospect to view details</p>
             </div>
-          )}
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="text-center py-12">
+          <Users size={48} className="text-gray-400 mb-4 mx-auto" />
+          <p className="text-gray-500 text-lg mb-2">No Prospect Selected</p>
+          <p className="text-gray-400 text-sm mb-6">Select a prospect from the list above to get started</p>
+          <button
+            onClick={() => setShowQuickCreate(true)}
+            className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all shadow-md hover:shadow-lg font-semibold"
+          >
+            <Plus size={20} />
+            Create Your First Prospect
+          </button>
+        </div>
+      )}
     </div>
   );
 
@@ -765,21 +1116,228 @@ export default function DemoDashboard() {
     </div>
   );
 
-  // Component: Analytics Panel
-  const AnalyticsPanel = () => (
-    <div className="analytics-panel">
-      <div className="analytics-header flex items-center justify-between mb-6">
-        <h3 className="text-lg font-semibold">Analytics Dashboard</h3>
-        <div className="text-xs text-gray-500">
-          Last sync: {formattedLastSync || 'No sync yet'}
+  // Component: Demo Builder Panel
+  const DemoBuilderPanel = () => {
+    const [companyWebsite, setCompanyWebsite] = useState('');
+    const [generatedScenarios, setGeneratedScenarios] = useState<string[]>([]);
+
+    // Auto-populate website when prospect is selected
+    useEffect(() => {
+      if (selectedCustData?.website) {
+        setCompanyWebsite(selectedCustData.website);
+      }
+    }, [selectedCustData]);
+
+    const demoPromptTemplates = [
+      {
+        category: 'Initial Setup',
+        icon: Target,
+        prompts: [
+          {
+            title: 'Complete Customer Record',
+            template: `Create a complete customer record for ${selectedCustData?.name || '[Company Name]'} in NetSuite with the following details:\n- Industry: ${selectedCustData?.industry || '[Industry]'}\n- Company Size: ${selectedCustData?.size || '[Size]'} employees\n- Budget: ${selectedCustData?.budget || '[Budget]'}\n- Primary Contact: [Contact Name and Email]\n- Billing Address: [Address]\n- Payment Terms: Net 30\n- Currency: USD\n- Tax Status: Taxable`
+          },
+          {
+            title: 'Subsidiary & Entity Structure',
+            template: `Set up a multi-entity structure for ${selectedCustData?.name || '[Company Name]'}:\n- Parent Entity: ${selectedCustData?.name || '[Company Name]'} Holdings\n- Operating Subsidiaries: [List 2-3 subsidiaries]\n- Configure intercompany relationships and elimination accounts\n- Set up consolidated financial reporting`
+          }
+        ]
+      },
+      {
+        category: 'Demo Data Creation',
+        icon: FileText,
+        prompts: [
+          {
+            title: 'Sample Project Setup',
+            template: `Create a realistic demo project for ${selectedCustData?.name || '[Company Name]'} titled "${selectedCustData?.focus?.[0] || 'Implementation'} Project - Q${Math.ceil((new Date().getMonth() + 1) / 3)} ${new Date().getFullYear()}":\n- Project Type: ${selectedCustData?.industry || 'Professional Services'}\n- Budget: ${selectedCustData?.budget?.split('-')[0] || '$150K'}\n- Timeline: 12 weeks\n- Add 8-10 tasks with realistic estimates\n- Include milestones at 25%, 50%, 75%, and 100% completion\n- Add 3-4 team member assignments with different roles`
+          },
+          {
+            title: 'Time & Expense Entries',
+            template: `Generate realistic time and expense data for ${selectedCustData?.name || '[Company Name]'}:\n- Create 15-20 approved time entries across 4 team members\n- Date range: Last 30 days\n- Include billable and non-billable hours\n- Add 5-7 expense reports with receipts:\n  * Travel expenses\n  * Client meals\n  * Software/tools\n  * Office supplies\n- Ensure entries align with project tasks`
+          },
+          {
+            title: 'Invoice & Revenue',
+            template: `Create invoicing scenario for ${selectedCustData?.name || '[Company Name]'}:\n- Generate 3 invoices for the demo project\n- Invoice 1: Initial deposit (30% of project value)\n- Invoice 2: Mid-project milestone (40% of project value)  \n- Invoice 3: Final delivery (30% of project value)\n- Include line items for professional services, expenses, and any additional charges\n- Set appropriate tax codes and payment terms`
+          }
+        ]
+      },
+      {
+        category: 'Advanced Scenarios',
+        icon: Zap,
+        prompts: [
+          {
+            title: 'Resource Planning Setup',
+            template: `Build a resource planning demonstration for ${selectedCustData?.name || '[Company Name]'}:\n- Create resource allocation plan for next 12 weeks\n- Add 10-12 team members with different skill sets: ${selectedCustData?.focus?.join(', ') || 'PM, Developer, QA, Designer'}\n- Set utilization targets: Billable 70-85%, Internal 15-30%\n- Create project assignments with varying allocations (25%, 50%, 75%, 100%)\n- Include PTO and holidays\n- Show capacity vs demand analysis`
+          },
+          {
+            title: 'Multi-Currency Scenario',
+            template: `Configure multi-currency demonstration:\n- Enable currencies: USD, EUR, GBP, CAD\n- Create transactions in different currencies for ${selectedCustData?.name || '[Company Name]'}\n- Set up currency exchange rate tables\n- Show consolidated reporting in base currency (USD)\n- Demonstrate gain/loss calculations`
+          },
+          {
+            title: 'Approval Workflow',
+            template: `Set up approval workflows for ${selectedCustData?.name || '[Company Name]'}:\n- Time entry approvals (Manager → Department Head)\n- Expense report approvals (Manager → Finance, amounts >$500)\n- Purchase order approvals (Tiered by amount)\n- Demonstrate pending approvals dashboard\n- Show email notifications and mobile approvals`
+          }
+        ]
+      },
+      {
+        category: 'Reporting & Analytics',
+        icon: BarChart3,
+        prompts: [
+          {
+            title: 'Executive Dashboard',
+            template: `Create executive dashboard for ${selectedCustData?.name || '[Company Name]'} showing:\n- Revenue recognition summary\n- Project profitability metrics\n- Resource utilization rates\n- Outstanding AR/AP\n- Budget vs actual analysis\n- Top 5 projects by revenue\n- Quarterly comparison charts`
+          },
+          {
+            title: 'Custom Reports',
+            template: `Build custom saved searches and reports:\n- Project Status Report: All active projects with budget, actual costs, % complete\n- Resource Utilization Report: By employee, showing billable vs non-billable hours\n- Revenue Forecast: Pipeline and projected revenue for next 2 quarters\n- Client Profitability Analysis: For ${selectedCustData?.name || '[Company Name]'} and similar clients\n- Time Entry Detail: Exportable CSV for payroll processing`
+          }
+        ]
+      }
+    ];
+
+    const generateWebsiteScenarios = () => {
+      if (!companyWebsite.trim()) return;
+
+      const scenarios = [
+        `Analyze the website ${companyWebsite} and create a NetSuite demo scenario that addresses the company's apparent business needs. Include specific features they would likely value based on their industry and service offerings.`,
+        `Based on ${companyWebsite}, identify 3-5 pain points this company likely faces that NetSuite could solve. Create demo talking points for each.`,
+        `Review ${companyWebsite} and suggest a complete NetSuite module suite recommendation (which modules to demo and why) based on their business model.`
+      ];
+
+      setGeneratedScenarios(scenarios);
+      pushToast('✓ Website scenarios generated', 'success');
+    };
+
+    return (
+      <div className="demo-builder-panel max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="mb-6 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-2xl p-6 shadow-lg">
+          <div className="flex items-center gap-3 mb-2">
+            <Zap size={28} />
+            <h2 className="text-2xl font-bold">Demo Builder</h2>
+          </div>
+          <p className="text-purple-100">Generate AI prompts to build comprehensive NetSuite demonstrations</p>
+          {selectedCustData && (
+            <div className="mt-3 bg-white/20 rounded-lg px-3 py-2 inline-block">
+              <span className="text-sm">Building for: <strong>{selectedCustData.name}</strong></span>
+            </div>
+          )}
         </div>
+
+        {/* Website Analysis Section */}
+        <div className="mb-6 bg-white rounded-xl border-2 border-indigo-200 p-6 shadow-md">
+          <div className="flex items-center gap-2 mb-4">
+            <Target size={20} className="text-indigo-600" />
+            <h3 className="text-lg font-bold text-gray-900">Company Website Analysis</h3>
+          </div>
+          <p className="text-sm text-gray-600 mb-4">Paste a company website URL to generate tailored demo scenarios and talking points</p>
+
+          <div className="flex gap-3">
+            <input
+              type="url"
+              value={companyWebsite}
+              onChange={(e) => setCompanyWebsite(e.target.value)}
+              placeholder="https://company-website.com"
+              className="flex-1 px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            />
+            <button
+              onClick={generateWebsiteScenarios}
+              disabled={!companyWebsite.trim()}
+              className={`px-6 py-3 rounded-lg font-semibold transition-all ${
+                companyWebsite.trim()
+                  ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:from-indigo-700 hover:to-purple-700 shadow-md'
+                  : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+              }`}
+            >
+              Generate Scenarios
+            </button>
+          </div>
+
+          {generatedScenarios.length > 0 && (
+            <div className="mt-4 space-y-2">
+              <p className="text-sm font-semibold text-gray-700 mb-2">Generated Prompts:</p>
+              {generatedScenarios.map((scenario, idx) => (
+                <div key={idx} className="bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-200 rounded-lg p-4">
+                  <p className="text-sm text-gray-700 mb-3">{scenario}</p>
+                  <button
+                    onClick={() => {
+                      copyToClipboard(scenario, `website-${idx}`, 'Website analysis prompt');
+                    }}
+                    className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm font-medium"
+                  >
+                    <Copy size={14} />
+                    Copy Prompt
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Prompt Templates */}
+        <div className="space-y-6">
+          {demoPromptTemplates.map((category, catIdx) => {
+            const CategoryIcon = category.icon;
+            return (
+              <div key={catIdx} className="bg-white rounded-xl border shadow-sm p-6">
+                <div className="flex items-center gap-3 mb-4 pb-3 border-b">
+                  <div className="p-2 bg-blue-100 rounded-lg">
+                    <CategoryIcon size={20} className="text-blue-600" />
+                  </div>
+                  <h3 className="text-lg font-bold text-gray-900">{category.category}</h3>
+                  <span className="ml-auto text-xs bg-gray-100 px-3 py-1 rounded-full text-gray-600">
+                    {category.prompts.length} templates
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {category.prompts.map((prompt, promptIdx) => (
+                    <div key={promptIdx} className="bg-gradient-to-br from-gray-50 to-blue-50 border-2 border-gray-200 rounded-lg p-4 hover:border-blue-300 transition-all">
+                      <div className="flex items-start justify-between mb-3">
+                        <h4 className="font-semibold text-gray-900 text-sm">{prompt.title}</h4>
+                        <button
+                          onClick={() => {
+                            copyToClipboard(prompt.template, `template-${catIdx}-${promptIdx}`, prompt.title);
+                          }}
+                          className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-xs font-medium"
+                        >
+                          <Copy size={12} />
+                          Copy
+                        </button>
+                      </div>
+                      <div className="bg-white rounded-lg p-3 border border-gray-200">
+                        <pre className="text-xs text-gray-700 whitespace-pre-wrap font-mono leading-relaxed">
+                          {prompt.template}
+                        </pre>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* No Prospect Selected State */}
+        {!selectedCustData && (
+          <div className="mt-6 bg-yellow-50 border-2 border-yellow-200 rounded-xl p-6 text-center">
+            <AlertCircle size={32} className="text-yellow-600 mx-auto mb-3" />
+            <h4 className="font-semibold text-gray-900 mb-2">No Prospect Selected</h4>
+            <p className="text-sm text-gray-600 mb-4">
+              Select a prospect from the Customer Context tab to personalize these demo prompts
+            </p>
+            <button
+              onClick={() => setActiveTab('context')}
+              className="inline-flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+            >
+              Go to Customer Context
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        )}
       </div>
-      <DataVisualization 
-        className="space-y-6"
-        data={analyticsData}
-      />
-    </div>
-  );
+    );
+  };
 
   // Component: Export Panel
   const ExportPanel = () => (
@@ -794,13 +1352,14 @@ export default function DemoDashboard() {
         </p>
         <DataExport
           data={netsuiteExportData}
-          onExportComplete={(success: boolean, filename: string) => {
+          onExportComplete={(success: boolean, filename?: string) => {
             if (success) {
+              const filenameStr = filename ? ` ${filename}` : '';
               setActionStatus({
                 type: 'success',
-                message: `Export completed: ${filename}`
+                message: `Export completed:${filenameStr}`
               });
-              pushToast(`Export completed: ${filename}`, 'success');
+              pushToast(`Export completed:${filenameStr}`, 'success');
             } else {
               setActionStatus({
                 type: 'error',
@@ -923,6 +1482,13 @@ export default function DemoDashboard() {
             <div className="header-actions flex flex-col sm:flex-row gap-2">
               <AccountSwitcher />
               <button
+                className="ghost-button px-3 py-2 text-sm flex items-center gap-2"
+                onClick={() => setShowClipboardPanel(!showClipboardPanel)}
+              >
+                <Copy size={16} />
+                Clipboard ({clipboardHistory.length})
+              </button>
+              <button
                 className="ghost-button px-3 py-2 text-sm"
                 onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
               >
@@ -949,7 +1515,7 @@ export default function DemoDashboard() {
             {[
               { tab: 'context', label: 'Customer Context', icon: User },
               { tab: 'prompts', label: 'Demo Prompts', icon: BookOpen },
-              { tab: 'analytics', label: 'Analytics', icon: BarChart3 },
+              { tab: 'demo-builder', label: 'Demo Builder', icon: Zap },
               { tab: 'export', label: 'Export', icon: Download }
             ].map(({ tab, label, icon: Icon }) => (
               <button
@@ -985,7 +1551,7 @@ export default function DemoDashboard() {
             <PromptLibrary />
           </div>
         )}
-        {activeTab === 'analytics' && <AnalyticsPanel />}
+        {activeTab === 'demo-builder' && <DemoBuilderPanel />}
         {activeTab === 'export' && <ExportPanel />}
 
         {/* Quick Create Modal */}
@@ -993,6 +1559,9 @@ export default function DemoDashboard() {
 
         {/* Toast Notifications */}
         <ToastStack />
+
+        {/* Clipboard History Panel */}
+        <ClipboardHistoryPanel />
       </div>
     </div>
   );
