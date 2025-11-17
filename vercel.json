@@ -1,6 +1,11 @@
 {
   "version": 2,
-  "env": {
-    "NETSUITE_ACCOUNT_ID": "td3049589"
-  }
+  "buildCommand": "cd netsuite-dashboard && npm ci && CI=false npm run build",
+  "outputDirectory": "netsuite-dashboard/build",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
 }
