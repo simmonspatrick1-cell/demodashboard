@@ -79,6 +79,26 @@ export default function ScenarioGenerator({ onScenarioGenerated, onClose }: Scen
     defaultStatus: template?.defaultStatus || undefined
   });
 
+  const loadLocalTemplates = useCallback(async () => {
+    try {
+      const response = await fetch('/data/scenario-templates.json');
+      if (!response.ok) {
+        throw new Error('Local templates asset missing');
+      }
+      const payload = await response.json();
+      const templatePayload = Array.isArray(payload) ? payload : [];
+      if (templatePayload.length > 0) {
+        setTemplates(templatePayload.map((tpl: any, idx: number) => normalizeTemplate(tpl, idx)));
+        setStatusMessage('Loaded built-in template pack.');
+        return;
+      }
+    } catch (err) {
+      console.warn('Failed to load local templates, using embedded fallback.', err);
+    }
+    setTemplates(FALLBACK_TEMPLATES);
+    setStatusMessage('Loaded embedded template pack.');
+  }, []);
+
   const loadTemplates = useCallback(async () => {
     try {
       setLoadingTemplates(true);
@@ -92,19 +112,17 @@ export default function ScenarioGenerator({ onScenarioGenerated, onClose }: Scen
         setTemplates(templatePayload.map((tpl: any, idx: number) => normalizeTemplate(tpl, idx)));
         setStatusMessage(null);
       } else {
-        setTemplates(FALLBACK_TEMPLATES);
-        setStatusMessage('Loaded offline template pack (no templates returned from API).');
+        await loadLocalTemplates();
       }
       setError(null);
     } catch (err) {
       console.error('Failed to load templates:', err);
-      setTemplates(FALLBACK_TEMPLATES);
-      setStatusMessage('Live template service is unavailable. Showing offline presets instead.');
+      await loadLocalTemplates();
       setError(null);
     } finally {
       setLoadingTemplates(false);
     }
-  }, []);
+  }, [loadLocalTemplates]);
 
   // Load templates on component mount
   useEffect(() => {
@@ -135,6 +153,19 @@ export default function ScenarioGenerator({ onScenarioGenerated, onClose }: Scen
       companyName: sanitizedName,
       customization: customization || 'Standard professional services demo scenario'
     };
+  };
+
+  const buildOfflineScenario = (templateMeta?: ScenarioTemplate) => {
+    const promptSeed = templateMeta?.prompt || 'Design a NetSuite PSA scenario highlighting utilization and billing.';
+    return normalizeScenario(
+      {
+        name: companyName || templateMeta?.name,
+        industry,
+        description: `${promptSeed}${customization ? `\nCustomization: ${customization}` : ''}`,
+        prompt: promptSeed
+      },
+      templateMeta
+    );
   };
 
   const handleGenerate = async () => {
@@ -175,8 +206,8 @@ export default function ScenarioGenerator({ onScenarioGenerated, onClose }: Scen
       }
     } catch (err: any) {
       console.error('Scenario generation failed:', err);
-      const fallbackScenario = normalizeScenario(null, templateMeta);
-      setStatusMessage('Live generator unreachable. Created scenario with offline template.');
+      const fallbackScenario = buildOfflineScenario(templateMeta);
+      setStatusMessage('Generated scenario using offline template pack.');
       setSuccess(true);
       if (onScenarioGenerated) {
         onScenarioGenerated(fallbackScenario);
