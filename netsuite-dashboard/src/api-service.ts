@@ -104,6 +104,22 @@ class APIService {
   }
 
   /**
+   * Persist a scenario template to the managed API (optional)
+   */
+  static async saveTemplate(template: any): Promise<ApiResponse> {
+    try {
+      const response = await fetchWithRetry(`${API_BASE_URL}/scenarios/templates`, {
+        method: 'POST',
+        body: JSON.stringify(template)
+      });
+      return await response.json();
+    } catch (error: any) {
+      console.error('Failed to save template:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Check API health status
    */
   static async checkHealth(): Promise<any> {

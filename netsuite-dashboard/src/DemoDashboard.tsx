@@ -342,12 +342,14 @@ const DemoDashboard: React.FC = () => {
     });
   }, []);
 
-  const handleScenarioGenerated = useCallback((newScenario: Prospect) => {
-    setDynamicCustomers((prev) => [newScenario, ...prev]);
-    setSelectedCustomer(newScenario.id);
-    setShowScenarioGenerator(false);
-    pushToast(`Scenario "${newScenario.name}" added`, 'success');
-  }, [pushToast]);
+  const handleScenarioGenerated = useCallback(
+    (newScenario: Prospect) => {
+      setDynamicCustomers((prev) => [newScenario, ...prev]);
+      setSelectedCustomer(newScenario.id);
+      pushToast(`Scenario "${newScenario.name}" added`, 'success');
+    },
+    [pushToast]
+  );
 
   const syncNetsuiteFields = useCallback(async () => {
     if (!selectedCustData) return;

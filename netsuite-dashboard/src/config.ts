@@ -26,7 +26,8 @@ export const config = {
     advancedFiltering: true,
     dataVisualization: true,
     userPreferences: true,
-    notifications: true
+    notifications: true,
+    templateSync: false
   },
   
   // Storage Keys
@@ -36,7 +37,8 @@ export const config = {
     recentItems: 'netsuite_dashboard_recent',
     demoNotes: 'netsuite_dashboard_notes',
     prospects: 'netsuite_dashboard_prospects',
-    noteDrafts: 'netsuite_dashboard_note_drafts'
+    noteDrafts: 'netsuite_dashboard_note_drafts',
+    scenarioTemplates: 'netsuite_dashboard_custom_templates'
   },
   
   // Chart Configuration
