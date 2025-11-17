@@ -3,10 +3,10 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import App from './App';
 
-beforeAll(() => {
+beforeEach(() => {
   Object.defineProperty(navigator, 'clipboard', {
     value: {
-      writeText: jest.fn().mockResolvedValue(undefined)
+      writeText: jest.fn(() => Promise.resolve())
     },
     configurable: true
   });
@@ -40,6 +40,35 @@ describe('Demo Dashboard App', () => {
 
     await waitFor(() => {
       expect(screen.getByText(/AI Generated Summary/i)).toBeInTheDocument();
+    });
+  });
+
+  test('prompt copy button triggers clipboard mock', async () => {
+    render(<App />);
+
+    const promptTab = screen.getByRole('button', { name: /Demo Prompts/i });
+    await userEvent.click(promptTab);
+
+    const categoryToggle = await screen.findByRole('button', { name: /Customer Setup/i });
+    await userEvent.click(categoryToggle);
+
+    const copyButtons = await screen.findAllByRole('button', { name: /^Copy Prompt$/i });
+    await userEvent.click(copyButtons[0]);
+
+    expect(navigator.clipboard.writeText).toHaveBeenCalled();
+  });
+
+  test('launching AI scenario builder opens modal', async () => {
+    render(<App />);
+
+    const demoBuilderTab = screen.getByRole('button', { name: /Demo Builder/i });
+    await userEvent.click(demoBuilderTab);
+
+    const launchButton = screen.getByRole('button', { name: /Launch Scenario Generator/i });
+    await userEvent.click(launchButton);
+
+    await waitFor(() => {
+      expect(screen.getByText(/AI Scenario Generator/i)).toBeInTheDocument();
     });
   });
 });
