@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { BarChart3, PieChart, TrendingUp, Activity, Users, Clock, Filter, AlertTriangle } from 'lucide-react';
+import { BarChart3, TrendingUp, Activity, Users, Clock, Filter } from 'lucide-react';
 import { ResponsiveContainer, PieChart as RechartsPie, Pie, Cell, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, BarChart, Bar } from 'recharts';
 import { config } from './config';
 
@@ -24,7 +24,6 @@ interface DataVisualizationProps {
 export default function DataVisualization({ className = '', data }: DataVisualizationProps) {
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [selectedTimeRange, setSelectedTimeRange] = useState('7d');
 
   // Enhanced mock data with new fields for additional visualizations
@@ -124,16 +123,6 @@ export default function DataVisualization({ className = '', data }: DataVisualiz
             <div key={i} className="bg-gray-200 rounded-lg h-64"></div>
           ))}
         </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className={`${className} text-center py-8`}>
-        <AlertTriangle className="w-8 h-8 mx-auto text-red-500 mb-2" />
-        <p className="text-gray-600">Failed to load analytics data</p>
-        <p className="text-sm text-gray-500">{error}</p>
       </div>
     );
   }

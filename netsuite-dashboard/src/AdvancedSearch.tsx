@@ -1,15 +1,7 @@
 // Advanced Search and Filtering Component
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Search, Filter, X, Calendar, Tag, Zap, Clock, SortAsc, SortDesc } from 'lucide-react';
-import { config } from './config';
 import storageService from './storage-service';
-
-interface FilterOption {
-  id: string;
-  label: string;
-  value: any;
-  count?: number;
-}
 
 interface SearchFilters {
   query: string;
@@ -57,6 +49,7 @@ export default function AdvancedSearch({
   const [showFilters, setShowFilters] = useState(showAdvancedFilters);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [showSearchSuggestions, setShowSearchSuggestions] = useState(false);
+  const debouncedFilterChangeRef = useRef<((filters: SearchFilters) => void) | null>(null);
 
   // Load recent searches on mount
   useEffect(() => {
@@ -64,24 +57,30 @@ export default function AdvancedSearch({
   }, []);
 
   // Debounced filter change handler
-  const debouncedFilterChange = useCallback(
-    debounce((newFilters: SearchFilters) => {
+  useEffect(() => {
+    debouncedFilterChangeRef.current = debounce((newFilters: SearchFilters) => {
       onFiltersChange(newFilters);
-      
-      // Save search query to recent searches
+
       if (newFilters.query.trim()) {
         storageService.addRecentSearch(newFilters.query);
         setRecentSearches(storageService.getRecentSearches());
       }
-    }, 300),
-    [onFiltersChange]
-  );
+    }, 300);
+
+    return () => {
+      debouncedFilterChangeRef.current = null;
+    };
+  }, [onFiltersChange]);
 
   // Update filters and trigger change
   const updateFilters = (updates: Partial<SearchFilters>) => {
     const newFilters = { ...filters, ...updates };
     setFilters(newFilters);
-    debouncedFilterChange(newFilters);
+    if (debouncedFilterChangeRef.current) {
+      debouncedFilterChangeRef.current(newFilters);
+    } else {
+      onFiltersChange(newFilters);
+    }
   };
 
   // Handle search input change

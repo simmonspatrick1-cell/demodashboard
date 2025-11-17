@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { Search, Menu, X, Building2, Check, BookOpen, ChevronDown, ChevronRight, Zap, Target, Users, Clock, FileText, TrendingUp, Loader, BarChart3, Download, ListChecks, AlertCircle, Plus, Copy, User } from 'lucide-react';  // Import all needed icons
+import { Search, Menu, X, Building2, Check, BookOpen, ChevronDown, ChevronRight, Zap, Target, Users, Clock, FileText, TrendingUp, Loader, BarChart3, Download, ListChecks, AlertCircle, Plus, Copy, User, Wand2 } from 'lucide-react';  // Import all needed icons
 import ScenarioGenerator from './ScenarioGenerator';
 import DataVisualization from './DataVisualization';
 import AdvancedSearch from './AdvancedSearch';
@@ -51,6 +51,31 @@ const PROMPT_CATEGORIES = [
   }
 ];
 
+const DASHBOARD_TABS = [
+  { id: 'context', label: 'Customer Context', icon: User },
+  { id: 'prompts', label: 'Demo Prompts', icon: BookOpen },
+  { id: 'demo-builder', label: 'Demo Builder', icon: Zap },
+  { id: 'export', label: 'Export', icon: Download }
+] as const;
+
+const PREP_FOCUS_POINTS = [
+  {
+    id: 'intake',
+    title: 'Discovery Intake',
+    description: 'Capture entities, industries, pain points, and demo focus areas for every prospect.'
+  },
+  {
+    id: 'generation',
+    title: 'AI Scenario Builder',
+    description: 'Generate NetSuite prompts, SuiteQL, and demo scripts in seconds with the AI builder.'
+  },
+  {
+    id: 'execution',
+    title: 'Run & Share',
+    description: 'Push data into NetSuite, sync records, and export talk tracks or dashboards for handoff.'
+  }
+];
+
 type ToastMessage = { id: string; message: string; type: 'success' | 'error' | 'info' };
 
 interface SearchFilters {
@@ -62,7 +87,6 @@ export default function DemoDashboard() {
   // State management
   const [activeTab, setActiveTab] = useState('context');
   const [selectedAccount, setSelectedAccount] = useState('services');
-  const [analyticsData] = useState<any>(undefined);
   const [selectedCustomer, setSelectedCustomer] = useState<number | null>(null);
   const [globalSearchQuery, setGlobalSearchQuery] = useState('');
   const [promptSearch, setPromptSearch] = useState('');
@@ -70,7 +94,6 @@ export default function DemoDashboard() {
   const [expandedCategory, setExpandedCategory] = useState<number | null>(null);
   const [favorites, setFavorites] = useState<string[]>([]);
   const [demoNotes, setDemoNotes] = useState<{[key: number]: string}>({});
-  const [netsuiteSyncEnabled, setNetsuiteSyncEnabled] = useState<boolean>(true);
   const [syncLoading, setSyncLoading] = useState<boolean>(false);
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
   const [customFieldsData, setCustomFieldsData] = useState<{[key: number]: any}>({});
@@ -203,10 +226,90 @@ export default function DemoDashboard() {
     ];
   }, [selectedAccount, selectedCustomer, customFieldsData, selectedCustData, demoNotes]);
 
-  const formattedLastSync = useMemo(() => {
-    if (!lastSyncTime) return null;
-    return lastSyncTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  }, [lastSyncTime]);
+  const lastSyncDisplay = useMemo(() => {
+    const activeSync = selectedCustData ? syncHistory[selectedCustData.id] : lastSyncTime;
+    if (!activeSync) return 'Not synced yet';
+    return activeSync.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  }, [lastSyncTime, selectedCustData, syncHistory]);
+
+  const prepWorkflow = useMemo(() => {
+    const hasProspect = Boolean(selectedCustomer);
+    const hasSyncedFields = selectedCustData ? Boolean(customFieldsData[selectedCustData.id]) : false;
+    const hasGeneratedScenario = dynamicCustomers.some((cust: any) => cust.aiGenerated);
+    const hasCopiedPrompt = clipboardHistory.length > 0;
+    const hasExport = netsuiteExportData.length > 0;
+
+    return [
+      {
+        id: 'prospect',
+        title: 'Capture Discovery',
+        description: 'Add a prospect with industry, size, and focus areas.',
+        done: hasProspect
+      },
+      {
+        id: 'sync',
+        title: 'Sync NetSuite',
+        description: 'Pull NetSuite data or AI summaries for context.',
+        done: hasSyncedFields
+      },
+      {
+        id: 'generate',
+        title: 'Generate Scenario',
+        description: 'Build AI-driven prompts & prep assets.',
+        done: hasGeneratedScenario
+      },
+      {
+        id: 'share',
+        title: 'Share Assets',
+        description: 'Copy prompts or export SuiteQL/talk tracks.',
+        done: hasCopiedPrompt || hasExport
+      }
+    ];
+  }, [selectedCustomer, selectedCustData, customFieldsData, dynamicCustomers, clipboardHistory, netsuiteExportData]);
+
+  const completedPrepSteps = prepWorkflow.filter((step) => step.done).length;
+  const prepCompletion = Math.round((completedPrepSteps / prepWorkflow.length) * 100);
+  const nextPrepStep = prepWorkflow.find((step) => !step.done);
+
+  const nextPrepAction = (() => {
+    if (!selectedCustomer) {
+      return {
+        label: 'Add Prospect',
+        description: 'Capture discovery data to anchor the rest of the workflow.',
+        action: () => setShowQuickCreate(true)
+      };
+    }
+
+    if (selectedCustData && !customFieldsData[selectedCustData.id]) {
+      return {
+        label: 'Sync NetSuite Data',
+        description: 'Pull context fields and summaries for this account.',
+        action: () => syncNetsuiteFields()
+      };
+    }
+
+    if (!clipboardHistory.length) {
+      return {
+        label: 'Copy Demo Prompt',
+        description: 'Hop into Demo Prompts to seed SuiteQL or data creation.',
+        action: () => setActiveTab('prompts')
+      };
+    }
+
+    if (!netsuiteExportData.length) {
+      return {
+        label: 'Export Assets',
+        description: 'Download SuiteQL, talk tracks, or sync logs to share.',
+        action: () => setActiveTab('export')
+      };
+    }
+
+    return {
+      label: 'Open Demo Builder',
+      description: 'Fine-tune prompts & generate scenario collateral.',
+      action: () => setActiveTab('demo-builder')
+    };
+  })();
 
   // Helper functions
   const handleScenarioGenerated = useCallback((newScenario: any) => {
@@ -215,6 +318,9 @@ export default function DemoDashboard() {
 
     // Auto-select the new scenario
     setSelectedCustomer(newScenario.id);
+
+    // close AI builder sheet if open
+    setShowScenarioGenerator(false);
 
     // Show success message
     setActionStatus({
@@ -599,6 +705,33 @@ export default function DemoDashboard() {
     );
   };
 
+  const ScenarioGeneratorModal = () => {
+    if (!showScenarioGenerator) {
+      return null;
+    }
+
+    return (
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center px-4 py-6 bg-slate-900/70 backdrop-blur-sm"
+        role="dialog"
+        aria-modal="true"
+        aria-label="AI scenario generator"
+      >
+        <div
+          className="absolute inset-0"
+          aria-hidden="true"
+          onClick={() => setShowScenarioGenerator(false)}
+        />
+        <div className="relative z-10 w-full max-w-2xl">
+          <ScenarioGenerator
+            onScenarioGenerated={handleScenarioGenerated}
+            onClose={() => setShowScenarioGenerator(false)}
+          />
+        </div>
+      </div>
+    );
+  };
+
   // Component: Toast Stack
   const ToastStack = React.memo(() => (
     <div className="toast-stack fixed top-4 right-4 space-y-2 z-50" aria-live="polite">
@@ -728,6 +861,89 @@ export default function DemoDashboard() {
     </div>
   ));
 
+  const PrepMissionBanner = React.memo(() => {
+    const missionAccount = selectedCustData?.name || 'your next prospect';
+    const nextStepLabel = nextPrepStep ? nextPrepStep.title : 'Ready to share assets';
+
+    return (
+      <div className="prep-mission">
+        <div className="prep-mission__main">
+          <p className="prep-mission__eyebrow">Demo Prep Mission</p>
+          <h2>Get {missionAccount} demo-ready in minutes</h2>
+          <p className="prep-mission__subtext">
+            Standardize discovery intake, AI scenario generation, and NetSuite execution so you can move from idea to polished story fast.
+          </p>
+          <div className="prep-mission__meta">
+            <div className="prep-progress">
+              <div className="prep-progress__value">{prepCompletion}%</div>
+              <div className="prep-progress__label">
+                workflow complete
+                <span>{completedPrepSteps} / {prepWorkflow.length} tasks</span>
+              </div>
+            </div>
+            <div className="prep-next-step">
+              <span className="prep-next-step__label">Next up</span>
+              <strong>{nextStepLabel}</strong>
+            </div>
+          </div>
+        </div>
+        {nextPrepAction && (
+          <div className="prep-mission__action">
+            <p>{nextPrepAction.description}</p>
+            <button type="button" onClick={nextPrepAction.action}>
+              {nextPrepAction.label}
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  });
+
+  const PrepWorkflowGuide = React.memo(() => (
+    <div className="prep-workflow-section">
+      <div className="prep-workflow-grid">
+        {prepWorkflow.map((step, idx) => (
+          <div key={step.id} className={`prep-workflow-card ${step.done ? 'is-complete' : ''}`}>
+            <div className="prep-workflow-card__label">Step {idx + 1}</div>
+            <div>
+              <h4>{step.title}</h4>
+              <p>{step.description}</p>
+            </div>
+            <span className="prep-workflow-card__status">
+              {step.done ? 'Complete' : 'Pending'}
+            </span>
+          </div>
+        ))}
+      </div>
+      <div className="prep-focus-grid">
+        {PREP_FOCUS_POINTS.map((point) => (
+          <div key={point.id} className="prep-focus-card">
+            <p className="prep-focus-card__label">{point.title}</p>
+            <p className="prep-focus-card__text">{point.description}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  ));
+
+  const ActionStatusBanner = React.memo(() => {
+    if (!actionStatus) return null;
+    const resolvedStatus = typeof actionStatus === 'string'
+      ? {
+          message: actionStatus,
+          type: actionStatus.includes('✓') ? 'success' : actionStatus.includes('⚠') ? 'warning' : 'info'
+        }
+      : actionStatus;
+    const TypeIcon = resolvedStatus.type === 'success' ? Check : resolvedStatus.type === 'warning' ? AlertCircle : Loader;
+
+    return (
+      <div className={`action-status action-status--${resolvedStatus.type || 'info'}`}>
+        <TypeIcon size={16} />
+        <span>{resolvedStatus.message}</span>
+      </div>
+    );
+  });
+
   // Component: Summary Highlights
   const SummaryHighlights = React.memo(() => (
     <div className="summary-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -790,18 +1006,29 @@ export default function DemoDashboard() {
   // Component: Prospect Selector
   const ProspectSelector = () => (
     <div className="prospect-selector-card bg-gradient-to-br from-white to-blue-50 rounded-2xl border-2 border-blue-200 p-6 shadow-lg mb-6">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h3 className="text-lg font-bold text-gray-900 mb-1">Select Your Prospect</h3>
           <p className="text-sm text-gray-600">Choose an existing prospect or create a new one to get started</p>
         </div>
-        <button
-          onClick={() => setShowQuickCreate(true)}
-          className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all shadow-md hover:shadow-lg font-semibold"
-        >
-          <Plus size={20} />
-          New Prospect
-        </button>
+        <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
+          <button
+            type="button"
+            onClick={() => setShowQuickCreate(true)}
+            className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold shadow-md hover:shadow-lg transition-all"
+          >
+            <Plus size={18} />
+            New Prospect
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowScenarioGenerator(true)}
+            className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-lg border-2 border-dashed border-blue-400 text-blue-700 font-semibold bg-white/70 hover:bg-white transition-colors"
+          >
+            <Wand2 size={18} />
+            AI Scenario
+          </button>
+        </div>
       </div>
 
       {/* Prospect Grid */}
@@ -843,12 +1070,15 @@ export default function DemoDashboard() {
   // Component: Customer Context Panel
   const CustomerContextPanel = () => (
     <div className="customer-context">
+      <PrepMissionBanner />
+      <PrepWorkflowGuide />
       <SummaryHighlights />
 
       {/* Prospect Selector */}
       <ProspectSelector />
 
       {selectedCustData ? (
+        <>
         <div className="customer-layout grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Industry-Specific Prompts */}
           <div className="industry-prompts-panel lg:col-span-1">
@@ -892,6 +1122,20 @@ export default function DemoDashboard() {
                   <Target size={18} className="text-blue-600" />
                 </div>
                 <h4 className="text-sm font-semibold text-gray-900">Quick Actions</h4>
+              </div>
+              <p className="text-xs text-gray-500 mb-2">
+                Active workspace: <strong>{currentAccount?.name}</strong>
+              </p>
+              <ActionStatusBanner />
+              <div className="quick-actions-meta">
+                <div>
+                  <span>Last Sync</span>
+                  <strong>{lastSyncDisplay}</strong>
+                </div>
+                <div>
+                  <span>Clipboard</span>
+                  <strong>{clipboardHistory.length} items</strong>
+                </div>
               </div>
 
               <div className="space-y-2">
@@ -1019,6 +1263,21 @@ export default function DemoDashboard() {
             </div>
           </div>
         </div>
+        <div className="insights-grid">
+          <div className="insights-card">
+            <DemoChecklist />
+          </div>
+          <div className="insights-card">
+            <h4 className="insights-card__title">NetSuite Custom Fields</h4>
+            <CustomFieldsPanel />
+          </div>
+          <div className="insights-card insights-card--wide">
+            <h4 className="insights-card__title">Demo Intelligence</h4>
+            <p className="insights-card__subtitle">Mock analytics to illustrate adoption and prep velocity</p>
+            <DataVisualization className="insights-analytics" />
+          </div>
+        </div>
+        </>
       ) : (
         <div className="text-center py-12">
           <Users size={48} className="text-gray-400 mb-4 mx-auto" />
@@ -1120,13 +1379,14 @@ export default function DemoDashboard() {
   const DemoBuilderPanel = () => {
     const [companyWebsite, setCompanyWebsite] = useState('');
     const [generatedScenarios, setGeneratedScenarios] = useState<string[]>([]);
+    const selectedWebsite = selectedCustData?.website;
 
     // Auto-populate website when prospect is selected
     useEffect(() => {
-      if (selectedCustData?.website) {
-        setCompanyWebsite(selectedCustData.website);
+      if (selectedWebsite) {
+        setCompanyWebsite(selectedWebsite);
       }
-    }, [selectedCustData]);
+    }, [selectedWebsite]);
 
     const demoPromptTemplates = [
       {
@@ -1480,7 +1740,6 @@ export default function DemoDashboard() {
               </div>
             </div>
             <div className="header-actions flex flex-col sm:flex-row gap-2">
-              <AccountSwitcher />
               <button
                 className="ghost-button px-3 py-2 text-sm flex items-center gap-2"
                 onClick={() => setShowClipboardPanel(!showClipboardPanel)}
@@ -1499,39 +1758,53 @@ export default function DemoDashboard() {
 
           {/* Mobile Menu Toggle */}
           <button
+            type="button"
             className="lg:hidden ml-auto mb-4"
+            aria-label="Toggle workspace controls"
+            aria-expanded={isMobileMenuOpen}
+            aria-controls="dashboard-controls"
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
           >
             {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
           </button>
 
           {/* Account Switcher - Responsive */}
-          <div className={`header-accounts ${isMobileMenuOpen ? 'block' : 'hidden lg:block'}`}>
+          <div
+            id="dashboard-controls"
+            className={`header-accounts ${isMobileMenuOpen ? 'block' : 'hidden lg:block'}`}
+          >
             <AccountSwitcher />
           </div>
 
           {/* Tab Navigation - Responsive */}
-          <div className="dashboard-tabs flex flex-col sm:flex-row overflow-x-auto lg:overflow-visible gap-2 lg:gap-0">
-            {[
-              { tab: 'context', label: 'Customer Context', icon: User },
-              { tab: 'prompts', label: 'Demo Prompts', icon: BookOpen },
-              { tab: 'demo-builder', label: 'Demo Builder', icon: Zap },
-              { tab: 'export', label: 'Export', icon: Download }
-            ].map(({ tab, label, icon: Icon }) => (
-              <button
-                key={tab}
-                onClick={() => {
-                  setActiveTab(tab);
-                  setIsMobileMenuOpen(false); // Close mobile menu
-                }}
-                className={`dashboard-tab flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${activeTab === tab ? 'is-active bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}`}
-              >
-                <Icon size={18} />
-                <span className="hidden sm:inline">{label}</span>
-                {activeTab === tab && <Check size={16} />}
-              </button>
-            ))}
-          </div>
+          <nav
+            className="dashboard-tabs flex flex-col sm:flex-row overflow-x-auto lg:overflow-visible gap-2 lg:gap-0"
+            role="tablist"
+            aria-label="Dashboard sections"
+          >
+            {DASHBOARD_TABS.map(({ id, label, icon: Icon }) => {
+              const buttonId = `dashboard-tab-${id}`;
+              const panelId = `dashboard-panel-${id}`;
+              return (
+                <button
+                  key={id}
+                  id={buttonId}
+                  role="tab"
+                  aria-selected={activeTab === id}
+                  aria-controls={panelId}
+                  onClick={() => {
+                    setActiveTab(id);
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className={`dashboard-tab flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${activeTab === id ? 'is-active bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}`}
+                >
+                  <Icon size={18} />
+                  <span className="hidden sm:inline">{label}</span>
+                  {activeTab === id && <Check size={16} />}
+                </button>
+              );
+            })}
+          </nav>
         </div>
       </div>
 
@@ -1541,21 +1814,54 @@ export default function DemoDashboard() {
         {activeTab !== 'context' && <GlobalSearch />}
 
         {/* Tab Content */}
-        {activeTab === 'context' && <CustomerContextPanel />}
-        {activeTab === 'prompts' && (
-          <div className="space-y-6">
-            <AdvancedSearch
-              onFiltersChange={(filters: SearchFilters) => setPromptSearch(filters.query)} // Local search for prompts
-              className="w-full"
-            />
-            <PromptLibrary />
-          </div>
+        {activeTab === 'context' && (
+          <section
+            id="dashboard-panel-context"
+            role="tabpanel"
+            aria-labelledby="dashboard-tab-context"
+          >
+            <CustomerContextPanel />
+          </section>
         )}
-        {activeTab === 'demo-builder' && <DemoBuilderPanel />}
-        {activeTab === 'export' && <ExportPanel />}
+        {activeTab === 'prompts' && (
+          <section
+            id="dashboard-panel-prompts"
+            role="tabpanel"
+            aria-labelledby="dashboard-tab-prompts"
+          >
+            <div className="space-y-6">
+              <AdvancedSearch
+                onFiltersChange={(filters: SearchFilters) => setPromptSearch(filters.query)} // Local search for prompts
+                className="w-full"
+              />
+              <PromptLibrary />
+            </div>
+          </section>
+        )}
+        {activeTab === 'demo-builder' && (
+          <section
+            id="dashboard-panel-demo-builder"
+            role="tabpanel"
+            aria-labelledby="dashboard-tab-demo-builder"
+          >
+            <DemoBuilderPanel />
+          </section>
+        )}
+        {activeTab === 'export' && (
+          <section
+            id="dashboard-panel-export"
+            role="tabpanel"
+            aria-labelledby="dashboard-tab-export"
+          >
+            <ExportPanel />
+          </section>
+        )}
 
         {/* Quick Create Modal */}
         {showQuickCreate && <QuickCreateForm />}
+
+        {/* AI Scenario Generator */}
+        <ScenarioGeneratorModal />
 
         {/* Toast Notifications */}
         <ToastStack />

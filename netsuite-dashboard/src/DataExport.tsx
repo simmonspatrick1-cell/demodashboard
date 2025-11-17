@@ -1,7 +1,7 @@
 // Data Export Utility Component
 import React, { useState } from 'react';
-import { Download, FileText, Table, Database, Calendar, Filter, Loader2 } from 'lucide-react';
-import apiService, { ExportOptions } from './api-service';
+import { Download, FileText, Table, Database, Calendar, Loader2 } from 'lucide-react';
+import { ExportOptions } from './api-service';
 
 interface ExportComponentProps {
   data?: any[];
