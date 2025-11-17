@@ -1,41 +1,55 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  BarChart3,
-  BookOpen,
-  Building2,
-  Check,
-  ChevronDown,
-  ClipboardList,
-  Download,
-  Menu,
-  Moon,
-  Plus,
-  Search,
-  Star,
-  Sun,
-  X,
-  Users,
-  Wand2
-} from 'lucide-react';
+import { BookOpen, Building2, Check, ClipboardList, Download, Menu, Moon, Plus, Search, Sun, X, Users, Wand2 } from 'lucide-react';
 import ScenarioGenerator from './ScenarioGenerator';
 import AdvancedSearch from './AdvancedSearch';
 import DataExport from './DataExport';
 import storageService from './storage-service';
+import PrepMissionBanner from './components/PrepMissionBanner';
+import PromptLibrary from './components/PromptLibrary';
+import QuickActionsDeck from './components/QuickActionsDeck';
+import { PrepWorkflowStep, PromptCategory, Prospect, QuickAction } from './types/dashboard';
 
-interface Prospect {
-  id: number;
-  name: string;
-  entityid: string;
-  industry: string;
-  size: string;
-  status: string;
-  demoDate: string;
-  focus: string[];
-  budget: string;
-  nsId: number;
-  website?: string;
-  aiGenerated?: boolean;
-}
+const FOCUSABLE_SELECTORS =
+  'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])';
+
+const focusFirstElement = (container: HTMLElement | null) => {
+  if (!container) return;
+  const focusable = container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTORS);
+  const target = focusable[0] || container;
+  target.focus();
+};
+
+const trapFocus = (event: React.KeyboardEvent, container: HTMLElement | null) => {
+  if (event.key !== 'Tab' || !container) return;
+  const focusable = container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTORS);
+  if (focusable.length === 0) return;
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (event.shiftKey) {
+    if (document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    }
+  } else {
+    if (document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
+};
+
+const handleOverlayKeyDown = (
+  event: React.KeyboardEvent,
+  onClose: () => void,
+  container: HTMLElement | null
+) => {
+  if (event.key === 'Escape') {
+    event.stopPropagation();
+    onClose();
+  } else if (event.key === 'Tab') {
+    trapFocus(event, container);
+  }
+};
 
 interface SearchFilters {
   query: string;
@@ -56,7 +70,7 @@ const KEY_PROSPECTS: Prospect[] = [
   { id: 7, name: 'Formative Group', entityid: 'Formative-Demo', industry: 'Salesforce Consulting', size: '80-120', status: 'Active', demoDate: 'Nov 25', focus: ['Scaling Operations', 'Acquisitions', 'Resource Mgmt'], budget: '$200K-400K', nsId: 1938, website: 'https://formativegroup.com' }
 ];
 
-const PROMPT_CATEGORIES = [
+const PROMPT_CATEGORIES: PromptCategory[] = [
   {
     name: 'Customer Setup',
     prompts: [
@@ -145,7 +159,8 @@ const DemoDashboard: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [showClipboardPanel, setShowClipboardPanel] = useState(false);
-  const [expandedPromptCategory, setExpandedPromptCategory] = useState<number | null>(null);
+  const quickCreateRef = useRef<HTMLDivElement | null>(null);
+  const scenarioRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     storageService.saveProspects(dynamicCustomers);
@@ -169,6 +184,18 @@ const DemoDashboard: React.FC = () => {
   useEffect(() => {
     storageService.setPreferences({ lastCustomerId: selectedCustomer });
   }, [selectedCustomer]);
+
+  useEffect(() => {
+    if (showQuickCreate) {
+      focusFirstElement(quickCreateRef.current);
+    }
+  }, [showQuickCreate]);
+
+  useEffect(() => {
+    if (showScenarioGenerator) {
+      focusFirstElement(scenarioRef.current);
+    }
+  }, [showScenarioGenerator]);
 
   const allCustomers = useMemo(() => [...KEY_PROSPECTS, ...dynamicCustomers], [dynamicCustomers]);
 
@@ -222,7 +249,7 @@ const DemoDashboard: React.FC = () => {
     });
   }, [nsData, allCustomers, customFieldsData, syncHistory, selectedAccount]);
 
-  const prepWorkflow = useMemo(() => {
+  const prepWorkflow: PrepWorkflowStep[] = useMemo(() => {
     const hasProspect = Boolean(selectedCustData);
     const hasSyncedFields = selectedCustData ? Boolean(customFieldsData[selectedCustData.id]) : false;
     const hasScenario = dynamicCustomers.some((cust) => cust.aiGenerated);
@@ -267,6 +294,11 @@ const DemoDashboard: React.FC = () => {
         .catch(() => pushToast('Clipboard copy failed', 'error'));
     },
     [pushToast]
+  );
+
+  const handlePromptCopy = useCallback(
+    (prompt: string, index: string) => copyToClipboard(prompt, index, 'Prompt copied'),
+    [copyToClipboard]
   );
 
   const toggleFavorite = useCallback((prompt: string) => {
@@ -336,11 +368,11 @@ const DemoDashboard: React.FC = () => {
     setDemoNotes((prev) => ({ ...prev, [selectedCustData.id]: value }));
   };
 
-  const quickActions = useMemo(() => {
+  const quickActions: QuickAction[] = useMemo(() => {
     if (!selectedCustData) {
       return [];
     }
-    const actions = [
+    return [
       {
         id: 'project',
         label: 'Create Demo Project',
@@ -369,7 +401,9 @@ const DemoDashboard: React.FC = () => {
         description: 'Services + T&E mix',
         action: () =>
           copyToClipboard(
-            `Create an estimate for ${selectedCustData.name} with Professional Services (60%), Travel (20%), and Software (20%) totaling ${selectedCustData.budget.split('-')[0] || '$150K'}.`,
+            `Create an estimate for ${selectedCustData.name} with Professional Services (60%), Travel (20%), and Software (20%) totaling ${
+              selectedCustData.budget.split('-')[0] || '$150K'
+            }.`,
             'quick-estimate',
             'Estimate prompt'
           )
@@ -389,13 +423,13 @@ const DemoDashboard: React.FC = () => {
         id: 'sync',
         label: syncLoading ? 'Syncing...' : 'Sync NetSuite',
         description: lastSyncDisplay,
-        action: syncNetsuiteFields
+        action: syncNetsuiteFields,
+        disabled: syncLoading
       }
     ];
-    return actions;
   }, [selectedCustData, syncLoading, lastSyncDisplay, copyToClipboard, syncNetsuiteFields]);
 
-  const filteredPrompts = useMemo(() => {
+  const filteredPrompts: PromptCategory[] = useMemo(() => {
     if (!promptSearch) return PROMPT_CATEGORIES;
     return PROMPT_CATEGORIES.map((cat) => ({
       ...cat,
@@ -490,52 +524,14 @@ const DemoDashboard: React.FC = () => {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-        <section className="grid gap-4 lg:grid-cols-3">
-          <div className="lg:col-span-2 rounded-2xl border border-blue-200 bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-6 shadow-lg">
-            <p className="text-xs uppercase tracking-[0.3em] text-blue-100">Demo Prep Mission</p>
-            <h2 className="text-2xl font-semibold mt-1">Get {selectedCustData?.name || 'your next prospect'} demo-ready in minutes</h2>
-            <p className="text-blue-100 mt-2">Capture discovery, generate AI prompts, sync NetSuite data, and share assets from a single workspace.</p>
-            <div className="flex flex-wrap gap-4 mt-6">
-              <div className="flex items-center gap-4 bg-white/10 rounded-2xl px-4 py-3">
-                <div>
-                  <p className="text-3xl font-bold">{prepCompletion}%</p>
-                  <p className="text-xs uppercase tracking-[0.2em] text-blue-100">Workflow Complete</p>
-                </div>
-                <div className="text-xs text-blue-100/90">
-                  <p>{completedSteps} / {prepWorkflow.length} steps</p>
-                  <p>Last sync: {lastSyncDisplay}</p>
-                </div>
-              </div>
-              <div className="flex-1 min-w-[200px]">
-                <div className="grid grid-cols-2 gap-2">
-                  {prepWorkflow.map((step) => (
-                    <div key={step.id} className={`rounded-xl border px-3 py-2 text-sm ${step.done ? 'border-green-400 bg-white/15' : 'border-white/40 bg-white/5'}`}>
-                      <div className="flex items-center gap-2">
-                        <Check className={`h-4 w-4 ${step.done ? 'text-green-300' : 'text-white/60'}`} />
-                        <span>{step.label}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-2xl border bg-white dark:bg-gray-800 p-5 shadow-sm">
-            <div className="flex items-center gap-2 mb-4">
-              <BarChart3 className="h-5 w-5 text-blue-600" />
-              <h3 className="text-lg font-semibold">Pipeline Snapshot</h3>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              {Object.entries(statusCounts).map(([status, count]) => (
-                <div key={status} className="p-3 rounded-xl border border-gray-200 dark:border-gray-700">
-                  <p className="text-xs uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">{status}</p>
-                  <p className="text-2xl font-semibold">{count}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
+        <PrepMissionBanner
+          selectedCustomer={selectedCustData}
+          prepCompletion={prepCompletion}
+          completedSteps={completedSteps}
+          prepWorkflow={prepWorkflow}
+          lastSyncDisplay={lastSyncDisplay}
+          statusCounts={statusCounts}
+        />
 
         <AdvancedSearch
           onFiltersChange={(filters: SearchFilters) => {
@@ -688,33 +684,7 @@ const DemoDashboard: React.FC = () => {
                         </div>
                       </div>
 
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.2em] text-gray-500 mb-2">Quick Action Deck</p>
-                        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                          {quickActions.map((action) => (
-                            <button
-                              key={action.id}
-                              onClick={action.action}
-                              className="text-left border border-gray-200 dark:border-gray-700 rounded-xl p-4 hover:border-blue-500 transition"
-                              disabled={action.id === 'sync' && syncLoading}
-                            >
-                              <p className="text-sm font-semibold">{action.label}</p>
-                              <p className="text-xs text-gray-500 dark:text-gray-400">{action.description}</p>
-                            </button>
-                          ))}
-                        </div>
-                        {actionStatus && (
-                          <div className={`mt-4 rounded-xl border p-3 text-sm ${
-                            typeof actionStatus === 'string'
-                              ? 'border-blue-200 text-blue-700'
-                              : actionStatus.type === 'success'
-                              ? 'border-green-200 text-green-700'
-                              : 'border-red-200 text-red-700'
-                          }`}>
-                            {typeof actionStatus === 'string' ? actionStatus : actionStatus.message}
-                          </div>
-                        )}
-                      </div>
+                      <QuickActionsDeck actions={quickActions} actionStatus={actionStatus} />
 
                       <div className="grid gap-4 md:grid-cols-2">
                         <div className="rounded-xl border border-gray-200 dark:border-gray-700 p-4">
@@ -787,79 +757,14 @@ const DemoDashboard: React.FC = () => {
         )}
 
         {activeTab === 'prompts' && (
-          <section className="space-y-6">
-            <div className="flex flex-wrap gap-3 items-center">
-              <div className="relative flex-1 min-w-[240px]">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                <input
-                  value={promptSearch}
-                  onChange={(e) => setPromptSearch(e.target.value)}
-                  placeholder="Search prompt templates"
-                  className="pl-9 pr-3 py-2 rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent w-full"
-                />
-              </div>
-              <button className="px-4 py-2 rounded-full border" onClick={() => setPromptSearch('')}>
-                Clear
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              {filteredPrompts.length === 0 && (
-                <div className="rounded-2xl border border-dashed border-gray-300 dark:border-gray-700 p-10 text-center">
-                  <p className="text-gray-500">No prompts match your search.</p>
-                </div>
-              )}
-
-              {filteredPrompts.map((category, categoryIndex) => (
-                <div key={category.name} className="rounded-2xl border bg-white dark:bg-gray-900">
-                  <button
-                    className="w-full flex justify-between items-center p-4 text-left"
-                    onClick={() =>
-                      setExpandedPromptCategory((prev) =>
-                        prev === categoryIndex ? null : categoryIndex
-                      )
-                    }
-                  >
-                    <div>
-                      <p className="text-xs uppercase tracking-[0.2em] text-gray-500">Category</p>
-                      <h3 className="text-lg font-semibold">{category.name}</h3>
-                    </div>
-                    <ChevronDown
-                      className={`h-5 w-5 transition-transform ${
-                        expandedPromptCategory === categoryIndex ? 'rotate-180' : ''
-                      }`}
-                    />
-                  </button>
-                  <div
-                    className={`border-t border-gray-200 dark:border-gray-800 ${
-                      expandedPromptCategory === categoryIndex ? 'block' : 'hidden'
-                    }`}
-                  >
-                    {category.prompts.map((prompt, promptIdx) => (
-                      <div key={promptIdx} className="p-4 border-b border-dashed last:border-0">
-                        <p className="text-sm text-gray-700 dark:text-gray-200 mb-3">{prompt}</p>
-                        <div className="flex items-center gap-2">
-                          <button
-                            className="px-3 py-1 rounded-full bg-blue-600 text-white text-xs"
-                            onClick={() => copyToClipboard(prompt, `${categoryIndex}-${promptIdx}`, 'Prompt copied')}
-                          >
-                            Copy Prompt
-                          </button>
-                          <button
-                            className={`px-3 py-1 rounded-full border text-xs ${favorites.includes(prompt) ? 'border-yellow-400 text-yellow-500' : 'border-gray-300'}`}
-                            onClick={() => toggleFavorite(prompt)}
-                          >
-                            <Star className={`h-3 w-3 inline mr-1 ${favorites.includes(prompt) ? 'fill-yellow-400 text-yellow-400' : ''}`} />
-                            {favorites.includes(prompt) ? 'Favorited' : 'Favorite'}
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
+          <PromptLibrary
+            promptSearch={promptSearch}
+            onPromptSearchChange={setPromptSearch}
+            filteredPrompts={filteredPrompts}
+            favorites={favorites}
+            toggleFavorite={toggleFavorite}
+            copyPrompt={handlePromptCopy}
+          />
         )}
 
         {activeTab === 'demo-builder' && (
@@ -894,8 +799,17 @@ const DemoDashboard: React.FC = () => {
       </main>
 
       {showQuickCreate && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center px-4" role="dialog" aria-modal="true">
-          <div className="bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-2xl shadow-2xl">
+        <div
+          className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center px-4"
+          role="dialog"
+          aria-modal="true"
+          onKeyDown={(event) => handleOverlayKeyDown(event, () => setShowQuickCreate(false), quickCreateRef.current)}
+        >
+          <div
+            ref={quickCreateRef}
+            tabIndex={-1}
+            className="bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-2xl shadow-2xl"
+          >
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className="text-xl font-semibold">Create New Prospect</h3>
@@ -918,8 +832,15 @@ const DemoDashboard: React.FC = () => {
       )}
 
       {showScenarioGenerator && (
-        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center px-4">
-          <div className="bg-white dark:bg-gray-900 rounded-2xl p-4 max-w-3xl w-full shadow-2xl">
+        <div
+          className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center px-4"
+          onKeyDown={(event) => handleOverlayKeyDown(event, () => setShowScenarioGenerator(false), scenarioRef.current)}
+        >
+          <div
+            ref={scenarioRef}
+            tabIndex={-1}
+            className="bg-white dark:bg-gray-900 rounded-2xl p-4 max-w-3xl w-full shadow-2xl"
+          >
             <ScenarioGenerator onScenarioGenerated={handleScenarioGenerated} onClose={() => setShowScenarioGenerator(false)} />
           </div>
         </div>
@@ -1081,9 +1002,28 @@ interface ClipboardHistoryProps {
 }
 
 const ClipboardHistoryPanel: React.FC<ClipboardHistoryProps> = ({ show, history, onClose, onClear, onCopy }) => {
+  const panelRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (show) {
+      focusFirstElement(panelRef.current);
+    }
+  }, [show]);
+
   return (
-    <div className={`fixed right-0 top-0 h-full w-full max-w-sm transform duration-300 z-40 ${show ? 'translate-x-0' : 'translate-x-full'}`}>
-      <div className="h-full bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-800 shadow-xl flex flex-col">
+    <div
+      className={`fixed right-0 top-0 h-full w-full max-w-sm transform duration-300 z-40 ${
+        show ? 'translate-x-0' : 'translate-x-full'
+      }`}
+      role="dialog"
+      aria-modal="true"
+      onKeyDown={(event) => handleOverlayKeyDown(event, onClose, panelRef.current)}
+    >
+      <div
+        ref={panelRef}
+        tabIndex={-1}
+        className="h-full bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-800 shadow-xl flex flex-col"
+      >
         <div className="p-4 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between gap-3">
           <div>
             <h4 className="font-semibold">Clipboard History</h4>

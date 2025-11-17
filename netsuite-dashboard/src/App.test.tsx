@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { act } from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import App from './App';
@@ -25,8 +25,10 @@ describe('Demo Dashboard App', () => {
     render(<App />);
 
     const searchInput = screen.getByPlaceholderText(/Search prospects or industries/i);
-    await userEvent.clear(searchInput);
-    await userEvent.type(searchInput, 'AdvisorHR');
+    await act(async () => {
+      await userEvent.clear(searchInput);
+      await userEvent.type(searchInput, 'AdvisorHR');
+    });
 
     expect(screen.getAllByText('AdvisorHR').length).toBeGreaterThan(0);
     expect(screen.queryByText('GSB Group')).not.toBeInTheDocument();
@@ -36,7 +38,9 @@ describe('Demo Dashboard App', () => {
     render(<App />);
 
     const syncButtons = await screen.findAllByRole('button', { name: /Sync NetSuite/i });
-    await userEvent.click(syncButtons[0]);
+    await act(async () => {
+      await userEvent.click(syncButtons[0]);
+    });
 
     await waitFor(() => {
       expect(screen.getByText(/AI Generated Summary/i)).toBeInTheDocument();
@@ -47,13 +51,19 @@ describe('Demo Dashboard App', () => {
     render(<App />);
 
     const promptTab = screen.getByRole('button', { name: /Demo Prompts/i });
-    await userEvent.click(promptTab);
+    await act(async () => {
+      await userEvent.click(promptTab);
+    });
 
     const categoryToggle = await screen.findByRole('button', { name: /Customer Setup/i });
-    await userEvent.click(categoryToggle);
+    await act(async () => {
+      await userEvent.click(categoryToggle);
+    });
 
     const copyButtons = await screen.findAllByRole('button', { name: /^Copy Prompt$/i });
-    await userEvent.click(copyButtons[0]);
+    await act(async () => {
+      await userEvent.click(copyButtons[0]);
+    });
 
     expect(navigator.clipboard.writeText).toHaveBeenCalled();
   });
@@ -62,10 +72,14 @@ describe('Demo Dashboard App', () => {
     render(<App />);
 
     const demoBuilderTab = screen.getByRole('button', { name: /Demo Builder/i });
-    await userEvent.click(demoBuilderTab);
+    await act(async () => {
+      await userEvent.click(demoBuilderTab);
+    });
 
     const launchButton = screen.getByRole('button', { name: /Launch Scenario Generator/i });
-    await userEvent.click(launchButton);
+    await act(async () => {
+      await userEvent.click(launchButton);
+    });
 
     await waitFor(() => {
       expect(screen.getByText(/AI Scenario Generator/i)).toBeInTheDocument();
