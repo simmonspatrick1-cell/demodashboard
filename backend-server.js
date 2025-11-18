@@ -11,6 +11,7 @@ const morgan = require('morgan');
 
 const projectsRouter = require('./api/projects');
 const debugRouter = require('./api/debug');
+const customersRouter = require('./api/customers');
 
 const app = express();
 const PORT = Number(process.env.API_PORT || process.env.PORT || 3004);
@@ -35,6 +36,7 @@ app.get('/api/health', (req, res) => {
 
 app.use('/api/projects', projectsRouter);
 app.use('/api/debug', debugRouter);
+app.use('/api/customers', customersRouter);
 
 // Basic error handler so unhandled exceptions do not crash the server.
 app.use((err, req, res, next) => {

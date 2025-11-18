@@ -52,6 +52,30 @@ npm run build        # outputs to netsuite-dashboard/build
 
 The repo already contains a `vercel.json` that tells Vercel to build from `netsuite-dashboard` and serve `build/` as a SPA, so running `vercel --prod` from the repo root will deploy the consolidated app.
 
+## NetSuite RESTlet "Hello World"
+
+Need to confirm that your NetSuite account, integration record, and TBA token are wired up before deploying the full project sync RESTlet? Upload [`netsuite-restlet-hello-world.js`](netsuite-restlet-hello-world.js) to NetSuite (SuiteScript 2.1 → RESTlet) and create a deployment in **Released** status. The script simply logs the incoming payload and responds with a JSON message so you can test both GET and POST requests with `curl` or the `test-netsuite-connection.sh` flow:
+
+```bash
+# After setting NETSUITE_REST_URL + OAuth env vars
+curl "$NETSUITE_REST_URL" \
+  -H "Authorization: OAuth ..." \
+  -H "Content-Type: application/json"
+```
+
+Expected response:
+
+```json
+{
+  "success": true,
+  "message": "Hello from NetSuite RESTlet (GET)",
+  "timestamp": "2024-01-01T00:00:00.000Z",
+  "input": {}
+}
+```
+
+Once your auth is confirmed, swap the deployment to the full [`netsuite-restlet.js`](netsuite-restlet.js) script.
+
 ## Contributing / Customizing
 
 - All UI/state lives in `netsuite-dashboard/src/DemoDashboard.tsx`. Adjust UX, hooks, or data mocks there.
