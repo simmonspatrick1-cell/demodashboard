@@ -1,5 +1,6 @@
 // Storage utility service for user preferences and data persistence
 import { config } from './config';
+import { ProjectRecord } from './types/dashboard';
 
 export interface UserPreferences {
   theme: 'light' | 'dark' | 'auto';
@@ -191,6 +192,24 @@ class StorageService {
 
   saveProspects(prospects: any[]): void {
     this.setItem(config.storage.prospects, prospects);
+  }
+
+  // Applied prompts per prospect
+  getAppliedPrompts(): Record<number, string[]> {
+    return this.getItem(config.storage.appliedPrompts, {});
+  }
+
+  saveAppliedPrompts(promptsMap: Record<number, string[]>): void {
+    this.setItem(config.storage.appliedPrompts, promptsMap);
+  }
+
+  // Project sync records
+  getProjectSyncs(): Record<number, ProjectRecord> {
+    return this.getItem(config.storage.projectSyncs, {} as Record<number, ProjectRecord>);
+  }
+
+  saveProjectSyncs(syncs: Record<number, ProjectRecord>): void {
+    this.setItem(config.storage.projectSyncs, syncs);
   }
 
   // Recent Items Management

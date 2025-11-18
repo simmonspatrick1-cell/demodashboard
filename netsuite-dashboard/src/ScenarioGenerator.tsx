@@ -23,6 +23,9 @@ interface ScenarioGeneratorProps {
   onClose: () => void;
   apiClient?: ScenarioApiClient;
   featureFlags?: ScenarioGeneratorFeatureFlags;
+  defaultCompanyName?: string;
+  defaultIndustry?: string;
+  defaultWebsite?: string;
 }
 
 type ScenarioGeneratorFeatureFlags = {
@@ -40,6 +43,7 @@ interface ScenarioTemplate {
   prompt: string;
   defaultStatus?: string;
   synced?: boolean;
+  website?: string;
 }
 
 interface TemplateFormState {
@@ -125,13 +129,17 @@ export default function ScenarioGenerator({
   onScenarioGenerated,
   onClose,
   apiClient = APIService,
-  featureFlags
+  featureFlags,
+  defaultCompanyName,
+  defaultIndustry,
+  defaultWebsite
 }: ScenarioGeneratorProps) {
   const [baseTemplates, setBaseTemplates] = useState<ScenarioTemplate[]>(FALLBACK_TEMPLATES);
   const [customTemplates, setCustomTemplates] = useState<ScenarioTemplate[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<string>('');
-  const [companyName, setCompanyName] = useState<string>('');
-  const [industry, setIndustry] = useState<string>('');
+  const [companyName, setCompanyName] = useState<string>(defaultCompanyName || '');
+  const [industry, setIndustry] = useState<string>(defaultIndustry || '');
+  const [website, setWebsite] = useState<string>(defaultWebsite || '');
   const [customization, setCustomization] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [loadingTemplates, setLoadingTemplates] = useState<boolean>(true);
@@ -254,6 +262,18 @@ export default function ScenarioGenerator({
   }, [loadTemplates]);
 
   useEffect(() => {
+    setCompanyName(defaultCompanyName || '');
+  }, [defaultCompanyName]);
+
+  useEffect(() => {
+    setIndustry(defaultIndustry || '');
+  }, [defaultIndustry]);
+
+  useEffect(() => {
+    setWebsite(defaultWebsite || '');
+  }, [defaultWebsite]);
+
+  useEffect(() => {
     if (typeof window === 'undefined') return;
     try {
       const stored = window.localStorage.getItem(templateStorageKey);
@@ -298,7 +318,8 @@ export default function ScenarioGenerator({
       prompt: data?.prompt || templateMeta?.prompt,
       category: data?.category || templateMeta?.industry || 'AI Scenario',
       companyName: sanitizedName,
-      customization: customization || 'Standard professional services demo scenario'
+      customization: customization || 'Standard professional services demo scenario',
+      website: data?.website || website || templateMeta?.website
     };
   };
 
@@ -309,7 +330,8 @@ export default function ScenarioGenerator({
         name: companyName || templateMeta?.name,
         industry,
         description: `${promptSeed}${customization ? `\nCustomization: ${customization}` : ''}`,
-        prompt: promptSeed
+        prompt: promptSeed,
+        website
       },
       templateMeta
     );
@@ -331,6 +353,8 @@ export default function ScenarioGenerator({
         template: selectedTemplate,
         companyName,
         industry,
+        website,
+        websiteUrl: website,
         customization: customization || 'Standard professional services demo scenario'
       });
 
@@ -362,8 +386,9 @@ export default function ScenarioGenerator({
 
   const resetForm = () => {
     setSelectedTemplate('');
-    setCompanyName('');
-    setIndustry('');
+    setCompanyName(defaultCompanyName || '');
+    setIndustry(defaultIndustry || '');
+    setWebsite(defaultWebsite || '');
     setCustomization('');
     setError(null);
     setSuccess(false);
@@ -705,6 +730,23 @@ export default function ScenarioGenerator({
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             disabled={isLoading}
           />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Website URL
+          </label>
+          <input
+            type="url"
+            value={website}
+            onChange={(e) => setWebsite(e.target.value)}
+            placeholder="https://prospect-site.com"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            disabled={isLoading}
+          />
+          {defaultWebsite && (
+            <p className="text-xs text-gray-500 mt-1">Pulled from the selected prospect.</p>
+          )}
         </div>
 
         <div>

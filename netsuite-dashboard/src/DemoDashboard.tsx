@@ -3,11 +3,12 @@ import { BookOpen, Building2, Check, ClipboardList, Download, Menu, Moon, Plus, 
 import ScenarioGenerator from './ScenarioGenerator';
 import AdvancedSearch from './AdvancedSearch';
 import DataExport from './DataExport';
+import APIService, { ProjectSyncPayload } from './api-service';
 import storageService from './storage-service';
 import PrepMissionBanner from './components/PrepMissionBanner';
 import PromptLibrary from './components/PromptLibrary';
 import QuickActionsDeck from './components/QuickActionsDeck';
-import { PrepWorkflowStep, PromptCategory, Prospect, QuickAction } from './types/dashboard';
+import { PrepWorkflowStep, ProjectRecord, PromptCategory, Prospect, QuickAction } from './types/dashboard';
 
 const FOCUSABLE_SELECTORS =
   'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])';
@@ -147,11 +148,14 @@ const DemoDashboard: React.FC = () => {
   const [favorites, setFavorites] = useState<string[]>(storageService.getFavorites());
   const [clipboardHistory, setClipboardHistory] = useState<{ id: string; label: string; text: string; timestamp: Date }[]>([]);
   const [demoNotes, setDemoNotes] = useState<{ [key: number]: string }>(storageService.getNoteDrafts());
+  const [appliedPrompts, setAppliedPrompts] = useState<Record<number, string[]>>(storageService.getAppliedPrompts());
   const [nsData, setNsData] = useState<Record<number, any>>({});
   const [customFieldsData, setCustomFieldsData] = useState<Record<number, any>>({});
   const [syncHistory, setSyncHistory] = useState<Record<number, Date>>({});
+  const [projectSyncs, setProjectSyncs] = useState<Record<number, ProjectRecord>>(storageService.getProjectSyncs());
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
   const [syncLoading, setSyncLoading] = useState(false);
+  const [projectSyncLoading, setProjectSyncLoading] = useState(false);
   const [actionStatus, setActionStatus] = useState<string | { type: 'success' | 'error' | 'info'; message: string } | null>(null);
   const [showQuickCreate, setShowQuickCreate] = useState(false);
   const [showScenarioGenerator, setShowScenarioGenerator] = useState(false);
@@ -171,6 +175,14 @@ const DemoDashboard: React.FC = () => {
       storageService.saveNoteDraft(Number(id), value || '');
     });
   }, [demoNotes]);
+
+  useEffect(() => {
+    storageService.saveAppliedPrompts(appliedPrompts);
+  }, [appliedPrompts]);
+
+  useEffect(() => {
+    storageService.saveProjectSyncs(projectSyncs);
+  }, [projectSyncs]);
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark');
@@ -261,6 +273,7 @@ const DemoDashboard: React.FC = () => {
       const customer = allCustomers.find((c) => c.id === numericId);
       const syncedAt = recordData?.syncedAt || syncHistory[numericId]?.toISOString() || '';
       const customFields = customFieldsData[numericId] || {};
+      const projectRecord = projectSyncs[numericId];
       return {
         customerId: numericId,
         name: customer?.name || recordData?.companyname,
@@ -273,11 +286,17 @@ const DemoDashboard: React.FC = () => {
         email: recordData?.email,
         phone: recordData?.phone,
         customFields,
+        projectId: projectRecord?.projectId,
+        projectName: projectRecord?.projectName,
+        projectPrompts: projectRecord?.prompts,
+        projectTasks: projectRecord?.tasks,
+        projectSyncedAt: projectRecord?.syncedAt,
+        projectSource: projectRecord?.source,
         source: 'NetSuite',
         raw: recordData
       };
     });
-  }, [nsData, allCustomers, customFieldsData, syncHistory, selectedAccount]);
+  }, [nsData, allCustomers, customFieldsData, syncHistory, selectedAccount, projectSyncs]);
 
   const prepWorkflow: PrepWorkflowStep[] = useMemo(() => {
     const hasProspect = Boolean(selectedCustData);
@@ -346,6 +365,18 @@ const DemoDashboard: React.FC = () => {
     (newScenario: Prospect) => {
       setDynamicCustomers((prev) => [newScenario, ...prev]);
       setSelectedCustomer(newScenario.id);
+      if (newScenario.description) {
+        setDemoNotes((prev) => ({ ...prev, [newScenario.id]: newScenario.description || '' }));
+      }
+      if (newScenario.prompt) {
+        setAppliedPrompts((prev) => {
+          const existing = prev[newScenario.id] || [];
+          if (existing.includes(newScenario.prompt as string)) {
+            return prev;
+          }
+          return { ...prev, [newScenario.id]: [...existing, newScenario.prompt as string] };
+        });
+      }
       pushToast(`Scenario "${newScenario.name}" added`, 'success');
     },
     [pushToast]
@@ -400,10 +431,202 @@ const DemoDashboard: React.FC = () => {
     setDemoNotes((prev) => ({ ...prev, [selectedCustData.id]: value }));
   };
 
+  const appliedPromptsForSelected = useMemo(() => {
+    if (!selectedCustData) return [] as string[];
+    return appliedPrompts[selectedCustData.id] || [];
+  }, [appliedPrompts, selectedCustData]);
+
+  const handleApplyPromptToProspect = useCallback(
+    (prompt: string) => {
+      if (!selectedCustData) {
+        pushToast('Select a prospect before applying prompts.', 'info');
+        return;
+      }
+      const currentPrompts = appliedPrompts[selectedCustData.id] || [];
+      if (currentPrompts.includes(prompt)) {
+        pushToast('Prompt already applied to this prospect.', 'info');
+        return;
+      }
+      setAppliedPrompts((prev) => ({
+        ...prev,
+        [selectedCustData.id]: [...currentPrompts, prompt]
+      }));
+      pushToast('Prompt attached to prospect', 'success');
+    },
+    [appliedPrompts, selectedCustData, pushToast]
+  );
+
+  const handleRemoveAppliedPrompt = useCallback(
+    (prompt: string) => {
+      if (!selectedCustData) return;
+      setAppliedPrompts((prev) => {
+        const currentPrompts = prev[selectedCustData.id] || [];
+        const nextPrompts = currentPrompts.filter((item) => item !== prompt);
+        const updated = { ...prev };
+        if (nextPrompts.length === 0) {
+          delete updated[selectedCustData.id];
+        } else {
+          updated[selectedCustData.id] = nextPrompts;
+        }
+        return updated;
+      });
+      pushToast('Prompt removed from prospect', 'info');
+    },
+    [selectedCustData, pushToast]
+  );
+
+  const handleClearAppliedPrompts = useCallback(() => {
+    if (!selectedCustData) return;
+    setAppliedPrompts((prev) => {
+      if (!prev[selectedCustData.id]) return prev;
+      const updated = { ...prev };
+      delete updated[selectedCustData.id];
+      return updated;
+    });
+    pushToast('Cleared applied prompts', 'info');
+  }, [selectedCustData, pushToast]);
+
+  const handleProjectSync = useCallback(async () => {
+    if (!selectedCustData) return;
+    if (appliedPromptsForSelected.length === 0) {
+      pushToast('Apply prompts before creating a project.', 'info');
+      setActionStatus({ type: 'info', message: 'Add at least one prompt to build a project plan.' });
+      setTimeout(() => setActionStatus(null), 3500);
+      return;
+    }
+
+    const snapshotCustomer = selectedCustData;
+    const promptsSnapshot = [...appliedPromptsForSelected];
+    const noteSnapshot = demoNotes[snapshotCustomer.id] || '';
+    const syncedAt = new Date();
+    const projectId = `PRJ-${snapshotCustomer.entityid.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 6)}-${syncedAt
+      .getTime()
+      .toString()
+      .slice(-4)}`;
+
+    const generateTasksFromPrompts = (prompts: string[]): ProjectRecord['tasks'] =>
+      prompts.slice(0, 4).map((promptText, index, arr) => {
+        const status: ProjectRecord['tasks'][number]['status'] =
+          index === 0 ? 'Scheduled' : index === arr.length - 1 ? 'Ready' : 'Pending';
+        return {
+          name: `Track ${index + 1}: ${promptText.slice(0, 50)}${promptText.length > 50 ? '…' : ''}`,
+          owner: ['Engagement Lead', 'Solution Architect', 'Project Manager', 'Consultant'][index] || 'Project Team',
+          status
+        };
+      });
+
+    const offlineRecord: ProjectRecord = {
+      projectId,
+      projectName: `${snapshotCustomer.name} - Demo Build`,
+      syncedAt: syncedAt.toISOString(),
+      prompts: promptsSnapshot,
+      notes: noteSnapshot,
+      website: snapshotCustomer.website,
+      source: snapshotCustomer.aiGenerated ? 'Scenario Builder' : 'Manual',
+      tasks: generateTasksFromPrompts(promptsSnapshot)
+    };
+
+    const payload: ProjectSyncPayload = {
+      customerId: snapshotCustomer.nsId,
+      account: selectedAccount,
+      prompts: promptsSnapshot,
+      notes: noteSnapshot,
+      website: snapshotCustomer.website,
+      prospectName: snapshotCustomer.name,
+      industry: snapshotCustomer.industry,
+      focusAreas: snapshotCustomer.focus
+    };
+
+    setProjectSyncLoading(true);
+    setActionStatus('Creating NetSuite project...');
+
+    try {
+      const apiResult = await APIService.syncProject(payload);
+      if (!apiResult?.success || !apiResult.data) {
+        throw new Error(apiResult?.error || 'Project API response missing data');
+      }
+
+      const serverRecord = apiResult.data;
+      const normalizeStatus = (
+        status?: string
+      ): ProjectRecord['tasks'][number]['status'] =>
+        status === 'Ready' || status === 'Scheduled' ? status : 'Pending';
+
+      const serverTasks = Array.isArray(serverRecord.tasks) && serverRecord.tasks.length
+        ? serverRecord.tasks.map((task: any, idx: number) => ({
+            name: task?.name || offlineRecord.tasks[idx]?.name || `Task ${idx + 1}`,
+            owner: task?.owner || offlineRecord.tasks[idx]?.owner || 'Project Team',
+            status: normalizeStatus(task?.status)
+          }))
+        : offlineRecord.tasks;
+
+      const projectRecord: ProjectRecord = {
+        projectId: serverRecord.projectId || offlineRecord.projectId,
+        projectName: serverRecord.projectName || offlineRecord.projectName,
+        syncedAt: serverRecord.syncedAt || offlineRecord.syncedAt,
+        prompts: Array.isArray(serverRecord.prompts) && serverRecord.prompts.length ? serverRecord.prompts : offlineRecord.prompts,
+        notes: serverRecord.notes ?? offlineRecord.notes,
+        website: serverRecord.website ?? offlineRecord.website,
+        source: serverRecord.source === 'Scenario Builder' ? 'Scenario Builder' : 'Manual',
+        tasks: serverTasks
+      };
+
+      setProjectSyncs((prev) => ({
+        ...prev,
+        [snapshotCustomer.id]: projectRecord
+      }));
+      setActionStatus({ type: 'success', message: 'NetSuite project created' });
+      pushToast('NetSuite project created', 'success');
+    } catch (err) {
+      console.error('Project sync failed:', err);
+      setProjectSyncs((prev) => ({
+        ...prev,
+        [snapshotCustomer.id]: offlineRecord
+      }));
+      setActionStatus({ type: 'error', message: 'API unavailable — stored offline project plan' });
+      pushToast('Project saved offline', 'info');
+    } finally {
+      setProjectSyncLoading(false);
+      setTimeout(() => setActionStatus(null), 4000);
+    }
+  }, [
+    appliedPromptsForSelected,
+    demoNotes,
+    selectedCustData,
+    pushToast,
+    selectedAccount
+  ]);
+
+  const selectedProjectRecord = useMemo(() => {
+    if (!selectedCustData) return undefined;
+    return projectSyncs[selectedCustData.id];
+  }, [projectSyncs, selectedCustData]);
+
+  const projectSyncedDisplay = useMemo(() => {
+    if (!selectedProjectRecord) return 'Not synced yet';
+    return new Date(selectedProjectRecord.syncedAt).toLocaleString([], {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  }, [selectedProjectRecord]);
+
   const quickActions: QuickAction[] = useMemo(() => {
     if (!selectedCustData) {
       return [];
     }
+    const canSyncProject = appliedPromptsForSelected.length > 0;
+    const projectActionLabel = projectSyncLoading
+      ? 'Building Project...'
+      : selectedProjectRecord
+        ? 'Resync NetSuite Project'
+        : 'Create NetSuite Project';
+    const projectActionDescription = selectedProjectRecord
+      ? `Synced ${projectSyncedDisplay}`
+      : canSyncProject
+        ? 'Convert applied prompts into SuiteProjects tasks'
+        : 'Apply prompts to enable project sync';
     return [
       {
         id: 'project',
@@ -457,9 +680,27 @@ const DemoDashboard: React.FC = () => {
         description: lastSyncDisplay,
         action: syncNetsuiteFields,
         disabled: syncLoading
+      },
+      {
+        id: 'project-sync',
+        label: projectActionLabel,
+        description: projectActionDescription,
+        action: handleProjectSync,
+        disabled: projectSyncLoading || !canSyncProject
       }
     ];
-  }, [selectedCustData, syncLoading, lastSyncDisplay, copyToClipboard, syncNetsuiteFields]);
+  }, [
+    selectedCustData,
+    syncLoading,
+    lastSyncDisplay,
+    copyToClipboard,
+    syncNetsuiteFields,
+    appliedPromptsForSelected,
+    projectSyncLoading,
+    selectedProjectRecord,
+    projectSyncedDisplay,
+    handleProjectSync
+  ]);
 
   const filteredPrompts: PromptCategory[] = useMemo(() => {
     if (!promptSearch) return PROMPT_CATEGORIES;
@@ -722,7 +963,7 @@ const DemoDashboard: React.FC = () => {
 
                       <QuickActionsDeck actions={quickActions} actionStatus={actionStatus} />
 
-                      <div className="grid gap-4 md:grid-cols-2">
+                      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                         <div className="rounded-xl border border-gray-200 dark:border-gray-700 p-4">
                           <p className="text-xs uppercase tracking-[0.2em] text-gray-500 mb-2">Demo Notes</p>
                           <textarea
@@ -732,6 +973,46 @@ const DemoDashboard: React.FC = () => {
                             rows={4}
                             placeholder="Capture storylines, objections, or next steps"
                           />
+                        </div>
+                        <div className="rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+                          <div className="flex items-center justify-between mb-3">
+                            <p className="text-xs uppercase tracking-[0.2em] text-gray-500">Applied Prompts</p>
+                            {appliedPromptsForSelected.length > 0 && (
+                              <button className="text-xs text-blue-600" onClick={handleClearAppliedPrompts}>
+                                Clear
+                              </button>
+                            )}
+                          </div>
+                          {appliedPromptsForSelected.length === 0 ? (
+                            <div className="text-sm text-gray-500">
+                              Use the Prompts tab to attach guided scripts.
+                              <button
+                                className="mt-2 text-blue-600 text-xs underline"
+                                onClick={() => setActiveTab('prompts')}
+                              >
+                                Open Prompt Library
+                              </button>
+                            </div>
+                          ) : (
+                            <ul className="space-y-3 text-sm">
+                              {appliedPromptsForSelected.map((prompt, idx) => (
+                                <li key={`${prompt}-${idx}`} className="border-b border-dashed border-gray-200 dark:border-gray-700 pb-2 last:border-0 last:pb-0">
+                                  <div className="flex items-start gap-2">
+                                    <span className="text-xs text-gray-400">{idx + 1}.</span>
+                                    <div className="flex-1">
+                                      <p className="text-gray-700 dark:text-gray-200 whitespace-pre-wrap">{prompt}</p>
+                                      <button
+                                        className="text-xs text-blue-600 mt-1"
+                                        onClick={() => handleRemoveAppliedPrompt(prompt)}
+                                      >
+                                        Remove
+                                      </button>
+                                    </div>
+                                  </div>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
                         </div>
                         <div className="rounded-xl border border-gray-200 dark:border-gray-700 p-4">
                           <div className="flex items-center justify-between mb-3">
@@ -756,6 +1037,67 @@ const DemoDashboard: React.FC = () => {
                             </div>
                           )}
                         </div>
+                      </div>
+
+                      <div className="rounded-2xl border border-dashed border-gray-300 dark:border-gray-700 p-4 bg-gray-50 dark:bg-gray-900/40">
+                        <div className="flex items-center justify-between mb-3">
+                          <div>
+                            <p className="text-xs uppercase tracking-[0.2em] text-gray-500">NetSuite Project Sync</p>
+                            <h4 className="text-lg font-semibold">
+                              {selectedProjectRecord?.projectName || 'SuiteProjects not synced'}
+                            </h4>
+                          </div>
+                          <span className="text-xs text-gray-500">{projectSyncedDisplay}</span>
+                        </div>
+                        {selectedProjectRecord ? (
+                          <div className="space-y-4 text-sm">
+                            <div className="flex flex-wrap gap-6 text-xs text-gray-500">
+                              <span>
+                                Project ID:{' '}
+                                <span className="font-semibold text-gray-900 dark:text-gray-100">
+                                  {selectedProjectRecord.projectId}
+                                </span>
+                              </span>
+                              <span>Source: {selectedProjectRecord.source}</span>
+                            </div>
+                            <div>
+                              <p className="text-xs uppercase tracking-[0.2em] text-gray-500 mb-2">Tasks</p>
+                              <div className="space-y-2">
+                                {selectedProjectRecord.tasks.map((task, idx) => (
+                                  <div key={`${task.name}-${idx}`} className="flex items-center justify-between gap-4 border border-gray-200 dark:border-gray-800 rounded-lg p-3">
+                                    <div>
+                                      <p className="font-semibold text-sm text-gray-900 dark:text-gray-100">{task.name}</p>
+                                      <p className="text-xs text-gray-500">Owner: {task.owner}</p>
+                                    </div>
+                                    <span
+                                      className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                                        task.status === 'Ready'
+                                          ? 'bg-green-100 text-green-700'
+                                          : task.status === 'Scheduled'
+                                          ? 'bg-blue-100 text-blue-700'
+                                          : 'bg-yellow-100 text-yellow-700'
+                                      }`}
+                                    >
+                                      {task.status}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                            <div>
+                              <p className="text-xs uppercase tracking-[0.2em] text-gray-500 mb-2">Prompt Bundle</p>
+                              <ul className="list-disc pl-5 space-y-1 text-xs text-gray-500">
+                                {selectedProjectRecord.prompts.map((prompt, idx) => (
+                                  <li key={`project-prompt-${idx}`}>{prompt}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="text-sm text-gray-500">
+                            Apply prompts and run the NetSuite project quick action to seed SuiteProjects.
+                          </div>
+                        )}
                       </div>
 
                       <div className="flex flex-wrap gap-3">
@@ -800,6 +1142,9 @@ const DemoDashboard: React.FC = () => {
             favorites={favorites}
             toggleFavorite={toggleFavorite}
             copyPrompt={handlePromptCopy}
+            onApplyPrompt={selectedCustData ? handleApplyPromptToProspect : undefined}
+            appliedPrompts={selectedCustData ? appliedPromptsForSelected : []}
+            activeProspectName={selectedCustData?.name}
           />
         )}
 
@@ -859,6 +1204,9 @@ const DemoDashboard: React.FC = () => {
               onCreate={(prospect) => {
                 setDynamicCustomers((prev) => [prospect, ...prev]);
                 setSelectedCustomer(prospect.id);
+                if (prospect.notes) {
+                  setDemoNotes((prev) => ({ ...prev, [prospect.id]: prospect.notes || '' }));
+                }
                 setShowQuickCreate(false);
                 pushToast(`${prospect.name} added`, 'success');
               }}
@@ -884,7 +1232,13 @@ const DemoDashboard: React.FC = () => {
             >
               <X size={18} />
             </button>
-            <ScenarioGenerator onScenarioGenerated={handleScenarioGenerated} onClose={() => setShowScenarioGenerator(false)} />
+            <ScenarioGenerator
+              onScenarioGenerated={handleScenarioGenerated}
+              onClose={() => setShowScenarioGenerator(false)}
+              defaultCompanyName={selectedCustData?.name}
+              defaultIndustry={selectedCustData?.industry}
+              defaultWebsite={selectedCustData?.website}
+            />
           </div>
         </div>
       )}
@@ -915,7 +1269,8 @@ const QuickCreateForm: React.FC<QuickCreateFormProps> = ({ onCreate }) => {
     budget: '$150K+',
     focus: 'Resource Planning, Billing',
     website: '',
-    demoDate: 'TBD'
+    demoDate: 'TBD',
+    notes: ''
   });
 
   const isValid = form.name.trim() && form.industry.trim();
@@ -998,6 +1353,15 @@ const QuickCreateForm: React.FC<QuickCreateFormProps> = ({ onCreate }) => {
             <option value="Proposal">Proposal</option>
           </select>
         </div>
+        <div className="md:col-span-2">
+          <label className="text-xs uppercase text-gray-500">Discovery Notes</label>
+          <textarea
+            value={form.notes}
+            onChange={(e) => setForm({ ...form, notes: e.target.value })}
+            className="input min-h-[90px]"
+            placeholder="What are they trying to solve? Key website observations?"
+          />
+        </div>
       </div>
       <div className="flex justify-end gap-3">
         <button className="px-4 py-2 rounded-full border" onClick={() => setForm({
@@ -1008,7 +1372,8 @@ const QuickCreateForm: React.FC<QuickCreateFormProps> = ({ onCreate }) => {
           budget: '$150K+',
           focus: 'Resource Planning, Billing',
           website: '',
-          demoDate: 'TBD'
+          demoDate: 'TBD',
+          notes: ''
         })}>
           Reset
         </button>
@@ -1026,7 +1391,8 @@ const QuickCreateForm: React.FC<QuickCreateFormProps> = ({ onCreate }) => {
             focus: form.focus.split(',').map((item) => item.trim()).filter(Boolean),
             budget: form.budget || '$150K+',
             nsId: Math.floor(Math.random() * 4000) + 2000,
-            website: form.website
+            website: form.website,
+            notes: form.notes.trim() || undefined
           })}
         >
           Create Prospect

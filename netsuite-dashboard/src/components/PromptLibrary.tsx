@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, ChevronDown, Copy, Star } from 'lucide-react';
+import { Search, ChevronDown, Copy, Star, Check } from 'lucide-react';
 import { PromptCategory } from '../types/dashboard';
 
 interface PromptLibraryProps {
@@ -9,6 +9,9 @@ interface PromptLibraryProps {
   favorites: string[];
   toggleFavorite: (prompt: string) => void;
   copyPrompt: (prompt: string, index: string) => void;
+  onApplyPrompt?: (prompt: string) => void;
+  appliedPrompts?: string[];
+  activeProspectName?: string;
 }
 
 export default function PromptLibrary({
@@ -17,7 +20,10 @@ export default function PromptLibrary({
   filteredPrompts,
   favorites,
   toggleFavorite,
-  copyPrompt
+  copyPrompt,
+  onApplyPrompt,
+  appliedPrompts = [],
+  activeProspectName
 }: PromptLibraryProps) {
   const [expandedCategory, setExpandedCategory] = useState<number | null>(null);
 
@@ -37,6 +43,12 @@ export default function PromptLibrary({
           Clear
         </button>
       </div>
+
+      {!onApplyPrompt && (
+        <div className="rounded-2xl border border-dashed border-gray-300 dark:border-gray-700 p-4 text-sm text-gray-500">
+          Select a prospect in the Context tab to apply prompts directly.
+        </div>
+      )}
 
       <div className="space-y-4">
         {filteredPrompts.length === 0 && (
@@ -65,10 +77,11 @@ export default function PromptLibrary({
                   {category.prompts.map((prompt, promptIdx) => {
                     const promptId = `${categoryIndex}-${promptIdx}`;
                     const isFavorite = favorites.includes(prompt);
+                    const isApplied = appliedPrompts.includes(prompt);
                     return (
                       <div key={promptIdx} className="p-4 border-b border-dashed last:border-0">
                         <p className="text-sm text-gray-700 dark:text-gray-200 mb-3">{prompt}</p>
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <button
                             className="px-3 py-1 rounded-full bg-blue-600 text-white text-xs inline-flex items-center gap-1"
                             onClick={() => copyPrompt(prompt, promptId)}
@@ -83,6 +96,18 @@ export default function PromptLibrary({
                           >
                             <Star className={`h-3 w-3 ${isFavorite ? 'fill-yellow-400 text-yellow-400' : ''}`} />
                             {isFavorite ? 'Favorited' : 'Favorite'}
+                          </button>
+                          <button
+                            className={`px-3 py-1 rounded-full border text-xs inline-flex items-center gap-1 ${
+                              isApplied
+                                ? 'border-green-500 text-green-600 bg-green-50 dark:bg-green-900/20'
+                                : 'border-gray-300'
+                            } ${!onApplyPrompt ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            disabled={!onApplyPrompt}
+                            onClick={() => onApplyPrompt?.(prompt)}
+                          >
+                            <Check className="h-3 w-3" />
+                            {isApplied ? 'Applied' : `Apply${activeProspectName ? ` to ${activeProspectName}` : ''}`}
                           </button>
                         </div>
                       </div>

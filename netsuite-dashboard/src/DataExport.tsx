@@ -28,8 +28,14 @@ export default function DataExport({ data = [], className = '', onExportComplete
     { id: 'entityId', label: 'Entity ID', selected: true },
     { id: 'netsuiteId', label: 'NetSuite Internal ID', selected: true },
     { id: 'syncedAt', label: 'Synced At', selected: true },
+    { id: 'projectId', label: 'Project ID', selected: true },
+    { id: 'projectName', label: 'Project Name', selected: true },
+    { id: 'projectSyncedAt', label: 'Project Synced At', selected: true },
     { id: 'email', label: 'Email', selected: false },
     { id: 'phone', label: 'Phone', selected: false },
+    { id: 'projectSource', label: 'Project Source', selected: false },
+    { id: 'projectPrompts', label: 'Project Prompts', selected: false },
+    { id: 'projectTasks', label: 'Project Tasks', selected: false },
     { id: 'customFields', label: 'Custom Fields', selected: true },
     { id: 'raw', label: 'Raw Payload', selected: false }
   ];

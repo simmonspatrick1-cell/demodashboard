@@ -38,7 +38,9 @@ export const config = {
     demoNotes: 'netsuite_dashboard_notes',
     prospects: 'netsuite_dashboard_prospects',
     noteDrafts: 'netsuite_dashboard_note_drafts',
-    scenarioTemplates: 'netsuite_dashboard_custom_templates'
+    scenarioTemplates: 'netsuite_dashboard_custom_templates',
+    appliedPrompts: 'netsuite_dashboard_applied_prompts',
+    projectSyncs: 'netsuite_dashboard_project_syncs'
   },
   
   // Chart Configuration

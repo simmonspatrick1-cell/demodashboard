@@ -10,7 +10,10 @@ export interface Prospect {
   budget: string;
   nsId: number;
   website?: string;
+  notes?: string;
   aiGenerated?: boolean;
+  prompt?: string;
+  description?: string;
 }
 
 export interface PrepWorkflowStep {
@@ -31,4 +34,15 @@ export interface QuickAction {
   description: string;
   action: () => void;
   disabled?: boolean;
+}
+
+export interface ProjectRecord {
+  projectId: string;
+  projectName: string;
+  syncedAt: string;
+  prompts: string[];
+  notes?: string;
+  website?: string;
+  source: 'Manual' | 'Scenario Builder';
+  tasks: { name: string; owner: string; status: 'Scheduled' | 'Pending' | 'Ready' }[];
 }
