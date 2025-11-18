@@ -2,7 +2,7 @@
 
 A single React application (located in [`netsuite-dashboard/`](netsuite-dashboard)) that showcases a fully wired NetSuite demo experience: prospect intake, AI prompt generation, mock NetSuite sync, clipboard utilities, and export tooling — all in one place.
 
-This repository now treats that app as the **only** source of truth. All earlier duplicate files, sample backends, and scattered docs have been removed so you only need to work inside the CRA project.
+This repository now treats that app as the **primary** source of truth. A lightweight Express API (optional) lives at the repo root under `backend-server.js` when you need to hit a real NetSuite endpoint or mock server.
 
 ## Features
 
@@ -36,6 +36,13 @@ npm install          # installs CRA dependencies
 npm start            # http://localhost:3000 in development
 ```
 
+If you want the mock/real NetSuite API locally:
+
+```bash
+npm install          # from the repo root (installs Express backend deps)
+npm run dev          # starts backend-server.js on http://localhost:3004
+```
+
 ## Production Build
 
 ```bash
@@ -49,7 +56,8 @@ The repo already contains a `vercel.json` that tells Vercel to build from `netsu
 
 - All UI/state lives in `netsuite-dashboard/src/DemoDashboard.tsx`. Adjust UX, hooks, or data mocks there.
 - `ScenarioGenerator.tsx`, `DataExport.tsx`, and `storage-service.ts` contain the reusable helpers for prompt generation, exports, and local persistence.
-- If you hook the dashboard to a real NetSuite backend, add the integration code directly inside the CRA app (or introduce a new directory and document it here). Avoid creating duplicate entry points in the repo so we keep things centralized.
+- The optional Express API is defined in `backend-server.js` with routes under `/api`. `netsuite-dashboard/src/config.ts` points to `http://localhost:3004/api` for local development.
+- If you hook the dashboard to a real NetSuite backend, wire it through that API layer (or replace the mock implementation) and document any additional environment variables here.
 
 ## Questions?
 
