@@ -118,6 +118,30 @@ export default function DemoDashboard() {
   }, [promptSearch]);
 
   // ============ HELPER FUNCTIONS ============
+  const formatPrompt = (prompt, customer) => {
+    if (!customer) return prompt;
+    
+    const today = new Date().toISOString().split('T')[0];
+    const futureDate = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    
+    return prompt
+      .replace(/\[Company Name\]/gi, customer.name)
+      .replace(/\[Customer Name\]/gi, customer.name)
+      .replace(/\[Customer\]/gi, customer.name)
+      .replace(/\[Client\]/gi, customer.name)
+      .replace(/\[Vertical\]/gi, customer.industry)
+      .replace(/\[Industry\]/gi, customer.industry)
+      .replace(/\[company size\]/gi, customer.size)
+      .replace(/\[amount\]/gi, customer.budget)
+      .replace(/\[Budget\]/gi, customer.budget)
+      .replace(/\[Project Name\]/gi, `${customer.name} Implementation`)
+      .replace(/\[PRJ####\]/gi, `PRJ-${customer.entityid}-${Math.floor(Math.random() * 1000)}`)
+      .replace(/\[Date\]/gi, today)
+      .replace(/\[Start\]/gi, today)
+      .replace(/\[End\]/gi, futureDate)
+      .replace(/\[contact info\]/gi, 'primary@example.com');
+  };
+
   const copyToClipboard = (text, index) => {
     navigator.clipboard.writeText(text);
     setCopiedIndex(index);
@@ -288,6 +312,7 @@ export default function DemoDashboard() {
       // Prepare export data with hashtags
       const exportData = createExportData(customerData, null, {
         modules: selectedCustData.focus || [],
+        memo: demoNotes[selectedCustData.id] || '',
         estimate: {
           type: 'T&M',
           customer: selectedCustData.name,
@@ -323,7 +348,8 @@ export default function DemoDashboard() {
 
     // Prepare export data for new customer creation
     const exportData = createExportData(prospectData, null, {
-      modules: prospectData.focus || []
+      modules: prospectData.focus || [],
+      memo: selectedCustData ? (demoNotes[selectedCustData.id] || '') : ''
     });
 
     // Export via email - this will create the customer in NetSuite
@@ -367,7 +393,8 @@ export default function DemoDashboard() {
         };
 
         const exportData = createExportData(selectedCustData, projectData, {
-          modules: selectedCustData.focus || []
+          modules: selectedCustData.focus || [],
+          memo: demoNotes[selectedCustData.id] || ''
         });
 
         exportViaEmail(exportData, {
@@ -425,7 +452,8 @@ export default function DemoDashboard() {
 
         const exportData = createExportData(selectedCustData, null, {
           estimate: estimateData,
-          modules: selectedCustData.focus || []
+          modules: selectedCustData.focus || [],
+          memo: demoNotes[selectedCustData.id] || ''
         });
 
         exportViaEmail(exportData, {
@@ -669,14 +697,14 @@ export default function DemoDashboard() {
               </div>
             </div>
 
-            {/* Quick Notes */}
+            {/* AI Strategy / Notes */}
             <div className="bg-white rounded-lg border border-gray-200 p-4">
-              <p className="text-xs text-gray-500 font-semibold uppercase mb-2">Quick Notes</p>
+              <p className="text-xs text-gray-500 font-semibold uppercase mb-2">AI Strategy / Notes</p>
               <textarea
                 value={demoNotes[selectedCustData.id] || ''}
                 onChange={(e) => setDemoNotes({...demoNotes, [selectedCustData.id]: e.target.value})}
-                placeholder="Add demo notes, pain points, or follow-up items..."
-                className="w-full h-24 p-2 border border-gray-300 rounded-lg text-sm resize-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Paste your AI-generated strategy, meeting notes, or key pain points here..."
+                className="w-full h-32 p-3 border border-gray-300 rounded-lg text-sm resize-none focus:ring-2 focus:ring-blue-500 font-mono bg-gray-50"
               />
             </div>
 
@@ -927,15 +955,61 @@ export default function DemoDashboard() {
   // ============ COMPONENT: PROMPT LIBRARY ============
   const PromptLibrary = () => (
     <div className="space-y-4">
-      <div className="relative">
-        <Search size={18} className="absolute left-3 top-3 text-gray-400" />
-        <input
-          type="text"
-          placeholder="Search prompts..."
-          value={promptSearch}
-          onChange={(e) => setPromptSearch(e.target.value)}
-          className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-        />
+      {/* Workflow Guide Banner */}
+      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
+        <div className="flex items-start gap-3">
+          <div className="bg-blue-100 rounded-full p-2 mt-0.5">
+            <Zap size={20} className="text-blue-600" />
+          </div>
+          <div className="flex-1">
+            <h3 className="font-semibold text-gray-900 mb-2">🚀 AI-Powered Workflow</h3>
+            <ol className="text-sm text-gray-700 space-y-1.5">
+              <li className="flex items-start gap-2">
+                <span className="font-semibold text-blue-600 min-w-[20px]">1.</span>
+                <span><strong>Select a prospect</strong> from the Context tab (or add a new one)</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="font-semibold text-blue-600 min-w-[20px]">2.</span>
+                <span><strong>Copy a prompt</strong> below — it auto-fills with your prospect's details!</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="font-semibold text-blue-600 min-w-[20px]">3.</span>
+                <span><strong>Paste into Claude</strong> to generate strategy, project plans, or estimates</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="font-semibold text-blue-600 min-w-[20px]">4.</span>
+                <span><strong>Paste Claude's output</strong> into the "AI Strategy / Notes" field (Context tab)</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="font-semibold text-blue-600 min-w-[20px]">5.</span>
+                <span><strong>Export to NetSuite</strong> via Quick Actions — your notes are included!</span>
+              </li>
+            </ol>
+          </div>
+        </div>
+      </div>
+
+      {/* Search Bar with Context Indicator */}
+      <div className="space-y-2">
+        {selectedCustData && (
+          <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-2 flex items-center gap-2">
+            <Check size={16} className="text-green-600" />
+            <span className="text-sm text-green-800">
+              <strong>{selectedCustData.name}</strong> selected — prompts are auto-filled with their details!
+            </span>
+          </div>
+        )}
+        
+        <div className="relative">
+          <Search size={18} className="absolute left-3 top-3 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search prompts..."
+            value={promptSearch}
+            onChange={(e) => setPromptSearch(e.target.value)}
+            className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+        </div>
       </div>
 
       <div className="space-y-3">
@@ -957,13 +1031,14 @@ export default function DemoDashboard() {
                 {category.prompts.map((prompt, promptIdx) => {
                   const globalIdx = catIdx * 100 + promptIdx;
                   const isFav = favorites.includes(prompt);
+                  const formattedPrompt = formatPrompt(prompt, selectedCustData);
                   
                   return (
                     <div key={promptIdx} className="p-4 hover:bg-gray-50 transition-colors">
-                      <p className="text-sm text-gray-700 mb-3 leading-relaxed">{prompt}</p>
+                      <p className="text-sm text-gray-700 mb-3 leading-relaxed whitespace-pre-wrap">{formattedPrompt}</p>
                       <div className="flex gap-2">
                         <button
-                          onClick={() => copyToClipboard(prompt, globalIdx)}
+                          onClick={() => copyToClipboard(formattedPrompt, globalIdx)}
                           className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors font-medium text-sm"
                         >
                           {copiedIndex === globalIdx ? (
