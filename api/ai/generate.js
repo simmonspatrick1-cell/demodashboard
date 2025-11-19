@@ -6,9 +6,12 @@ export default async function handler(req, res) {
   }
 
   const { type, content, apiKey } = req.body;
+  
+  // Use environment variable if apiKey is not provided or empty
+  const finalApiKey = (apiKey && apiKey.trim()) ? apiKey.trim() : process.env.ANTHROPIC_API_KEY;
 
-  if (!apiKey) {
-    return res.status(400).json({ error: 'Claude API Key is required' });
+  if (!finalApiKey) {
+    return res.status(400).json({ error: 'Claude API Key is required (in settings or env vars)' });
   }
 
   try {
@@ -72,13 +75,13 @@ export default async function handler(req, res) {
     }
 
     // 2. Call Claude API
-    const anthropicResponse = await fetch('https://api.anthropic.com/v1/messages', {
+    let anthropicResponse = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
-        'x-api-key': apiKey,
+        'x-api-key': finalApiKey,
         'anthropic-version': '2023-06-01',
         'content-type': 'application/json',
-        'dangerously-allow-browser': 'true' // Typically server-side doesn't need this, but Vercel functions might behave like browser envs occasionally
+        'dangerously-allow-browser': 'true'
       },
       body: JSON.stringify({
         model: 'claude-3-haiku-20240307',
@@ -88,7 +91,28 @@ export default async function handler(req, res) {
       })
     });
 
-    const data = await anthropicResponse.json();
+    let data = await anthropicResponse.json();
+
+    // 2a. Retry Logic: If 401 Unauthorized AND we used a custom key, try again with system key
+    if (data.error && data.error.type === 'authentication_error' && finalApiKey !== process.env.ANTHROPIC_API_KEY && process.env.ANTHROPIC_API_KEY) {
+      console.log('Authentication failed with custom key. Retrying with system key...');
+      anthropicResponse = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'x-api-key': process.env.ANTHROPIC_API_KEY,
+          'anthropic-version': '2023-06-01',
+          'content-type': 'application/json',
+          'dangerously-allow-browser': 'true'
+        },
+        body: JSON.stringify({
+          model: 'claude-3-haiku-20240307',
+          max_tokens: 4096,
+          system: systemPrompt,
+          messages: [{ role: 'user', content: prompt }]
+        })
+      });
+      data = await anthropicResponse.json();
+    }
 
     if (data.error) {
       throw new Error(data.error.message);
