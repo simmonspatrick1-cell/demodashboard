@@ -75,16 +75,13 @@ export default function DemoDashboard() {
     localStorage.setItem('demodashboard_prospects', JSON.stringify(prospects));
   }, [prospects]);
 
-  // Load API Key from local storage or use default
+  // Load API Key from local storage
   useEffect(() => {
     const savedKey = localStorage.getItem('demodashboard_claude_key');
     if (savedKey) {
       setClaudeApiKey(savedKey);
-    } else {
-      // Use default API key (can be overridden in Settings)
-      const defaultKey = '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';
-      setClaudeApiKey(defaultKey);
     }
+    // No default hardcoded key - rely on backend environment variables if not set
   }, []);
 
   // Save API Key to local storage
@@ -96,12 +93,13 @@ export default function DemoDashboard() {
 
   // AI Generation Handler
   const generateFromAI = async (type, content) => {
-    if (!claudeApiKey) {
-      setShowSettingsModal(true);
-      setActionStatus('⚠ Please enter your Claude API Key first');
-      setTimeout(() => setActionStatus(null), 3000);
-      return;
-    }
+    // If no key in settings, we'll try without it and let the backend use its env var
+    // if (!claudeApiKey) {
+    //   setShowSettingsModal(true);
+    //   setActionStatus('⚠ Please enter your Claude API Key first');
+    //   setTimeout(() => setActionStatus(null), 3000);
+    //   return;
+    // }
 
     setIsGeneratingAI(true);
     setActionStatus('🤖 Analyzing website...');
@@ -1757,15 +1755,21 @@ export default function DemoDashboard() {
               <h2 className="text-xl font-bold text-gray-900">Claude API Settings</h2>
             </div>
             <div className="p-6">
+              <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-100">
+                <p className="text-xs text-blue-900 font-medium mb-2">💡 System API Key Configured</p>
+                <p className="text-xs text-blue-800">
+                  The dashboard has a system-wide API key configured. You can leave the field below <strong>empty</strong> to use the system key, or enter your own to override it.
+                </p>
+              </div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Claude API Key
+                Claude API Key (Optional)
               </label>
               <input
                 type="text"
                 value={claudeApiKey}
                 onChange={(e) => setClaudeApiKey(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-mono text-sm"
-                placeholder="sk-ant-api03-..."
+                placeholder="Leave empty to use system key..."
               />
               {!localStorage.getItem('demodashboard_claude_key') && claudeApiKey && (
                 <p className="text-xs text-green-600 mt-2 flex items-center gap-1">
@@ -1796,20 +1800,19 @@ export default function DemoDashboard() {
               <button
                 onClick={() => {
                   const trimmedKey = claudeApiKey.trim();
-                  if (!trimmedKey.startsWith('sk-ant-api03-')) {
+                  if (trimmedKey && !trimmedKey.startsWith('sk-ant-api03-')) {
                     setActionStatus('⚠ Invalid API key format. Must start with "sk-ant-api03-"');
                     setTimeout(() => setActionStatus(null), 4000);
                     return;
                   }
                   saveClaudeKey(trimmedKey);
                   setShowSettingsModal(false);
-                  setActionStatus('✓ API Key saved!');
+                  setActionStatus(trimmedKey ? '✓ API Key saved!' : '✓ Using system key');
                   setTimeout(() => setActionStatus(null), 2000);
                 }}
-                disabled={!claudeApiKey || !claudeApiKey.trim()}
                 className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Save
+                {claudeApiKey ? 'Save Custom Key' : 'Use System Key'}
               </button>
             </div>
           </div>

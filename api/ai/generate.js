@@ -6,9 +6,12 @@ export default async function handler(req, res) {
   }
 
   const { type, content, apiKey } = req.body;
+  
+  // Use environment variable if apiKey is not provided or empty
+  const finalApiKey = (apiKey && apiKey.trim()) ? apiKey.trim() : process.env.ANTHROPIC_API_KEY;
 
-  if (!apiKey) {
-    return res.status(400).json({ error: 'Claude API Key is required' });
+  if (!finalApiKey) {
+    return res.status(400).json({ error: 'Claude API Key is required (in settings or env vars)' });
   }
 
   try {
@@ -75,7 +78,7 @@ export default async function handler(req, res) {
     const anthropicResponse = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
-        'x-api-key': apiKey,
+        'x-api-key': finalApiKey,
         'anthropic-version': '2023-06-01',
         'content-type': 'application/json',
         'dangerously-allow-browser': 'true' // Typically server-side doesn't need this, but Vercel functions might behave like browser envs occasionally
