@@ -24,6 +24,17 @@ const client = new Anthropic({
 app.use(cors());
 app.use(express.json());
 
+// ============ HEALTH CHECK ENDPOINT ============
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'OK',
+    timestamp: new Date().toISOString(),
+    version: '1.0.0',
+    uptime: process.uptime(),
+    env: process.env.NODE_ENV || 'development'
+  });
+});
+
 // ============ ENVIRONMENT VARIABLES ============
 const NETSUITE_ACCOUNT = process.env.NETSUITE_ACCOUNT_ID || "td3049589";
 const MCP_SERVER = "netsuite-stairway"; // Your MCP server name
@@ -615,7 +626,7 @@ app.use((err, req, res, next) => {
 });
 
 // ============ START SERVER ============
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3004;
 
 app.listen(PORT, () => {
   console.log(`✓ NetSuite Backend Server running on http://localhost:${PORT}`);

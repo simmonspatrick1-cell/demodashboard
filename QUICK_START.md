@@ -42,7 +42,7 @@ npm start
 ```
 
 5. **Test in browser:**
-   - Open http://localhost:3000
+   - Open http://localhost:3004
    - Click on any customer
    - Click "Sync NetSuite Data" button
    - Watch mock data load (it already does!)
@@ -91,7 +91,7 @@ npm install --save-dev @babel/node @babel/core @babel/preset-env
 ```env
 NETSUITE_ACCOUNT_ID=td3049589
 ANTHROPIC_API_KEY=your_claude_api_key_here
-PORT=3001
+PORT=3004
 ```
 
 **package.json** (update scripts):
@@ -110,7 +110,7 @@ PORT=3001
 npm start
 
 # You should see:
-# ✓ NetSuite Backend Server running on http://localhost:3001
+# ✓ NetSuite Backend Server running on http://localhost:3004
 ```
 
 ### Step 4: Update Dashboard to Call Backend
@@ -134,7 +134,7 @@ const syncNetsuiteFieFds = async () => {
   setActionStatus('Syncing from NetSuite...');
   
   try {
-    const response = await fetch('http://localhost:3001/api/netsuite/sync', {
+    const response = await fetch('http://localhost:3004/api/netsuite/sync', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -176,7 +176,7 @@ const syncNetsuiteFieFds = async () => {
 
 In browser console:
 ```javascript
-fetch('http://localhost:3001/api/health')
+fetch('http://localhost:3004/api/health')
   .then(r => r.json())
   .then(console.log)
 
@@ -202,7 +202,7 @@ fetch('http://localhost:3001/api/health')
 - [ ] Copy buttons work for prompts
 
 ### Full Mode (With Backend)
-- [ ] Backend server running on 3001
+- [ ] Backend server running on 3004
 - [ ] `/api/health` endpoint responds
 - [ ] Dashboard connects to backend
 - [ ] Real customer data from NetSuite loads
@@ -214,7 +214,7 @@ fetch('http://localhost:3001/api/health')
 
 ### "Cannot GET /api/netsuite/sync"
 - Backend not running? Start it: `npm start`
-- Wrong port? Check backend on 3001, dashboard calling it
+- Wrong port? Check backend on 3004, dashboard calling it
 
 ### "CORS error"
 - Backend is running but CORS not enabled
@@ -283,19 +283,19 @@ demo-backend/
 
 **GET /api/health**
 ```bash
-curl http://localhost:3001/api/health
+curl http://localhost:3004/api/health
 ```
 
 **POST /api/netsuite/sync**
 ```bash
-curl -X POST http://localhost:3001/api/netsuite/sync \
+curl -X POST http://localhost:3004/api/netsuite/sync \
   -H "Content-Type: application/json" \
   -d '{"customerId": 3161, "account": "services"}'
 ```
 
 **POST /api/netsuite/create-project**
 ```bash
-curl -X POST http://localhost:3001/api/netsuite/create-project \
+curl -X POST http://localhost:3004/api/netsuite/create-project \
   -H "Content-Type: application/json" \
   -d '{
     "entityid": "PRJ-DEMO-001",

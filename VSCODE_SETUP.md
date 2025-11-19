@@ -60,7 +60,7 @@ npm install
 
 ### Step 3: Start Backend (Optional)
 Press **F5** or click "Run → Start Debugging"
-→ Backend runs on http://localhost:3001
+→ Backend runs on http://localhost:3004
 
 ### Step 4: Open Dashboard in Your React App
 In another terminal:
@@ -140,7 +140,7 @@ outputs/
 # Press Ctrl+` to open terminal
 npm install    # First time only
 npm start      # Or press F5
-# Backend runs on http://localhost:3001
+# Backend runs on http://localhost:3004
 ```
 
 ### Terminal 2 (Frontend)
@@ -148,14 +148,14 @@ npm start      # Or press F5
 # Ctrl+Shift+` to open new terminal
 cd ../your-react-app
 npm start
-# Frontend runs on http://localhost:3000
+# Frontend runs on http://localhost:3004
 ```
 
 ### Both Running
 - Left side: Backend logs
 - Right side: Frontend logs
-- Open http://localhost:3000 in browser
-- Dashboard connects to backend on 3001
+- Open http://localhost:3004 in browser
+- Dashboard connects to backend on 3004
 
 ---
 
@@ -168,7 +168,7 @@ npm start
 4. View variables in left panel
 
 ### Debug Frontend
-1. Open http://localhost:3000
+1. Open http://localhost:3004
 2. Press **F12** (browser DevTools)
 3. Console tab for errors
 4. Network tab to see API calls

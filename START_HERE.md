@@ -14,7 +14,7 @@ cp DemoDashboard.jsx your-react-app/src/App.jsx
 # Run your React app
 npm start
 
-# Open http://localhost:3000
+# Open http://localhost:3004
 # Click any customer → "Sync NetSuite Data"
 # It works immediately! ✓
 ```
@@ -66,7 +66,7 @@ cp DemoDashboard.jsx src/App.jsx
 # 2. Start React
 npm start
 
-# 3. Open http://localhost:3000
+# 3. Open http://localhost:3004
 # ✅ Done! Click around, it all works!
 ```
 
