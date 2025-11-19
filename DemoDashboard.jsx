@@ -448,7 +448,8 @@ export default function DemoDashboard() {
           status: 'PENDING',
           dueDate: new Date(Date.now() + 30*24*60*60*1000).toISOString().split('T')[0],
           items: Object.values(lineItems).map(item => ({
-            name: item.name,
+            name: item.name,  // NetSuite item ID (for mapping)
+            displayName: item.displayName || item.name,  // Display name (for UI/export)
             description: item.description,
             quantity: 1,
             rate: parseFloat(budgetAmount) * item.percentOfBudget
@@ -782,6 +783,20 @@ export default function DemoDashboard() {
           Choose which NetSuite items to use when creating estimates. All items listed exist in your NetSuite account.
         </p>
         
+        {/* Rename Feature Info */}
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+          <div className="flex items-start gap-3">
+            <AlertCircle size={18} className="text-blue-600 mt-0.5 flex-shrink-0" />
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-blue-900 mb-1">💡 Rename Items for Your Dashboard</p>
+              <p className="text-xs text-blue-700">
+                Use <strong>Display Name</strong> to rename items for your dashboard (e.g., "Implementation Services" instead of "PS - Post Go-Live Support"). 
+                The <strong>NetSuite Item</strong> field determines which actual item gets exported. This lets you use friendly names while maintaining correct NetSuite mappings!
+              </p>
+            </div>
+          </div>
+        </div>
+        
         {/* Preset Selector */}
         <div className="mb-6">
           <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -828,11 +843,33 @@ export default function DemoDashboard() {
         <div className="space-y-4">
           {Object.entries(customItems).map(([key, item]) => (
             <div key={key} className="border border-gray-200 rounded-lg p-4">
+              {/* Display Name (Optional Rename) */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Display Name (Optional - rename for dashboard)
+                </label>
+                <input
+                  type="text"
+                  value={item.displayName || ''}
+                  onChange={(e) => {
+                    setCustomItems(prev => ({
+                      ...prev,
+                      [key]: { ...prev[key], displayName: e.target.value }
+                    }));
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder={`Leave blank to use: ${item.name}`}
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  This name appears in the dashboard. The NetSuite item below is what gets exported.
+                </p>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {/* Item Name Selector */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    NetSuite Item
+                    NetSuite Item <span className="text-red-500">*</span>
                   </label>
                   <select
                     value={item.name}
