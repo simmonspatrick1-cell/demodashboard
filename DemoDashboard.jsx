@@ -92,17 +92,9 @@ export default function DemoDashboard() {
   };
 
   // AI Generation Handler
-  const generateFromAI = async (type, content) => {
-    // If no key in settings, we'll try without it and let the backend use its env var
-    // if (!claudeApiKey) {
-    //   setShowSettingsModal(true);
-    //   setActionStatus('⚠ Please enter your Claude API Key first');
-    //   setTimeout(() => setActionStatus(null), 3000);
-    //   return;
-    // }
-
+  const generateFromAI = async (type, content, isRetry = false) => {
     setIsGeneratingAI(true);
-    setActionStatus('🤖 Analyzing website...');
+    setActionStatus(isRetry ? '🔄 Retrying with system key...' : '🤖 Analyzing...');
     
     try {
       // Ensure URL has protocol
@@ -111,21 +103,40 @@ export default function DemoDashboard() {
         url = 'https://' + url;
       }
       
+      // If retrying, explicitly send NO key to force system key usage
+      const payload = { 
+        type, 
+        content: url, 
+        apiKey: isRetry ? '' : claudeApiKey 
+      };
+
       const response = await fetch('/api/ai/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type, content: url, apiKey: claudeApiKey })
+        body: JSON.stringify(payload)
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `HTTP ${response.status}`);
+      const data = await response.json();
+
+      // Check for API key errors and auto-retry
+      if (!response.ok || data.error) {
+        const errorMessage = data.error || `HTTP ${response.status}`;
+        
+        // If invalid key and we haven't retried yet
+        if ((errorMessage.includes('invalid x-api-key') || errorMessage.includes('authentication_error')) && !isRetry && claudeApiKey) {
+          console.log('Invalid custom key detected. Clearing and retrying with system key...');
+          
+          // Clear the bad key from storage and state
+          localStorage.removeItem('demodashboard_claude_key');
+          setClaudeApiKey('');
+          
+          // Retry immediately
+          return generateFromAI(type, content, true);
+        }
+        
+        throw new Error(errorMessage);
       }
 
-      const data = await response.json();
-      console.log('AI Response:', data); // Debug log
-      
-      if (data.error) throw new Error(data.error);
       if (data.raw) {
         console.warn('Claude returned non-JSON:', data.raw);
         throw new Error('Could not parse AI response. Please try again.');
@@ -153,7 +164,7 @@ export default function DemoDashboard() {
         }));
         
         const fieldsUpdated = Object.keys(updates).filter(k => k !== 'website').length;
-        setActionStatus(`✓ Website analyzed! ${fieldsUpdated} field(s) auto-filled.`);
+        setActionStatus(`✓ Analyzed! ${fieldsUpdated} fields found.`);
       } else if (type === 'summarize_clipboard') {
         // Copy summary to clipboard history as a new item
         const summary = `## AI Summary\n\n${data.summary}`;
