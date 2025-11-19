@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Search, Settings, User, Users, Zap, ChevronRight, Copy, Check, BookOpen, ChevronDown, Target, Building2, Mail, Phone, MoreVertical, Play, Plus, FileText, Clock, TrendingUp, AlertCircle, Loader, RefreshCw, Database } from 'lucide-react';
+import { Search, Settings, User, Users, Zap, ChevronRight, Copy, Check, BookOpen, ChevronDown, Target, Building2, Mail, Phone, MoreVertical, Play, Plus, FileText, Clock, TrendingUp, AlertCircle, Loader, RefreshCw, Database, Globe } from 'lucide-react';
 // Import the NetSuite service
 // import NetSuiteService from './netsuite-service';
 import { exportViaEmail, createExportData } from './email-export-utils';
@@ -654,18 +654,20 @@ export default function DemoDashboard() {
 
   // ============ COMPONENT: QUICK ACTIONS PANEL ============
   const QuickActionsPanel = () => (
-    <div className="bg-white rounded-lg border border-gray-200 p-4">
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
       <div className="flex items-center justify-between mb-4">
-        <p className="text-xs text-gray-500 font-semibold uppercase">Quick Demo Tasks</p>
+        <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider">Quick Actions</h3>
         {actionStatus && (
-          <span className="text-xs text-green-600 font-medium">{actionStatus}</span>
+          <div className="flex items-center gap-1.5 text-xs font-medium text-green-600 bg-green-50 px-2.5 py-1 rounded-full animate-fade-in">
+             <Check size={12} />
+             {actionStatus}
+          </div>
         )}
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
         {quickActions.map((action) => {
           const Icon = action.icon;
           const isLoading = syncLoading && action.id === 'sync-netsuite';
-          // Only disable sync if no customer is selected or if another sync is running
           const isDisabled = (syncLoading && action.id !== 'sync-netsuite') || (!selectedCustData);
           const isLocalOnly = action.id === 'sync-netsuite' && selectedCustData && !selectedCustData.nsId;
           
@@ -674,23 +676,26 @@ export default function DemoDashboard() {
               key={action.id}
               onClick={action.action}
               disabled={isDisabled}
-              title={isLocalOnly ? 'Click to search and link to NetSuite record' : ''}
-              className={`p-3 rounded-lg transition-all text-xs font-medium flex flex-col items-center justify-center gap-2 ${
-                isLoading
-                  ? 'bg-blue-100 text-blue-700 cursor-wait'
-                  : isDisabled
-                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                  : isLocalOnly 
-                  ? 'bg-gradient-to-br from-orange-50 to-orange-100 text-orange-700 hover:from-orange-100 hover:to-orange-200 active:scale-95 border border-orange-200'
-                  : 'bg-gradient-to-br from-blue-50 to-blue-100 text-blue-700 hover:from-blue-100 hover:to-blue-200 active:scale-95'
-              }`}
+              title={isLocalOnly ? 'Click to search and link to NetSuite record' : action.label}
+              className={`
+                relative group flex flex-col items-center justify-center gap-2 p-3 rounded-xl border transition-all duration-200
+                ${isLoading 
+                  ? 'bg-blue-50 border-blue-100 text-blue-600 cursor-wait' 
+                  : isDisabled 
+                    ? 'bg-gray-50 border-gray-100 text-gray-400 cursor-not-allowed'
+                    : isLocalOnly
+                      ? 'bg-orange-50 border-orange-200 text-orange-700 hover:border-orange-300 hover:shadow-md hover:-translate-y-0.5'
+                      : 'bg-white border-gray-200 text-gray-600 hover:border-blue-300 hover:text-blue-600 hover:shadow-md hover:-translate-y-0.5'
+                }
+              `}
             >
-              {isLoading ? (
-                <Loader size={18} className="animate-spin" />
-              ) : (
-                <Icon size={18} />
-              )}
-              <span className="text-center leading-tight">{action.label}</span>
+              <div className={`
+                p-2 rounded-lg transition-colors
+                ${isLocalOnly ? 'bg-orange-100 text-orange-600' : isDisabled ? 'bg-gray-100' : 'bg-gray-50 group-hover:bg-blue-50 group-hover:text-blue-600'}
+              `}>
+                {isLoading ? <Loader size={18} className="animate-spin" /> : <Icon size={18} />}
+              </div>
+              <span className="text-[10px] font-semibold text-center leading-tight">{action.label}</span>
             </button>
           );
         })}
@@ -704,257 +709,284 @@ export default function DemoDashboard() {
     
     if (!fields) {
       return (
-        <div className="bg-blue-50 rounded-lg border border-blue-200 p-4">
-          <div className="flex items-start gap-3">
-            <AlertCircle size={18} className="text-blue-600 mt-0.5 flex-shrink-0" />
-            <div>
-              <p className="text-sm font-semibold text-blue-900">NetSuite Custom Fields</p>
-              <p className="text-xs text-blue-700 mt-1">Click "Sync NetSuite Data" above to load custom fields from your account.</p>
-            </div>
+        <div className="bg-blue-50 rounded-xl border border-blue-100 p-4 flex items-center gap-3">
+          <div className="bg-blue-100 p-2 rounded-lg">
+             <RefreshCw size={18} className="text-blue-600" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-blue-900">NetSuite Data Not Synced</p>
+            <p className="text-xs text-blue-700 mt-0.5">Click "Sync NetSuite Data" to load custom fields.</p>
           </div>
         </div>
       );
     }
 
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
         {Object.entries(fields).map(([key, value]) => (
-          <div key={key} className="bg-white rounded-lg border border-gray-200 p-3">
-            <p className="text-xs text-gray-500 font-semibold uppercase">{key.replace(/([A-Z])/g, ' $1')}</p>
-            <p className="text-sm font-medium text-gray-800 mt-1 line-clamp-2">{value}</p>
+          <div key={key} className="bg-gray-50 rounded-xl border border-gray-100 p-3 hover:bg-white hover:border-gray-200 hover:shadow-sm transition-all">
+            <p className="text-[10px] text-gray-500 font-semibold uppercase tracking-wide mb-1">{key.replace(/([A-Z])/g, ' $1')}</p>
+            <p className="text-sm font-medium text-gray-900 truncate" title={value}>{value}</p>
           </div>
         ))}
       </div>
     );
   };
-  const AccountSwitcher = () => (
-    <div className="flex gap-2 flex-wrap">
-      {accounts.map(account => (
-        <button
-          key={account.id}
-          onClick={() => setSelectedAccount(account.id)}
-          className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${
-            selectedAccount === account.id
-              ? 'bg-blue-600 text-white shadow-lg'
-              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-          }`}
-        >
-          <Building2 size={16} />
-          {account.name}
-          {account.id === selectedAccount && <Check size={16} />}
-        </button>
-      ))}
-    </div>
-  );
 
   // ============ COMPONENT: CUSTOMER CONTEXT PANEL ============
   const CustomerContextPanel = () => (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      {/* Customer List */}
-      <div className="lg:col-span-1 bg-white rounded-lg border border-gray-200 overflow-hidden flex flex-col">
-        <div className="p-4 bg-gradient-to-r from-blue-50 to-blue-100 border-b">
-          <h3 className="font-semibold text-gray-800 flex items-center gap-2">
-            <Users size={18} /> Key Prospects
-          </h3>
-          <p className="text-xs text-gray-600 mt-1">{currentAccount?.vertical}</p>
-        </div>
-        
-        <div className="p-3 border-b space-y-2">
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-[calc(100vh-180px)] min-h-[600px]">
+      {/* Customer List - Left Sidebar */}
+      <div className="lg:col-span-4 xl:col-span-3 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col h-full">
+        <div className="p-4 border-b border-gray-100 bg-gray-50/50">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+              <Users size={18} className="text-blue-600" /> Prospects
+            </h3>
+            <span className="text-xs font-medium px-2 py-1 bg-blue-100 text-blue-700 rounded-full">
+              {filteredCustomers.length}
+            </span>
+          </div>
+          
           <div className="relative">
-            <Search size={16} className="absolute left-2 top-2.5 text-gray-400" />
+            <Search size={14} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
             <input
               type="text"
-              placeholder="Search customers..."
+              placeholder="Search..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full pl-9 pr-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
             />
           </div>
+        </div>
+        
+        <div className="flex-1 overflow-y-auto divide-y divide-gray-50">
+          {filteredCustomers.map((customer) => (
+            <button
+              key={customer.id}
+              onClick={() => setSelectedCustomer(customer.id)}
+              className={`w-full text-left px-4 py-3.5 hover:bg-gray-50 transition-all group border-l-4 ${
+                selectedCustomer === customer.id 
+                  ? 'bg-blue-50/50 border-l-blue-600' 
+                  : 'border-l-transparent'
+              }`}
+            >
+              <div className="flex items-start justify-between mb-1">
+                <span className={`font-semibold text-sm ${selectedCustomer === customer.id ? 'text-blue-700' : 'text-gray-900'}`}>
+                  {customer.name}
+                </span>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${
+                  customer.status === 'Hot' ? 'bg-red-100 text-red-700' :
+                  customer.status === 'Active' ? 'bg-green-100 text-green-700' :
+                  customer.status === 'Proposal' ? 'bg-yellow-100 text-yellow-700' :
+                  'bg-gray-100 text-gray-600'
+                }`}>
+                  {customer.status}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-gray-500">{customer.industry}</span>
+                {!customer.nsId && (
+                  <span className="text-[10px] font-bold text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded border border-orange-100">
+                    LOCAL
+                  </span>
+                )}
+              </div>
+            </button>
+          ))}
+        </div>
+        
+        <div className="p-3 border-t border-gray-100 bg-gray-50">
           <button
             onClick={() => setShowAddProspectModal(true)}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-gray-200 text-gray-700 hover:text-blue-600 hover:border-blue-300 rounded-lg transition-all text-sm font-medium shadow-sm hover:shadow"
           >
             <Plus size={16} />
             Add New Prospect
           </button>
         </div>
-
-        <div className="flex-1 overflow-y-auto">
-          {filteredCustomers.map((customer) => (
-            <button
-              key={customer.id}
-              onClick={() => setSelectedCustomer(customer.id)}
-              className={`w-full text-left px-4 py-3 border-b border-gray-100 hover:bg-blue-50 transition-colors ${
-                selectedCustomer === customer.id ? 'bg-blue-100 border-l-4 border-l-blue-600' : ''
-              }`}
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <p className="font-semibold text-sm text-gray-800">{customer.name}</p>
-                    {!customer.nsId && (
-                      <span className="px-1.5 py-0.5 bg-orange-100 text-orange-700 text-[10px] font-semibold rounded">
-                        LOCAL
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-xs text-gray-500">{customer.industry}</p>
-                </div>
-                <span className={`px-2 py-1 rounded text-xs font-medium ${
-                  customer.status === 'Hot' ? 'bg-red-100 text-red-700' :
-                  customer.status === 'Active' ? 'bg-green-100 text-green-700' :
-                  customer.status === 'Proposal' ? 'bg-yellow-100 text-yellow-700' :
-                  'bg-gray-100 text-gray-700'
-                }`}>
-                  {customer.status}
-                </span>
-              </div>
-            </button>
-          ))}
-        </div>
       </div>
 
-      {/* Context Details */}
-      <div className="lg:col-span-2 space-y-4">
+      {/* Details Area */}
+      <div className="lg:col-span-8 xl:col-span-9 h-full overflow-y-auto pr-2 pb-4 custom-scrollbar">
         {selectedCustData ? (
-          <>
-            {/* Header */}
-            <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg p-6">
-              <div className="flex items-start justify-between">
+          <div className="space-y-6">
+            {/* Header Card */}
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-bl-full -mr-10 -mt-10 z-0"></div>
+              
+              <div className="relative z-10 flex flex-col md:flex-row md:items-start justify-between gap-4">
                 <div>
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-2xl font-bold">{selectedCustData.name}</h2>
-                    {!selectedCustData.nsId && (
-                      <span className="px-2 py-1 bg-orange-500 text-white text-xs font-semibold rounded">
-                        LOCAL ONLY
-                      </span>
-                    )}
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="bg-blue-600 text-white p-2 rounded-lg shadow-md">
+                      <Building2 size={24} />
+                    </div>
+                    <div>
+                      <h2 className="text-2xl font-bold text-gray-900 leading-none">{selectedCustData.name}</h2>
+                      <p className="text-sm text-gray-500 mt-1 font-medium">{selectedCustData.industry} • {selectedCustData.size} Employees</p>
+                    </div>
                   </div>
-                  <p className="text-blue-100 mt-1">{selectedCustData.industry}</p>
+                  
+                  <div className="flex flex-wrap gap-2 mt-3">
+                     {selectedCustData.focus.map((area, idx) => (
+                      <span key={idx} className="px-2.5 py-1 bg-blue-50 text-blue-700 text-xs font-medium rounded-md border border-blue-100">
+                        {area}
+                      </span>
+                    ))}
+                  </div>
                 </div>
-                <span className="bg-blue-500 px-3 py-1 rounded-full text-sm font-semibold">
-                  {selectedCustData.status}
-                </span>
-              </div>
-            </div>
 
-            {/* Local Prospect Warning */}
-            {!selectedCustData.nsId && (
-              <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-                <div className="flex items-start gap-3">
-                  <AlertCircle size={20} className="text-orange-600 mt-0.5 flex-shrink-0" />
-                  <div className="flex-1">
-                    <p className="text-sm font-semibold text-orange-900">This prospect is not in NetSuite yet</p>
-                    <p className="text-xs text-orange-700 mt-1">
-                      Click <strong>"Create Prospect"</strong> below to send this customer to NetSuite via email. 
-                      The SuiteScript will process it and create the customer record. 
-                      After 1-2 minutes, click <strong>"Sync NetSuite Data"</strong> to pull the customer ID back.
+                <div className="flex flex-col items-end gap-2">
+                  <a
+                    href={`https://${currentAccount?.instance}.app.netsuite.com/app/common/entity/customer.nl?id=${selectedCustData.nsId}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all shadow-sm ${
+                      selectedCustData.nsId 
+                        ? 'bg-blue-600 text-white hover:bg-blue-700 hover:shadow-md' 
+                        : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    }`}
+                  >
+                    <Target size={16} />
+                    {selectedCustData.nsId ? 'Open in NetSuite' : 'Not in NetSuite'}
+                    {selectedCustData.nsId && <ChevronRight size={14} />}
+                  </a>
+                  {selectedCustData.website && (
+                    <a 
+                      href={selectedCustData.website.startsWith('http') ? selectedCustData.website : `https://${selectedCustData.website}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-gray-500 hover:text-blue-600 flex items-center gap-1 transition-colors"
+                    >
+                      <Globe size={12} />
+                      {selectedCustData.website.replace(/^https?:\/\//, '')}
+                    </a>
+                  )}
+                </div>
+              </div>
+
+              {/* Local Warning Banner */}
+              {!selectedCustData.nsId && (
+                <div className="mt-5 bg-orange-50 border border-orange-200 rounded-lg p-3 flex items-start gap-3 animate-fade-in">
+                  <AlertCircle size={18} className="text-orange-600 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-sm font-bold text-orange-800">Prospect Not Synced</p>
+                    <p className="text-xs text-orange-700 mt-0.5">
+                      Use the <strong>Create Prospect</strong> action below to push this record to NetSuite.
                     </p>
                   </div>
                 </div>
-              </div>
-            )}
-
-            {/* Reference Data Selectors */}
-            <div className="bg-white rounded-lg border border-gray-200 p-4">
-              <p className="text-xs text-gray-500 font-semibold uppercase mb-3">Estimate Reference Data (Optional)</p>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <ClassSelector
-                  value={selectedClass?.id || selectedClass?.name}
-                  onChange={setSelectedClass}
-                />
-                <DepartmentSelector
-                  value={selectedDepartment?.id || selectedDepartment?.name}
-                  onChange={setSelectedDepartment}
-                />
-                <LocationSelector
-                  value={selectedLocation?.id || selectedLocation?.name}
-                  onChange={setSelectedLocation}
-                />
-              </div>
-            </div>
-
-            {/* Quick Actions */}
-            <QuickActionsPanel />
-
-            {/* Key Details Grid */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-white rounded-lg border border-gray-200 p-4">
-                <p className="text-xs text-gray-500 font-semibold uppercase">Entity ID</p>
-                <p className="text-lg font-semibold text-gray-800 mt-1">{selectedCustData.entityid}</p>
-              </div>
-              <div className="bg-white rounded-lg border border-gray-200 p-4">
-                <p className="text-xs text-gray-500 font-semibold uppercase">Company Size</p>
-                <p className="text-lg font-semibold text-gray-800 mt-1">{selectedCustData.size} employees</p>
-              </div>
-              <div className="bg-white rounded-lg border border-gray-200 p-4">
-                <p className="text-xs text-gray-500 font-semibold uppercase">Budget Range</p>
-                <p className="text-lg font-semibold text-green-700 mt-1">{selectedCustData.budget}</p>
-              </div>
-              <div className="bg-white rounded-lg border border-gray-200 p-4">
-                <p className="text-xs text-gray-500 font-semibold uppercase">Demo Date</p>
-                <p className="text-lg font-semibold text-blue-700 mt-1">{selectedCustData.demoDate}</p>
-              </div>
-              {selectedCustData.website && (
-                <div className="bg-white rounded-lg border border-gray-200 p-4">
-                  <p className="text-xs text-gray-500 font-semibold uppercase">Website</p>
-                  <a 
-                    href={selectedCustData.website.startsWith('http') ? selectedCustData.website : `https://${selectedCustData.website}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-lg font-semibold text-indigo-600 hover:text-indigo-800 mt-1 block truncate"
-                  >
-                    {selectedCustData.website}
-                  </a>
-                </div>
               )}
             </div>
+            
+            {/* Quick Actions Grid */}
+            <QuickActionsPanel />
 
-            {/* Custom Fields from NetSuite */}
+            {/* Info Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+               {/* Reference Data */}
+               <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 md:col-span-2">
+                 <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                   <Database size={16} className="text-gray-400" />
+                   Classification
+                 </h3>
+                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold uppercase text-gray-400 tracking-wide">Class</label>
+                      <ClassSelector
+                        value={selectedClass?.id || selectedClass?.name}
+                        onChange={setSelectedClass}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold uppercase text-gray-400 tracking-wide">Department</label>
+                      <DepartmentSelector
+                        value={selectedDepartment?.id || selectedDepartment?.name}
+                        onChange={setSelectedDepartment}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold uppercase text-gray-400 tracking-wide">Location</label>
+                      <LocationSelector
+                        value={selectedLocation?.id || selectedLocation?.name}
+                        onChange={setSelectedLocation}
+                      />
+                    </div>
+                 </div>
+               </div>
+
+               {/* Key Metrics */}
+               <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+                 <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                   <TrendingUp size={16} className="text-gray-400" />
+                   Opportunity
+                 </h3>
+                 <div className="space-y-4">
+                   <div>
+                     <p className="text-[10px] font-bold uppercase text-gray-400 tracking-wide">Budget</p>
+                     <p className="text-lg font-bold text-green-600">{selectedCustData.budget}</p>
+                   </div>
+                   <div>
+                     <p className="text-[10px] font-bold uppercase text-gray-400 tracking-wide">Demo Date</p>
+                     <p className="text-sm font-medium text-gray-900">{selectedCustData.demoDate}</p>
+                   </div>
+                   <div>
+                     <p className="text-[10px] font-bold uppercase text-gray-400 tracking-wide">Entity ID</p>
+                     <p className="text-sm font-mono text-gray-600">{selectedCustData.entityid}</p>
+                   </div>
+                 </div>
+               </div>
+            </div>
+
+            {/* Custom Fields */}
             <div>
-              <p className="text-xs text-gray-500 font-semibold uppercase mb-3">Synced NetSuite Fields</p>
+              <h3 className="text-sm font-semibold text-gray-900 mb-3 ml-1">Synced Data</h3>
               <CustomFieldsPanel />
             </div>
 
-            {/* Focus Areas */}
-            <div className="bg-white rounded-lg border border-gray-200 p-4">
-              <p className="text-xs text-gray-500 font-semibold uppercase mb-3">Demo Focus Areas</p>
-              <div className="flex flex-wrap gap-2">
-                {selectedCustData.focus.map((area, idx) => (
-                  <span key={idx} className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm font-medium">
-                    {area}
-                  </span>
-                ))}
+            {/* AI Notes */}
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                  <Zap size={16} className="text-purple-500" />
+                  AI Strategy & Notes
+                </h3>
+                <button 
+                  onClick={() => {
+                    // Add a copy action for notes
+                    navigator.clipboard.writeText(demoNotes[selectedCustData.id] || '');
+                    setActionStatus('✓ Notes copied!');
+                    setTimeout(() => setActionStatus(null), 2000);
+                  }}
+                  className="text-xs text-blue-600 hover:text-blue-700 font-medium"
+                >
+                  Copy
+                </button>
               </div>
-            </div>
-
-            {/* AI Strategy / Notes */}
-            <div className="bg-white rounded-lg border border-gray-200 p-4">
-              <p className="text-xs text-gray-500 font-semibold uppercase mb-2">AI Strategy / Notes</p>
               <textarea
                 value={demoNotes[selectedCustData.id] || ''}
                 onChange={(e) => setDemoNotes({...demoNotes, [selectedCustData.id]: e.target.value})}
                 placeholder="Paste your AI-generated strategy, meeting notes, or key pain points here..."
-                className="w-full h-32 p-3 border border-gray-300 rounded-lg text-sm resize-none focus:ring-2 focus:ring-blue-500 font-mono bg-gray-50"
+                className="w-full h-40 p-4 border border-gray-200 rounded-lg text-sm resize-none focus:ring-2 focus:ring-purple-500 focus:border-transparent font-mono bg-gray-50/50 leading-relaxed"
               />
             </div>
-
-            {/* NetSuite Link */}
-            <a
-              href={`https://${currentAccount?.instance}.app.netsuite.com/app/common/entity/customer.nl?id=${selectedCustData.nsId}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm"
-            >
-              <Target size={16} />
-              Open in NetSuite
-              <ChevronRight size={16} />
-            </a>
-          </>
+          </div>
         ) : (
-          <div className="bg-gray-50 rounded-lg border-2 border-dashed border-gray-300 p-12 text-center">
-            <Users size={48} className="mx-auto text-gray-300 mb-4" />
-            <p className="text-gray-500 font-medium">Select a prospect to view details</p>
+          <div className="h-full flex flex-col items-center justify-center text-center p-8 bg-white rounded-xl border border-gray-200 border-dashed">
+            <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mb-4">
+              <Users size={40} className="text-blue-300" />
+            </div>
+            <h3 className="text-xl font-bold text-gray-900 mb-2">No Prospect Selected</h3>
+            <p className="text-gray-500 max-w-md mx-auto mb-6">
+              Select a prospect from the list on the left to view their details, strategy notes, and quick actions.
+            </p>
+            <button
+              onClick={() => setShowAddProspectModal(true)}
+              className="px-6 py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-all shadow-md hover:shadow-lg flex items-center gap-2"
+            >
+              <Plus size={18} />
+              Add New Prospect
+            </button>
           </div>
         )}
       </div>
@@ -1391,170 +1423,196 @@ export default function DemoDashboard() {
 
   // ============ RENDER ============
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 font-sans text-gray-900">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex items-center justify-between mb-6">
+      <div className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            {/* Logo & Title */}
             <div className="flex items-center gap-3">
-              <div className="bg-blue-600 p-2 rounded-lg">
-                <Zap size={24} className="text-white" />
+              <div className="bg-blue-600 p-1.5 rounded-lg shadow-sm">
+                <Zap size={20} className="text-white" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">Demo Master Dashboard</h1>
-                <p className="text-sm text-gray-600">NetSuite PSA Demo Prep Hub</p>
+                <h1 className="text-lg font-bold text-gray-900 leading-tight">Demo Master</h1>
+                <p className="text-xs text-gray-500 font-medium">NetSuite PSA Hub</p>
               </div>
             </div>
-            
-            {/* Settings Button */}
-            <button 
-              onClick={() => setShowSettingsModal(true)}
-              className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors relative mr-2"
-              title="AI Settings"
-            >
-              <Settings size={20} />
-              {!claudeApiKey && (
-                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-              )}
-            </button>
 
-            {/* Clipboard History */}
-            <div className="relative">
-              <button
-                onClick={() => setShowClipboardHistory(!showClipboardHistory)}
-                className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors relative"
-                title="Clipboard History"
+            {/* Navigation Tabs - Centered */}
+            <div className="hidden md:flex space-x-1 bg-gray-100/50 p-1 rounded-xl">
+              {[
+                { id: 'context', label: 'Context', icon: User },
+                { id: 'prompts', label: 'Prompts', icon: BookOpen },
+                { id: 'items', label: 'Items', icon: Settings },
+                { id: 'reference', label: 'Reference', icon: Database }
+              ].map((tab) => {
+                const Icon = tab.icon;
+                const isActive = activeTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+                      isActive
+                        ? 'bg-white text-blue-700 shadow-sm ring-1 ring-gray-200'
+                        : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200/50'
+                    }`}
+                  >
+                    <Icon size={16} className={isActive ? 'text-blue-600' : 'text-gray-400'} />
+                    {tab.label}
+                  </button>
+                );
+              })}
+            </div>
+            
+            {/* Right Side Actions */}
+            <div className="flex items-center gap-3">
+              {/* Account Switcher Dropdown */}
+              <div className="relative group">
+                <button className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-600 hover:text-gray-900 bg-gray-50 hover:bg-gray-100 rounded-lg border border-gray-200 transition-colors">
+                  <Building2 size={16} />
+                  <span className="max-w-[100px] truncate">{currentAccount?.name}</span>
+                  <ChevronDown size={14} />
+                </button>
+                {/* Dropdown Menu */}
+                <div className="absolute right-0 top-full mt-1 w-56 bg-white rounded-xl shadow-xl border border-gray-100 hidden group-hover:block z-50 p-1">
+                   <p className="px-3 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">Select Account</p>
+                   {accounts.map(account => (
+                    <button
+                      key={account.id}
+                      onClick={() => setSelectedAccount(account.id)}
+                      className={`w-full text-left px-3 py-2 rounded-lg text-sm flex items-center justify-between ${
+                        selectedAccount === account.id ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      <span>{account.name}</span>
+                      {selectedAccount === account.id && <Check size={14} />}
+                    </button>
+                   ))}
+                </div>
+              </div>
+
+              <div className="h-6 w-px bg-gray-200 mx-1"></div>
+
+              {/* Settings Button */}
+              <button 
+                onClick={() => setShowSettingsModal(true)}
+                className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-all relative"
+                title="AI Settings"
               >
-                <Copy size={20} />
-                {clipboardHistory.length > 0 && (
-                  <span className="absolute top-0 right-0 w-4 h-4 bg-blue-600 text-white text-xs flex items-center justify-center rounded-full">
-                    {clipboardHistory.length}
-                  </span>
+                <Settings size={18} />
+                {!claudeApiKey && (
+                  <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full ring-2 ring-white"></span>
                 )}
               </button>
-              
-              {showClipboardHistory && (
-                <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-50 max-h-96 overflow-y-auto">
-                  <div className="p-3 border-b border-gray-200 bg-gray-50">
-                    <div className="flex justify-between items-center mb-2">
-                      <h3 className="font-semibold text-gray-700 text-sm">Clipboard History</h3>
-                      <button 
-                        onClick={() => setClipboardHistory([])}
-                        className="text-xs text-red-600 hover:text-red-800"
-                      >
-                        Clear
-                      </button>
+
+              {/* Clipboard History */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowClipboardHistory(!showClipboardHistory)}
+                  className={`p-2 rounded-lg transition-all relative ${showClipboardHistory ? 'bg-blue-50 text-blue-600' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'}`}
+                  title="Clipboard History"
+                >
+                  <Copy size={18} />
+                  {clipboardHistory.length > 0 && (
+                    <span className="absolute top-1 right-1 w-3.5 h-3.5 bg-blue-600 text-white text-[10px] flex items-center justify-center rounded-full ring-2 ring-white font-bold">
+                      {clipboardHistory.length}
+                    </span>
+                  )}
+                </button>
+                
+                {showClipboardHistory && (
+                  <div className="absolute right-0 top-full mt-3 w-80 bg-white rounded-xl shadow-xl border border-gray-100 z-50 max-h-96 overflow-y-auto ring-1 ring-black/5">
+                    <div className="p-3 border-b border-gray-100 bg-gray-50/50 sticky top-0 backdrop-blur-sm z-10">
+                      <div className="flex justify-between items-center mb-2">
+                        <h3 className="font-semibold text-gray-900 text-xs uppercase tracking-wide">Clipboard History</h3>
+                        <button 
+                          onClick={() => setClipboardHistory([])}
+                          className="text-[10px] font-medium text-red-600 hover:text-red-700 hover:bg-red-50 px-2 py-1 rounded"
+                        >
+                          CLEAR ALL
+                        </button>
+                      </div>
+                      {clipboardHistory.length > 0 && (
+                        <button
+                          onClick={() => generateFromAI('summarize_clipboard', clipboardHistory.map(h => h.text).join('\n\n'))}
+                          disabled={isGeneratingAI}
+                          className="w-full py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg text-xs font-medium hover:from-purple-700 hover:to-indigo-700 transition-all shadow-sm flex items-center justify-center gap-1.5"
+                        >
+                          {isGeneratingAI ? <Loader size={12} className="animate-spin" /> : <Zap size={12} />}
+                          Summarize with AI
+                        </button>
+                      )}
                     </div>
-                    {clipboardHistory.length > 0 && (
-                      <button
-                        onClick={() => generateFromAI('summarize_clipboard', clipboardHistory.map(h => h.text).join('\n\n'))}
-                        disabled={isGeneratingAI}
-                        className="w-full py-1.5 bg-purple-100 text-purple-700 rounded text-xs font-medium hover:bg-purple-200 transition-colors flex items-center justify-center gap-1"
-                      >
-                        {isGeneratingAI ? <Loader size={12} className="animate-spin" /> : <Zap size={12} />}
-                        Summarize with Claude
-                      </button>
+                    {clipboardHistory.length === 0 ? (
+                      <div className="p-8 text-center text-gray-400 text-sm flex flex-col items-center gap-2">
+                        <Copy size={24} className="opacity-20" />
+                        No history yet
+                      </div>
+                    ) : (
+                      <div className="divide-y divide-gray-50">
+                        {clipboardHistory.map((item, idx) => (
+                          <div key={idx} className="p-3 hover:bg-gray-50 group relative transition-colors">
+                            <p className="text-xs text-gray-600 line-clamp-3 pr-6 font-mono leading-relaxed">{item.text}</p>
+                            <span className="text-[10px] text-gray-400 mt-1.5 block font-medium">
+                              {item.timestamp.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                            </span>
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText(item.text);
+                                setShowClipboardHistory(false);
+                                setActionStatus('✓ Copied from history');
+                                setTimeout(() => setActionStatus(null), 2000);
+                              }}
+                              className="absolute right-2 top-3 p-1.5 bg-white border border-gray-200 rounded-md text-blue-600 opacity-0 group-hover:opacity-100 transition-all shadow-sm hover:bg-blue-50"
+                              title="Copy again"
+                            >
+                              <Copy size={12} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
                     )}
                   </div>
-                  {clipboardHistory.length === 0 ? (
-                    <div className="p-4 text-center text-gray-500 text-sm">
-                      No history yet
-                    </div>
-                  ) : (
-                    <div className="divide-y divide-gray-100">
-                      {clipboardHistory.map((item, idx) => (
-                        <div key={idx} className="p-3 hover:bg-gray-50 group relative">
-                          <p className="text-xs text-gray-800 line-clamp-2 pr-6">{item.text}</p>
-                          <span className="text-[10px] text-gray-400 mt-1 block">
-                            {item.timestamp.toLocaleTimeString()}
-                          </span>
-                          <button
-                            onClick={() => {
-                              navigator.clipboard.writeText(item.text);
-                              setShowClipboardHistory(false);
-                              setActionStatus('✓ Copied from history');
-                              setTimeout(() => setActionStatus(null), 2000);
-                            }}
-                            className="absolute right-2 top-3 text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity"
-                            title="Copy again"
-                          >
-                            <Copy size={14} />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
+                )}
+              </div>
             </div>
           </div>
-
-          {/* Account Switcher */}
-          <div className="mb-6">
-            <p className="text-xs text-gray-600 font-semibold uppercase mb-3">Active Demo Account</p>
-            <AccountSwitcher />
-          </div>
-
-          {/* Tab Navigation */}
-          <div className="flex gap-4 border-t border-gray-200 pt-4">
-            <button
-              onClick={() => setActiveTab('context')}
-              className={`px-4 py-2 font-medium transition-colors border-b-2 ${
-                activeTab === 'context'
-                  ? 'text-blue-600 border-blue-600'
-                  : 'text-gray-600 border-transparent hover:text-gray-900'
-              }`}
-            >
-              <span className="flex items-center gap-2">
-                <User size={18} />
-                Customer Context
-              </span>
-            </button>
-            <button
-              onClick={() => setActiveTab('prompts')}
-              className={`px-4 py-2 font-medium transition-colors border-b-2 ${
-                activeTab === 'prompts'
-                  ? 'text-blue-600 border-blue-600'
-                  : 'text-gray-600 border-transparent hover:text-gray-900'
-              }`}
-            >
-              <span className="flex items-center gap-2">
-                <BookOpen size={18} />
-                Demo Prompts ({favorites.length})
-              </span>
-            </button>
-            <button
-              onClick={() => setActiveTab('items')}
-              className={`px-4 py-2 font-medium transition-colors border-b-2 ${
-                activeTab === 'items'
-                  ? 'text-blue-600 border-blue-600'
-                  : 'text-gray-600 border-transparent hover:text-gray-900'
-              }`}
-            >
-              <span className="flex items-center gap-2">
-                <Settings size={18} />
-                Configure Items
-              </span>
-            </button>
-            <button
-              onClick={() => setActiveTab('reference')}
-              className={`px-4 py-2 font-medium transition-colors border-b-2 ${
-                activeTab === 'reference'
-                  ? 'text-blue-600 border-blue-600'
-                  : 'text-gray-600 border-transparent hover:text-gray-900'
-              }`}
-            >
-              <span className="flex items-center gap-2">
-                <Database size={18} />
-                Reference Data
-              </span>
-            </button>
+          
+          {/* Mobile Tab Navigation (Visible only on small screens) */}
+          <div className="md:hidden border-t border-gray-100 py-2 overflow-x-auto">
+             <div className="flex space-x-1">
+              {[
+                { id: 'context', label: 'Context', icon: User },
+                { id: 'prompts', label: 'Prompts', icon: BookOpen },
+                { id: 'items', label: 'Items', icon: Settings },
+                { id: 'reference', label: 'Reference', icon: Database }
+              ].map((tab) => {
+                const Icon = tab.icon;
+                const isActive = activeTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap flex items-center gap-1.5 ${
+                      isActive
+                        ? 'bg-blue-50 text-blue-700'
+                        : 'text-gray-600'
+                    }`}
+                  >
+                    <Icon size={14} />
+                    {tab.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {activeTab === 'context' ? <CustomerContextPanel /> :
          activeTab === 'prompts' ? <PromptLibrary /> :
          activeTab === 'items' ? <ItemConfigPanel /> :
