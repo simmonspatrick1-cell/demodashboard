@@ -1,13 +1,16 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Search, Settings, User, Users, Zap, ChevronRight, Copy, Check, BookOpen, ChevronDown, Target, Building2, Mail, Phone, MoreVertical, Play, Plus, FileText, Clock, TrendingUp, AlertCircle, Loader, RefreshCw } from 'lucide-react';
+import { Search, Settings, User, Users, Zap, ChevronRight, Copy, Check, BookOpen, ChevronDown, Target, Building2, Mail, Phone, MoreVertical, Play, Plus, FileText, Clock, TrendingUp, AlertCircle, Loader, RefreshCw, Database } from 'lucide-react';
 // Import the NetSuite service
 // import NetSuiteService from './netsuite-service';
 import { exportViaEmail, createExportData } from './email-export-utils';
 import { ITEM_CONFIG, ESTIMATE_PRESETS, AVAILABLE_ITEMS } from './src/itemConfig';
+import ReferenceDataManager from './src/ReferenceDataManager';
+import { ClassSelector, DepartmentSelector, LocationSelector } from './src/ReferenceDataSelector';
+// import { NETSUITE_CLASSES, NETSUITE_DEPARTMENTS, NETSUITE_EMPLOYEES, NETSUITE_LOCATIONS } from './src/netsuiteData';
 
 export default function DemoDashboard() {
   // ============ STATE MANAGEMENT ============
-  const [activeTab, setActiveTab] = useState('context'); // 'context', 'prompts', 'items'
+  const [activeTab, setActiveTab] = useState('context'); // 'context', 'prompts', 'items', 'reference'
   const [selectedAccount, setSelectedAccount] = useState('services');
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -30,6 +33,9 @@ export default function DemoDashboard() {
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
   const [clipboardHistory, setClipboardHistory] = useState([]);
   const [showClipboardHistory, setShowClipboardHistory] = useState(false);
+  const [selectedClass, setSelectedClass] = useState(null);
+  const [selectedDepartment, setSelectedDepartment] = useState(null);
+  const [selectedLocation, setSelectedLocation] = useState(null);
   const [prospects, setProspects] = useState([
     { id: 1, name: 'AdvisorHR', entityid: 'AdvisorHR-Demo', industry: 'PEO Services', size: '500-1000', status: 'Hot', demoDate: 'Oct 30', focus: ['Resource Planning', 'Multi-Entity', 'Billing'], budget: '$200K-500K', nsId: 3161, website: 'advisorhr.com' },
     { id: 2, name: 'GSB Group', entityid: 'GSB-Demo', industry: 'Consulting', size: '50-100', status: 'Active', demoDate: 'Nov 5', focus: ['Project Accounting', 'PSA'], budget: '$100K-200K', nsId: 1834, website: 'gsbgroup.com' },
@@ -52,16 +58,40 @@ export default function DemoDashboard() {
     website: ''
   });
 
-  // Load API Key from local storage
+  // Load Prospects from local storage
+  useEffect(() => {
+    const savedProspects = localStorage.getItem('demodashboard_prospects');
+    if (savedProspects) {
+      try {
+        setProspects(JSON.parse(savedProspects));
+      } catch (e) {
+        console.error('Failed to parse saved prospects', e);
+      }
+    }
+  }, []);
+
+  // Save Prospects to local storage
+  useEffect(() => {
+    localStorage.setItem('demodashboard_prospects', JSON.stringify(prospects));
+  }, [prospects]);
+
+  // Load API Key from local storage or use default
   useEffect(() => {
     const savedKey = localStorage.getItem('demodashboard_claude_key');
-    if (savedKey) setClaudeApiKey(savedKey);
+    if (savedKey) {
+      setClaudeApiKey(savedKey);
+    } else {
+      // Use default API key (can be overridden in Settings)
+      const defaultKey = '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';
+      setClaudeApiKey(defaultKey);
+    }
   }, []);
 
   // Save API Key to local storage
   const saveClaudeKey = (key) => {
-    setClaudeApiKey(key);
-    localStorage.setItem('demodashboard_claude_key', key);
+    const trimmedKey = key.trim();
+    setClaudeApiKey(trimmedKey);
+    localStorage.setItem('demodashboard_claude_key', trimmedKey);
   };
 
   // AI Generation Handler
@@ -74,32 +104,58 @@ export default function DemoDashboard() {
     }
 
     setIsGeneratingAI(true);
+    setActionStatus('🤖 Analyzing website...');
+    
     try {
+      // Ensure URL has protocol
+      let url = content;
+      if (type === 'analyze_url' && !url.startsWith('http://') && !url.startsWith('https://')) {
+        url = 'https://' + url;
+      }
+      
       const response = await fetch('/api/ai/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type, content, apiKey: claudeApiKey })
+        body: JSON.stringify({ type, content: url, apiKey: claudeApiKey })
       });
 
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP ${response.status}`);
+      }
+
       const data = await response.json();
+      console.log('AI Response:', data); // Debug log
+      
       if (data.error) throw new Error(data.error);
+      if (data.raw) {
+        console.warn('Claude returned non-JSON:', data.raw);
+        throw new Error('Could not parse AI response. Please try again.');
+      }
 
       if (type === 'analyze_url') {
         // Auto-fill prospect form
+        const updates = {
+          website: content
+        };
+        
+        if (data.name) updates.name = data.name;
+        if (data.industry) updates.industry = data.industry;
+        if (data.size) updates.size = data.size;
+        if (data.revenue) updates.budget = data.revenue;
+        if (data.focus_areas && Array.isArray(data.focus_areas)) {
+          updates.focus = data.focus_areas;
+        }
+        
+        console.log('Updating prospect with:', updates);
+        
         setNewProspect(prev => ({
           ...prev,
-          name: data.name || prev.name,
-          industry: data.industry || prev.industry,
-          size: data.size || prev.size,
-          budget: data.revenue || prev.budget,
-          focus: data.focus_areas || prev.focus,
-          website: data.website || prev.website
+          ...updates
         }));
-        // Also add AI notes if we have a description
-        if (data.description) {
-           // We can store this temporarily or let user copy it
-           setActionStatus('✓ Data extracted from website!');
-        }
+        
+        const fieldsUpdated = Object.keys(updates).filter(k => k !== 'website').length;
+        setActionStatus(`✓ Website analyzed! ${fieldsUpdated} field(s) auto-filled.`);
       } else if (type === 'summarize_clipboard') {
         // Copy summary to clipboard history as a new item
         const summary = `## AI Summary\n\n${data.summary}`;
@@ -271,38 +327,56 @@ export default function DemoDashboard() {
     }));
   };
 
-  const syncNetsuiteFieFds = async () => {
+  const syncNetsuiteFields = async () => {
     if (!selectedCustData) return;
-    
-    // Check if prospect has a NetSuite ID
-    if (!selectedCustData.nsId) {
-      setActionStatus('⚠ This prospect is not in NetSuite yet. Click "Create Prospect" first!');
-      setTimeout(() => setActionStatus(null), 4000);
-      return;
-    }
     
     setSyncLoading(true);
     setActionStatus('Syncing from NetSuite...');
     
     try {
+      // Prepare payload - either ID or search params
+      const payload = {
+        account: selectedAccount
+      };
+
+      if (selectedCustData.nsId) {
+        payload.customerId = selectedCustData.nsId;
+      } else {
+        payload.entityId = selectedCustData.entityid;
+        payload.companyName = selectedCustData.name;
+      }
+
       // Call the Vercel API endpoint to fetch real NetSuite data
       const response = await fetch('/api/netsuite/sync', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          customerId: selectedCustData.nsId,
-          account: selectedAccount
-        })
+        body: JSON.stringify(payload)
       });
 
       if (!response.ok) {
+        // If 404 and we were searching, just warn
+        if (response.status === 404 && !selectedCustData.nsId) {
+          throw new Error('Customer not found in NetSuite yet. Please wait a few minutes for the script to run.');
+        }
         const errorData = await response.json();
         throw new Error(errorData.error || `HTTP ${response.status}`);
       }
 
       const customerData = await response.json();
+
+      // If we found a new match for a local prospect, update it!
+      if (!selectedCustData.nsId && customerData.id) {
+        setProspects(prev => prev.map(p => 
+          p.id === selectedCustData.id 
+            ? { ...p, nsId: customerData.id, email: customerData.email, phone: customerData.phone } 
+            : p
+        ));
+        setActionStatus('✓ Found & Linked to NetSuite!');
+      } else {
+        setActionStatus('✓ Synced successfully');
+      }
 
       // Map NetSuite fields to display format
       setCustomFieldsData(prev => ({
@@ -323,11 +397,15 @@ export default function DemoDashboard() {
         [selectedCustData.id]: customerData
       }));
 
-      setActionStatus('✓ Synced successfully');
     } catch (error) {
       console.error('Sync error:', error);
       
-      // Fallback to mock data if API fails (for demo purposes)
+      if (!selectedCustData.nsId) {
+         setActionStatus(`⚠ ${error.message}`);
+      } else {
+        setActionStatus('⚠ Sync Failed: ' + error.message);
+        
+        // Fallback to mock data if API fails (for demo purposes)
       const mockNsResponse = {
         id: selectedCustData.nsId,
         entityid: selectedCustData.entityid,
@@ -359,8 +437,8 @@ export default function DemoDashboard() {
         ...prev,
         [selectedCustData.id]: mockNsResponse
       }));
-
-      setActionStatus(`⚠ API unavailable - showing demo data (${error.message})`);
+      
+      }
     } finally {
       setSyncLoading(false);
       setLastSyncTime(new Date());
@@ -518,6 +596,12 @@ export default function DemoDashboard() {
           total: calculatedTotal,
           status: 'PENDING',
           dueDate: new Date(Date.now() + 30*24*60*60*1000).toISOString().split('T')[0],
+          class: selectedClass?.name || selectedClass?.id,
+          classId: selectedClass?.id,
+          department: selectedDepartment?.name || selectedDepartment?.id,
+          departmentId: selectedDepartment?.id,
+          location: selectedLocation?.name || selectedLocation?.id,
+          locationId: selectedLocation?.id,
           items: Object.values(lineItems).map(item => ({
             name: item.name,  // NetSuite item ID (for mapping)
             displayName: item.displayName || item.name,  // Display name (for UI/export)
@@ -557,7 +641,7 @@ export default function DemoDashboard() {
       id: 'sync-netsuite',
       label: 'Sync NetSuite Data',
       icon: Loader,
-      action: syncNetsuiteFieFds
+      action: syncNetsuiteFields
     },
     {
       id: 'export-email',
@@ -583,23 +667,25 @@ export default function DemoDashboard() {
         {quickActions.map((action) => {
           const Icon = action.icon;
           const isLoading = syncLoading && action.id === 'sync-netsuite';
-          const isDisabled = (syncLoading && action.id !== 'sync-netsuite') || 
-                            (action.id === 'sync-netsuite' && !selectedCustData?.nsId);
-          const isSyncDisabled = action.id === 'sync-netsuite' && !selectedCustData?.nsId;
+          // Only disable sync if no customer is selected or if another sync is running
+          const isDisabled = (syncLoading && action.id !== 'sync-netsuite') || (!selectedCustData);
+          const isLocalOnly = action.id === 'sync-netsuite' && selectedCustData && !selectedCustData.nsId;
           
           return (
             <button
               key={action.id}
               onClick={action.action}
               disabled={isDisabled}
-              title={isSyncDisabled ? 'Create this prospect in NetSuite first' : ''}
+              title={isLocalOnly ? 'Click to search and link to NetSuite record' : ''}
               className={`p-3 rounded-lg transition-all text-xs font-medium flex flex-col items-center justify-center gap-2 ${
                 isLoading
                   ? 'bg-blue-100 text-blue-700 cursor-wait'
-                  : isSyncDisabled
+                  : isDisabled
                   ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  : isLocalOnly 
+                  ? 'bg-gradient-to-br from-orange-50 to-orange-100 text-orange-700 hover:from-orange-100 hover:to-orange-200 active:scale-95 border border-orange-200'
                   : 'bg-gradient-to-br from-blue-50 to-blue-100 text-blue-700 hover:from-blue-100 hover:to-blue-200 active:scale-95'
-              } ${isDisabled && !isSyncDisabled ? 'opacity-50' : ''}`}
+              }`}
             >
               {isLoading ? (
                 <Loader size={18} className="animate-spin" />
@@ -770,6 +856,25 @@ export default function DemoDashboard() {
                 </div>
               </div>
             )}
+
+            {/* Reference Data Selectors */}
+            <div className="bg-white rounded-lg border border-gray-200 p-4">
+              <p className="text-xs text-gray-500 font-semibold uppercase mb-3">Estimate Reference Data (Optional)</p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <ClassSelector
+                  value={selectedClass?.id || selectedClass?.name}
+                  onChange={setSelectedClass}
+                />
+                <DepartmentSelector
+                  value={selectedDepartment?.id || selectedDepartment?.name}
+                  onChange={setSelectedDepartment}
+                />
+                <LocationSelector
+                  value={selectedLocation?.id || selectedLocation?.name}
+                  onChange={setSelectedLocation}
+                />
+              </div>
+            </div>
 
             {/* Quick Actions */}
             <QuickActionsPanel />
@@ -1433,13 +1538,29 @@ export default function DemoDashboard() {
                 Configure Items
               </span>
             </button>
+            <button
+              onClick={() => setActiveTab('reference')}
+              className={`px-4 py-2 font-medium transition-colors border-b-2 ${
+                activeTab === 'reference'
+                  ? 'text-blue-600 border-blue-600'
+                  : 'text-gray-600 border-transparent hover:text-gray-900'
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                <Database size={18} />
+                Reference Data
+              </span>
+            </button>
           </div>
         </div>
       </div>
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {activeTab === 'context' ? <CustomerContextPanel /> : activeTab === 'prompts' ? <PromptLibrary /> : <ItemConfigPanel />}
+        {activeTab === 'context' ? <CustomerContextPanel /> :
+         activeTab === 'prompts' ? <PromptLibrary /> :
+         activeTab === 'items' ? <ItemConfigPanel /> :
+         activeTab === 'reference' ? <ReferenceDataManager /> : null}
       </div>
 
       {/* Add Prospect Modal */}
@@ -1640,14 +1761,29 @@ export default function DemoDashboard() {
                 Claude API Key
               </label>
               <input
-                type="password"
+                type="text"
                 value={claudeApiKey}
                 onChange={(e) => setClaudeApiKey(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-mono text-sm"
                 placeholder="sk-ant-api03-..."
               />
-              <p className="text-xs text-gray-500 mt-2">
-                Your API key is stored locally in your browser and sent directly to Claude's API.
+              {!localStorage.getItem('demodashboard_claude_key') && claudeApiKey && (
+                <p className="text-xs text-green-600 mt-2 flex items-center gap-1">
+                  ✓ Using default API key. You can change it here if needed.
+                </p>
+              )}
+              <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-100">
+                <p className="text-xs text-blue-900 font-medium mb-2">📝 How to get your own API key:</p>
+                <ol className="text-xs text-blue-800 space-y-1 ml-4 list-decimal">
+                  <li>Go to <a href="https://console.anthropic.com/" target="_blank" rel="noopener noreferrer" className="underline">console.anthropic.com</a></li>
+                  <li>Sign in or create an account</li>
+                  <li>Navigate to "API Keys" section</li>
+                  <li>Click "Create Key" and copy it</li>
+                  <li>Paste the full key here (starts with "sk-ant-api03-")</li>
+                </ol>
+              </div>
+              <p className="text-xs text-gray-500 mt-3">
+                🔒 Your API key is stored locally in your browser and sent directly to Claude's API. It is never stored on our servers.
               </p>
             </div>
             <div className="p-6 border-t border-gray-200 flex gap-3">
@@ -1659,12 +1795,19 @@ export default function DemoDashboard() {
               </button>
               <button
                 onClick={() => {
-                  saveClaudeKey(claudeApiKey);
+                  const trimmedKey = claudeApiKey.trim();
+                  if (!trimmedKey.startsWith('sk-ant-api03-')) {
+                    setActionStatus('⚠ Invalid API key format. Must start with "sk-ant-api03-"');
+                    setTimeout(() => setActionStatus(null), 4000);
+                    return;
+                  }
+                  saveClaudeKey(trimmedKey);
                   setShowSettingsModal(false);
                   setActionStatus('✓ API Key saved!');
                   setTimeout(() => setActionStatus(null), 2000);
                 }}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                disabled={!claudeApiKey || !claudeApiKey.trim()}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Save
               </button>

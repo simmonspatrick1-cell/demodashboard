@@ -7,12 +7,12 @@
   },
   "env": {
     "NETSUITE_ACCOUNT_ID": "td3049589",
-    "ANTHROPIC_API_KEY": "your_actual_anthropic_api_key_here"
+    "ANTHROPIC_API_KEY": "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"
   },
   "build": {
     "env": {
       "NETSUITE_ACCOUNT_ID": "td3049589",
-      "ANTHROPIC_API_KEY": "your_actual_anthropic_api_key_here"
+      "ANTHROPIC_API_KEY": "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"
     }
   }
 }
