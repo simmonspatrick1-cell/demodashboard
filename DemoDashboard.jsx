@@ -204,6 +204,14 @@ export default function DemoDashboard() {
 
   const syncNetsuiteFieFds = async () => {
     if (!selectedCustData) return;
+    
+    // Check if prospect has a NetSuite ID
+    if (!selectedCustData.nsId) {
+      setActionStatus('⚠ This prospect is not in NetSuite yet. Click "Create Prospect" first!');
+      setTimeout(() => setActionStatus(null), 4000);
+      return;
+    }
+    
     setSyncLoading(true);
     setActionStatus('Syncing from NetSuite...');
     
@@ -311,7 +319,6 @@ export default function DemoDashboard() {
 
       // Prepare export data with hashtags
       const exportData = createExportData(customerData, null, {
-        modules: selectedCustData.focus || [],
         memo: demoNotes[selectedCustData.id] || '',
         estimate: {
           type: 'T&M',
@@ -348,7 +355,6 @@ export default function DemoDashboard() {
 
     // Prepare export data for new customer creation
     const exportData = createExportData(prospectData, null, {
-      modules: prospectData.focus || [],
       memo: selectedCustData ? (demoNotes[selectedCustData.id] || '') : ''
     });
 
@@ -393,7 +399,6 @@ export default function DemoDashboard() {
         };
 
         const exportData = createExportData(selectedCustData, projectData, {
-          modules: selectedCustData.focus || [],
           memo: demoNotes[selectedCustData.id] || ''
         });
 
@@ -452,7 +457,6 @@ export default function DemoDashboard() {
 
         const exportData = createExportData(selectedCustData, null, {
           estimate: estimateData,
-          modules: selectedCustData.focus || [],
           memo: demoNotes[selectedCustData.id] || ''
         });
 
@@ -506,16 +510,23 @@ export default function DemoDashboard() {
         {quickActions.map((action) => {
           const Icon = action.icon;
           const isLoading = syncLoading && action.id === 'sync-netsuite';
+          const isDisabled = (syncLoading && action.id !== 'sync-netsuite') || 
+                            (action.id === 'sync-netsuite' && !selectedCustData?.nsId);
+          const isSyncDisabled = action.id === 'sync-netsuite' && !selectedCustData?.nsId;
+          
           return (
             <button
               key={action.id}
               onClick={action.action}
-              disabled={syncLoading && action.id !== 'sync-netsuite'}
+              disabled={isDisabled}
+              title={isSyncDisabled ? 'Create this prospect in NetSuite first' : ''}
               className={`p-3 rounded-lg transition-all text-xs font-medium flex flex-col items-center justify-center gap-2 ${
                 isLoading
                   ? 'bg-blue-100 text-blue-700 cursor-wait'
+                  : isSyncDisabled
+                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                   : 'bg-gradient-to-br from-blue-50 to-blue-100 text-blue-700 hover:from-blue-100 hover:to-blue-200 active:scale-95'
-              } disabled:opacity-50`}
+              } ${isDisabled && !isSyncDisabled ? 'opacity-50' : ''}`}
             >
               {isLoading ? (
                 <Loader size={18} className="animate-spin" />
@@ -622,7 +633,14 @@ export default function DemoDashboard() {
             >
               <div className="flex items-start justify-between">
                 <div className="flex-1">
-                  <p className="font-semibold text-sm text-gray-800">{customer.name}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-semibold text-sm text-gray-800">{customer.name}</p>
+                    {!customer.nsId && (
+                      <span className="px-1.5 py-0.5 bg-orange-100 text-orange-700 text-[10px] font-semibold rounded">
+                        LOCAL
+                      </span>
+                    )}
+                  </div>
                   <p className="text-xs text-gray-500">{customer.industry}</p>
                 </div>
                 <span className={`px-2 py-1 rounded text-xs font-medium ${
@@ -647,7 +665,14 @@ export default function DemoDashboard() {
             <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg p-6">
               <div className="flex items-start justify-between">
                 <div>
-                  <h2 className="text-2xl font-bold">{selectedCustData.name}</h2>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-2xl font-bold">{selectedCustData.name}</h2>
+                    {!selectedCustData.nsId && (
+                      <span className="px-2 py-1 bg-orange-500 text-white text-xs font-semibold rounded">
+                        LOCAL ONLY
+                      </span>
+                    )}
+                  </div>
                   <p className="text-blue-100 mt-1">{selectedCustData.industry}</p>
                 </div>
                 <span className="bg-blue-500 px-3 py-1 rounded-full text-sm font-semibold">
@@ -655,6 +680,23 @@ export default function DemoDashboard() {
                 </span>
               </div>
             </div>
+
+            {/* Local Prospect Warning */}
+            {!selectedCustData.nsId && (
+              <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <AlertCircle size={20} className="text-orange-600 mt-0.5 flex-shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-orange-900">This prospect is not in NetSuite yet</p>
+                    <p className="text-xs text-orange-700 mt-1">
+                      Click <strong>"Create Prospect"</strong> below to send this customer to NetSuite via email. 
+                      The SuiteScript will process it and create the customer record. 
+                      After 1-2 minutes, click <strong>"Sync NetSuite Data"</strong> to pull the customer ID back.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Quick Actions */}
             <QuickActionsPanel />

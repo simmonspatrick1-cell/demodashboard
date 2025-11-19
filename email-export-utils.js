@@ -63,13 +63,6 @@ export function formatDataWithHashtags(data) {
     }
   }
   
-  // Modules field (for multi-module implementations)
-  if (data.modules && Array.isArray(data.modules)) {
-    lines.push(`#modules: ${data.modules.join(',')}`);
-  } else if (data.modules && typeof data.modules === 'string') {
-    lines.push(`#modules: ${data.modules}`);
-  }
-  
   // Tasks
   if (data.tasks && Array.isArray(data.tasks)) {
     lines.push(`#tasks:`);
