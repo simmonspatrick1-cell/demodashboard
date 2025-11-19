@@ -784,14 +784,23 @@ export default function DemoDashboard() {
         </p>
         
         {/* Rename Feature Info */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4 mb-4">
           <div className="flex items-start gap-3">
-            <AlertCircle size={18} className="text-blue-600 mt-0.5 flex-shrink-0" />
+            <AlertCircle size={20} className="text-blue-600 mt-0.5 flex-shrink-0" />
             <div className="flex-1">
-              <p className="text-sm font-semibold text-blue-900 mb-1">💡 Rename Items for Your Dashboard</p>
-              <p className="text-xs text-blue-700">
-                Use <strong>Display Name</strong> to rename items for your dashboard (e.g., "Implementation Services" instead of "PS - Post Go-Live Support"). 
-                The <strong>NetSuite Item</strong> field determines which actual item gets exported. This lets you use friendly names while maintaining correct NetSuite mappings!
+              <p className="text-sm font-semibold text-blue-900 mb-2">🎯 Automatic Item Copy & Rename</p>
+              <p className="text-xs text-blue-700 mb-2">
+                When you add a <strong>Display Name</strong>, the system will:
+              </p>
+              <ol className="text-xs text-blue-700 space-y-1 ml-4">
+                <li>1. Check if an item with that name already exists in NetSuite</li>
+                <li>2. If not, <strong>copy the source NetSuite item</strong> and rename it</li>
+                <li>3. The new item inherits all properties (rate, accounts, etc.) from the source</li>
+                <li>4. Use the new item in your estimate</li>
+              </ol>
+              <p className="text-xs text-blue-700 mt-2">
+                <strong>Example:</strong> Rename "PS - Post Go-Live Support" to "Implementation Services" → 
+                Creates a new NetSuite item called "Implementation Services" with the same rate ($175/hr) and settings.
               </p>
             </div>
           </div>
@@ -846,7 +855,7 @@ export default function DemoDashboard() {
               {/* Display Name (Optional Rename) */}
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Display Name (Optional - rename for dashboard)
+                  Display Name (Optional - creates a copy in NetSuite)
                 </label>
                 <input
                   type="text"
@@ -861,7 +870,7 @@ export default function DemoDashboard() {
                   placeholder={`Leave blank to use: ${item.name}`}
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  This name appears in the dashboard. The NetSuite item below is what gets exported.
+                  💡 If you enter a name here, the system will copy the NetSuite item below and rename it. The new item will inherit all settings (rate, accounts, etc.).
                 </p>
               </div>
 
