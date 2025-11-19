@@ -24,6 +24,27 @@ export default function DemoDashboard() {
   const [nsData, setNsData] = useState({}); // Store NetSuite API responses
   const [selectedEstimatePreset, setSelectedEstimatePreset] = useState('standard');
   const [customItems, setCustomItems] = useState(ITEM_CONFIG.estimateLineItems);
+  const [showAddProspectModal, setShowAddProspectModal] = useState(false);
+  const [prospects, setProspects] = useState([
+    { id: 1, name: 'AdvisorHR', entityid: 'AdvisorHR-Demo', industry: 'PEO Services', size: '500-1000', status: 'Hot', demoDate: 'Oct 30', focus: ['Resource Planning', 'Multi-Entity', 'Billing'], budget: '$200K-500K', nsId: 3161 },
+    { id: 2, name: 'GSB Group', entityid: 'GSB-Demo', industry: 'Consulting', size: '50-100', status: 'Active', demoDate: 'Nov 5', focus: ['Project Accounting', 'PSA'], budget: '$100K-200K', nsId: 1834 },
+    { id: 3, name: 'Innovatia Technical', entityid: 'Innovatia-Demo', industry: 'Tech Consulting', size: '200-300', status: 'Active', demoDate: 'Nov 8', focus: ['Resource Utilization', 'Forecasting'], budget: '$150K-300K', nsId: 1938 },
+    { id: 4, name: 'Marabou Midstream', entityid: 'Marabou-Demo', industry: 'Energy/Midstream', size: '100-150', status: 'Active', demoDate: 'Nov 12', focus: ['Project Accounting', 'Multi-Entity', 'Consolidation'], budget: '$250K+', nsId: 2662 },
+    { id: 5, name: 'Lovse Surveys', entityid: 'Lovse-Demo', industry: 'Professional Services', size: '75-100', status: 'Qualified', demoDate: 'Nov 15', focus: ['Time & Expense', 'Billing'], budget: '$100K-150K', nsId: 1938 },
+    { id: 6, name: 'nFront Consulting', entityid: 'nFront-Demo', industry: 'Energy Consulting', size: '150-200', status: 'Proposal', demoDate: 'Pending', focus: ['Resource Planning', 'Project Accounting', 'Multi-Entity'], budget: '$5.2M', nsId: 4285 },
+    { id: 7, name: 'Formative Group', entityid: 'Formative-Demo', industry: 'Salesforce Consulting', size: '80-120', status: 'Active', demoDate: 'Nov 20', focus: ['Scaling Operations', 'Acquisitions', 'Resource Mgmt'], budget: '$200K-400K', nsId: 1938 },
+  ]);
+  const [newProspect, setNewProspect] = useState({
+    name: '',
+    entityid: '',
+    industry: '',
+    size: '',
+    status: 'Qualified',
+    demoDate: '',
+    focus: [],
+    budget: '',
+    nsId: null
+  });
 
   // ============ DATA SOURCES ============
   const accounts = [
@@ -79,12 +100,12 @@ export default function DemoDashboard() {
 
   // ============ CUSTOMER FILTERING & SEARCH ============
   const filteredCustomers = useMemo(() => {
-    return keyProspects.filter(cust =>
+    return prospects.filter(cust =>
       cust.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       cust.industry.toLowerCase().includes(searchQuery.toLowerCase()) ||
       cust.entityid.toLowerCase().includes(searchQuery.toLowerCase())
     );
-  }, [searchQuery]);
+  }, [searchQuery, prospects]);
 
   const filteredPrompts = useMemo(() => {
     if (!promptSearch) return promptCategories;
@@ -105,6 +126,47 @@ export default function DemoDashboard() {
     setFavorites(prev =>
       prev.includes(prompt) ? prev.filter(p => p !== prompt) : [...prev, prompt]
     );
+  };
+
+  const handleAddProspect = () => {
+    if (!newProspect.name || !newProspect.entityid) {
+      setActionStatus('⚠️ Please fill in Name and Entity ID');
+      setTimeout(() => setActionStatus(null), 3000);
+      return;
+    }
+
+    const prospectToAdd = {
+      ...newProspect,
+      id: prospects.length + 1,
+      nsId: null // Will be assigned when created in NetSuite
+    };
+
+    setProspects(prev => [...prev, prospectToAdd]);
+    setShowAddProspectModal(false);
+    setActionStatus('✓ Prospect added to list!');
+    setTimeout(() => setActionStatus(null), 3000);
+
+    // Reset form
+    setNewProspect({
+      name: '',
+      entityid: '',
+      industry: '',
+      size: '',
+      status: 'Qualified',
+      demoDate: '',
+      focus: [],
+      budget: '',
+      nsId: null
+    });
+  };
+
+  const toggleFocusArea = (area) => {
+    setNewProspect(prev => ({
+      ...prev,
+      focus: prev.focus.includes(area)
+        ? prev.focus.filter(f => f !== area)
+        : [...prev.focus, area]
+    }));
   };
 
   const syncNetsuiteFieFds = async () => {
@@ -492,7 +554,7 @@ export default function DemoDashboard() {
           <p className="text-xs text-gray-600 mt-1">{currentAccount?.vertical}</p>
         </div>
         
-        <div className="p-3 border-b">
+        <div className="p-3 border-b space-y-2">
           <div className="relative">
             <Search size={16} className="absolute left-2 top-2.5 text-gray-400" />
             <input
@@ -503,6 +565,13 @@ export default function DemoDashboard() {
               className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
+          <button
+            onClick={() => setShowAddProspectModal(true)}
+            className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+          >
+            <Plus size={16} />
+            Add New Prospect
+          </button>
         </div>
 
         <div className="flex-1 overflow-y-auto">
@@ -993,6 +1062,165 @@ export default function DemoDashboard() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {activeTab === 'context' ? <CustomerContextPanel /> : activeTab === 'prompts' ? <PromptLibrary /> : <ItemConfigPanel />}
       </div>
+
+      {/* Add Prospect Modal */}
+      {showAddProspectModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white">
+              <h2 className="text-xl font-bold text-gray-900">Add New Prospect</h2>
+              <button
+                onClick={() => setShowAddProspectModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {/* Name */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Company Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={newProspect.name}
+                  onChange={(e) => setNewProspect(prev => ({ ...prev, name: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="e.g., Acme Corporation"
+                />
+              </div>
+
+              {/* Entity ID */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Entity ID <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={newProspect.entityid}
+                  onChange={(e) => setNewProspect(prev => ({ ...prev, entityid: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="e.g., ACME-Demo"
+                />
+              </div>
+
+              {/* Industry */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Industry
+                </label>
+                <input
+                  type="text"
+                  value={newProspect.industry}
+                  onChange={(e) => setNewProspect(prev => ({ ...prev, industry: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="e.g., Professional Services"
+                />
+              </div>
+
+              {/* Size and Status */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Company Size
+                  </label>
+                  <input
+                    type="text"
+                    value={newProspect.size}
+                    onChange={(e) => setNewProspect(prev => ({ ...prev, size: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder="e.g., 100-200"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Status
+                  </label>
+                  <select
+                    value={newProspect.status}
+                    onChange={(e) => setNewProspect(prev => ({ ...prev, status: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="Qualified">Qualified</option>
+                    <option value="Active">Active</option>
+                    <option value="Hot">Hot</option>
+                    <option value="Proposal">Proposal</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Budget and Demo Date */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Budget
+                  </label>
+                  <input
+                    type="text"
+                    value={newProspect.budget}
+                    onChange={(e) => setNewProspect(prev => ({ ...prev, budget: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder="e.g., $100K-200K"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Demo Date
+                  </label>
+                  <input
+                    type="text"
+                    value={newProspect.demoDate}
+                    onChange={(e) => setNewProspect(prev => ({ ...prev, demoDate: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder="e.g., Dec 15"
+                  />
+                </div>
+              </div>
+
+              {/* Focus Areas */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Focus Areas
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {['Resource Planning', 'Project Accounting', 'Multi-Entity', 'Billing', 'Time & Expense', 'Forecasting', 'PSA', 'Consolidation'].map(area => (
+                    <button
+                      key={area}
+                      onClick={() => toggleFocusArea(area)}
+                      className={`px-3 py-2 rounded-lg border-2 text-sm transition-all ${
+                        newProspect.focus.includes(area)
+                          ? 'border-blue-600 bg-blue-50 text-blue-700 font-semibold'
+                          : 'border-gray-200 hover:border-gray-300 text-gray-700'
+                      }`}
+                    >
+                      {area}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 border-t border-gray-200 flex gap-3">
+              <button
+                onClick={() => setShowAddProspectModal(false)}
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddProspect}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+              >
+                Add Prospect
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
