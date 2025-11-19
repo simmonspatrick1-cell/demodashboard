@@ -7,7 +7,7 @@ import { ITEM_CONFIG, ESTIMATE_PRESETS, AVAILABLE_ITEMS } from './src/itemConfig
 
 export default function DemoDashboard() {
   // ============ STATE MANAGEMENT ============
-  const [activeTab, setActiveTab] = useState('context'); // 'context', 'prompts'
+  const [activeTab, setActiveTab] = useState('context'); // 'context', 'prompts', 'items'
   const [selectedAccount, setSelectedAccount] = useState('services');
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -22,6 +22,8 @@ export default function DemoDashboard() {
   const [customFieldsData, setCustomFieldsData] = useState({});
   const [actionStatus, setActionStatus] = useState(null);
   const [nsData, setNsData] = useState({}); // Store NetSuite API responses
+  const [selectedEstimatePreset, setSelectedEstimatePreset] = useState('standard');
+  const [customItems, setCustomItems] = useState(ITEM_CONFIG.estimateLineItems);
 
   // ============ DATA SOURCES ============
   const accounts = [
@@ -331,8 +333,9 @@ export default function DemoDashboard() {
         // Create estimate via email export using configured items
         const budgetAmount = selectedCustData.budget?.split('-')[0]?.replace('$', '').replace('K', '000') || '100000';
         
-        // Use items from configuration (you can change these in src/itemConfig.js)
-        const lineItems = ITEM_CONFIG.estimateLineItems;
+        // Use items from the Items Configuration tab (customItems state)
+        // Falls back to default config if not customized
+        const lineItems = customItems;
         
         const estimateData = {
           type: 'T&M',
@@ -341,26 +344,12 @@ export default function DemoDashboard() {
           total: budgetAmount,
           status: 'PENDING',
           dueDate: new Date(Date.now() + 30*24*60*60*1000).toISOString().split('T')[0],
-          items: [
-            { 
-              name: lineItems.professionalServices.name, 
-              description: lineItems.professionalServices.description, 
-              quantity: 1, 
-              rate: parseFloat(budgetAmount) * lineItems.professionalServices.percentOfBudget 
-            },
-            { 
-              name: lineItems.travelExpenses.name, 
-              description: lineItems.travelExpenses.description, 
-              quantity: 1, 
-              rate: parseFloat(budgetAmount) * lineItems.travelExpenses.percentOfBudget 
-            },
-            { 
-              name: lineItems.softwareLicensing.name, 
-              description: lineItems.softwareLicensing.description, 
-              quantity: 1, 
-              rate: parseFloat(budgetAmount) * lineItems.softwareLicensing.percentOfBudget 
-            }
-          ]
+          items: Object.values(lineItems).map(item => ({
+            name: item.name,
+            description: item.description,
+            quantity: 1,
+            rate: parseFloat(budgetAmount) * item.percentOfBudget
+          }))
         };
 
         const exportData = createExportData(selectedCustData, null, {
@@ -635,6 +624,228 @@ export default function DemoDashboard() {
     </div>
   );
 
+  // ============ COMPONENT: ITEM CONFIGURATION PANEL ============
+  const ItemConfigPanel = () => (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <h2 className="text-xl font-bold text-gray-900 mb-2">Configure Estimate Items</h2>
+        <p className="text-sm text-gray-600 mb-4">
+          Choose which NetSuite items to use when creating estimates. All items listed exist in your NetSuite account.
+        </p>
+        
+        {/* Preset Selector */}
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Quick Presets
+          </label>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+            {Object.entries(ESTIMATE_PRESETS).map(([key, preset]) => (
+              <button
+                key={key}
+                onClick={() => {
+                  setSelectedEstimatePreset(key);
+                  // Update custom items with preset
+                  const presetItems = {};
+                  preset.items.forEach((item, idx) => {
+                    const keys = ['professionalServices', 'travelExpenses', 'softwareLicensing', 'additional1', 'additional2'];
+                    if (keys[idx]) {
+                      presetItems[keys[idx]] = {
+                        name: item.name,
+                        description: item.description,
+                        percentOfBudget: item.percentOfBudget
+                      };
+                    }
+                  });
+                  setCustomItems(presetItems);
+                }}
+                className={`px-4 py-3 rounded-lg border-2 transition-all ${
+                  selectedEstimatePreset === key
+                    ? 'border-blue-600 bg-blue-50 text-blue-700 font-semibold'
+                    : 'border-gray-200 hover:border-gray-300 text-gray-700'
+                }`}
+              >
+                <div className="text-sm font-medium">{preset.name}</div>
+                <div className="text-xs text-gray-500 mt-1">{preset.items.length} items</div>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Line Items Configuration */}
+      <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Estimate Line Items</h3>
+        
+        <div className="space-y-4">
+          {Object.entries(customItems).map(([key, item]) => (
+            <div key={key} className="border border-gray-200 rounded-lg p-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* Item Name Selector */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    NetSuite Item
+                  </label>
+                  <select
+                    value={item.name}
+                    onChange={(e) => {
+                      setCustomItems(prev => ({
+                        ...prev,
+                        [key]: { ...prev[key], name: e.target.value }
+                      }));
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  >
+                    <optgroup label="Professional Services">
+                      <option value="PS - Post Go-Live Support">PS - Post Go-Live Support ($175/hr)</option>
+                      <option value="PS - Go-Live Support">PS - Go-Live Support ($200/hr)</option>
+                      <option value="PS - Training Services">PS - Training Services ($150/hr)</option>
+                      <option value="PS - Data Migration">PS - Data Migration ($140/hr)</option>
+                      <option value="PS - Discovery & Design Strategy">PS - Discovery & Design Strategy ($275/hr)</option>
+                    </optgroup>
+                    <optgroup label="Project Services">
+                      <option value="SVC_PR_Consulting">SVC_PR_Consulting ($200/hr)</option>
+                      <option value="SVC_PR_Project Management">SVC_PR_Project Management ($375/hr)</option>
+                      <option value="SVC_PR_Development">SVC_PR_Development ($220/hr)</option>
+                      <option value="SVC_PR_Testing">SVC_PR_Testing ($200/hr)</option>
+                      <option value="SVC_PR_Training">SVC_PR_Training ($120/hr)</option>
+                      <option value="SVC_PR_Integration">SVC_PR_Integration ($220/hr)</option>
+                      <option value="SVC_PR_Data Migration">SVC_PR_Data Migration ($125/hr)</option>
+                      <option value="SVC_PR_Business Analysis">SVC_PR_Business Analysis ($120/hr)</option>
+                    </optgroup>
+                    <optgroup label="Expenses">
+                      <option value="EXP_Travel Expenses">EXP_Travel Expenses</option>
+                      <option value="SVC_PR_Travel">SVC_PR_Travel ($200/hr)</option>
+                    </optgroup>
+                    <optgroup label="Software/Licensing">
+                      <option value="NIN_AA1: SaaS License A">NIN_AA1: SaaS License A ($24,000)</option>
+                      <option value="NIN_AA1: Perpetual License">NIN_AA1: Perpetual License</option>
+                      <option value="NIN_AA1: Platinum Support">NIN_AA1: Platinum Support ($12,000)</option>
+                    </optgroup>
+                  </select>
+                </div>
+
+                {/* Description */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Description
+                  </label>
+                  <input
+                    type="text"
+                    value={item.description}
+                    onChange={(e) => {
+                      setCustomItems(prev => ({
+                        ...prev,
+                        [key]: { ...prev[key], description: e.target.value }
+                      }));
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder="Line item description"
+                  />
+                </div>
+
+                {/* Percentage */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    % of Budget
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="5"
+                    value={item.percentOfBudget * 100}
+                    onChange={(e) => {
+                      setCustomItems(prev => ({
+                        ...prev,
+                        [key]: { ...prev[key], percentOfBudget: parseFloat(e.target.value) / 100 }
+                      }));
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Total Percentage Check */}
+        <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+          <div className="flex justify-between items-center">
+            <span className="text-sm font-medium text-gray-700">Total Percentage:</span>
+            <span className={`text-lg font-bold ${
+              Math.abs(Object.values(customItems).reduce((sum, item) => sum + item.percentOfBudget, 0) - 1) < 0.01
+                ? 'text-green-600'
+                : 'text-red-600'
+            }`}>
+              {(Object.values(customItems).reduce((sum, item) => sum + item.percentOfBudget, 0) * 100).toFixed(0)}%
+            </span>
+          </div>
+          {Math.abs(Object.values(customItems).reduce((sum, item) => sum + item.percentOfBudget, 0) - 1) >= 0.01 && (
+            <p className="text-xs text-red-600 mt-2">⚠️ Percentages should add up to 100%</p>
+          )}
+        </div>
+
+        {/* Save Button */}
+        <div className="mt-6 flex gap-3">
+          <button
+            onClick={() => {
+              // Save to local storage or update config
+              localStorage.setItem('customEstimateItems', JSON.stringify(customItems));
+              setActionStatus('✓ Item configuration saved!');
+              setTimeout(() => setActionStatus(null), 3000);
+            }}
+            className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
+          >
+            Save Configuration
+          </button>
+          <button
+            onClick={() => {
+              setCustomItems(ITEM_CONFIG.estimateLineItems);
+              setActionStatus('✓ Reset to defaults');
+              setTimeout(() => setActionStatus(null), 2000);
+            }}
+            className="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-semibold"
+          >
+            Reset to Defaults
+          </button>
+        </div>
+      </div>
+
+      {/* Available Items Reference */}
+      <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Available NetSuite Items</h3>
+        <p className="text-sm text-gray-600 mb-4">
+          All items from your NetSuite account (ItemSearchResults891.xls)
+        </p>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+          <div>
+            <h4 className="font-semibold text-gray-700 mb-2">Professional Services</h4>
+            <ul className="space-y-1 text-gray-600">
+              <li>• PS - Post Go-Live Support ($175/hr)</li>
+              <li>• PS - Go-Live Support ($200/hr)</li>
+              <li>• PS - Training Services ($150/hr)</li>
+              <li>• PS - Data Migration ($140/hr)</li>
+              <li>• PS - Discovery & Design Strategy ($275/hr)</li>
+            </ul>
+          </div>
+          
+          <div>
+            <h4 className="font-semibold text-gray-700 mb-2">Project Services</h4>
+            <ul className="space-y-1 text-gray-600">
+              <li>• SVC_PR_Consulting ($200/hr)</li>
+              <li>• SVC_PR_Project Management ($375/hr)</li>
+              <li>• SVC_PR_Development ($220/hr)</li>
+              <li>• SVC_PR_Testing ($200/hr)</li>
+              <li>• SVC_PR_Training ($120/hr)</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
   // ============ COMPONENT: PROMPT LIBRARY ============
   const PromptLibrary = () => (
     <div className="space-y-4">
@@ -761,13 +972,26 @@ export default function DemoDashboard() {
                 Demo Prompts ({favorites.length})
               </span>
             </button>
+            <button
+              onClick={() => setActiveTab('items')}
+              className={`px-4 py-2 font-medium transition-colors border-b-2 ${
+                activeTab === 'items'
+                  ? 'text-blue-600 border-blue-600'
+                  : 'text-gray-600 border-transparent hover:text-gray-900'
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                <Settings size={18} />
+                Configure Items
+              </span>
+            </button>
           </div>
         </div>
       </div>
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {activeTab === 'context' ? <CustomerContextPanel /> : <PromptLibrary />}
+        {activeTab === 'context' ? <CustomerContextPanel /> : activeTab === 'prompts' ? <PromptLibrary /> : <ItemConfigPanel />}
       </div>
     </div>
   );
