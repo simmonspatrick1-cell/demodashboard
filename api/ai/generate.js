@@ -1,0 +1,121 @@
+import * as cheerio from 'cheerio';
+
+export default async function handler(req, res) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  const { type, content, apiKey } = req.body;
+
+  if (!apiKey) {
+    return res.status(400).json({ error: 'Claude API Key is required' });
+  }
+
+  try {
+    let prompt = '';
+    let systemPrompt = 'You are an expert NetSuite solution architect and sales engineer.';
+
+    if (type === 'analyze_url') {
+      // 1. Fetch and Parse URL
+      try {
+        const response = await fetch(content);
+        const html = await response.text();
+        const $ = cheerio.load(html);
+        
+        // Extract relevant text (remove scripts, styles)
+        $('script, style').remove();
+        const text = $('body').text().replace(/\s+/g, ' ').trim().substring(0, 15000); // Limit context window
+
+        prompt = `
+          Analyze the following website content for a company:
+          
+          "${text}"
+
+          Based on this content, generate a JSON object with the following structure:
+          {
+            "name": "Company Name",
+            "industry": "Industry (e.g., SaaS, Manufacturing)",
+            "size": "Estimated Employee Count (e.g., 50-100)",
+            "revenue": "Estimated Revenue (e.g., $10M-20M)",
+            "website": "${content}",
+            "description": "Brief 1-2 sentence description",
+            "focus_areas": ["Area 1", "Area 2", "Area 3"],
+            "suggested_projects": [
+              { "name": "Project Name", "description": "Why this project fits" }
+            ]
+          }
+          
+          Only return the valid JSON object, no other text.
+        `;
+      } catch (error) {
+        return res.status(500).json({ error: `Failed to fetch URL: ${error.message}` });
+      }
+
+    } else if (type === 'summarize_clipboard') {
+      prompt = `
+        Summarize the following list of prompts or notes into a cohesive strategy document. 
+        Identify common themes, key requirements, and suggested next steps.
+
+        Input:
+        ${content}
+
+        Output Format:
+        ## Executive Summary
+        ...
+        ## Key Requirements
+        ...
+        ## Recommended Strategy
+        ...
+      `;
+    } else {
+      return res.status(400).json({ error: 'Invalid request type' });
+    }
+
+    // 2. Call Claude API
+    const anthropicResponse = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+        'dangerously-allow-browser': 'true' // Typically server-side doesn't need this, but Vercel functions might behave like browser envs occasionally
+      },
+      body: JSON.stringify({
+        model: 'claude-3-5-sonnet-20240620',
+        max_tokens: 4096,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+
+    const data = await anthropicResponse.json();
+
+    if (data.error) {
+      throw new Error(data.error.message);
+    }
+
+    // 3. Process Response
+    const completion = data.content[0].text;
+
+    // If looking for JSON, try to extract it if Claude added extra text
+    if (type === 'analyze_url') {
+      try {
+        const jsonMatch = completion.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          res.status(200).json(JSON.parse(jsonMatch[0]));
+        } else {
+          res.status(200).json({ error: 'Could not parse JSON from Claude response', raw: completion });
+        }
+      } catch (e) {
+        res.status(200).json({ error: 'Invalid JSON format', raw: completion });
+      }
+    } else {
+      res.status(200).json({ summary: completion });
+    }
+
+  } catch (error) {
+    console.error('AI Generation Error:', error);
+    res.status(500).json({ error: error.message });
+  }
+}
+

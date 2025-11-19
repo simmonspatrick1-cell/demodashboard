@@ -25,16 +25,19 @@ export default function DemoDashboard() {
   const [selectedEstimatePreset, setSelectedEstimatePreset] = useState('standard');
   const [customItems, setCustomItems] = useState(ITEM_CONFIG.estimateLineItems);
   const [showAddProspectModal, setShowAddProspectModal] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [claudeApiKey, setClaudeApiKey] = useState('');
+  const [isGeneratingAI, setIsGeneratingAI] = useState(false);
   const [clipboardHistory, setClipboardHistory] = useState([]);
   const [showClipboardHistory, setShowClipboardHistory] = useState(false);
   const [prospects, setProspects] = useState([
-    { id: 1, name: 'AdvisorHR', entityid: 'AdvisorHR-Demo', industry: 'PEO Services', size: '500-1000', status: 'Hot', demoDate: 'Oct 30', focus: ['Resource Planning', 'Multi-Entity', 'Billing'], budget: '$200K-500K', nsId: 3161 },
-    { id: 2, name: 'GSB Group', entityid: 'GSB-Demo', industry: 'Consulting', size: '50-100', status: 'Active', demoDate: 'Nov 5', focus: ['Project Accounting', 'PSA'], budget: '$100K-200K', nsId: 1834 },
-    { id: 3, name: 'Innovatia Technical', entityid: 'Innovatia-Demo', industry: 'Tech Consulting', size: '200-300', status: 'Active', demoDate: 'Nov 8', focus: ['Resource Utilization', 'Forecasting'], budget: '$150K-300K', nsId: 1938 },
-    { id: 4, name: 'Marabou Midstream', entityid: 'Marabou-Demo', industry: 'Energy/Midstream', size: '100-150', status: 'Active', demoDate: 'Nov 12', focus: ['Project Accounting', 'Multi-Entity', 'Consolidation'], budget: '$250K+', nsId: 2662 },
-    { id: 5, name: 'Lovse Surveys', entityid: 'Lovse-Demo', industry: 'Professional Services', size: '75-100', status: 'Qualified', demoDate: 'Nov 15', focus: ['Time & Expense', 'Billing'], budget: '$100K-150K', nsId: 1938 },
-    { id: 6, name: 'nFront Consulting', entityid: 'nFront-Demo', industry: 'Energy Consulting', size: '150-200', status: 'Proposal', demoDate: 'Pending', focus: ['Resource Planning', 'Project Accounting', 'Multi-Entity'], budget: '$5.2M', nsId: 4285 },
-    { id: 7, name: 'Formative Group', entityid: 'Formative-Demo', industry: 'Salesforce Consulting', size: '80-120', status: 'Active', demoDate: 'Nov 20', focus: ['Scaling Operations', 'Acquisitions', 'Resource Mgmt'], budget: '$200K-400K', nsId: 1938 },
+    { id: 1, name: 'AdvisorHR', entityid: 'AdvisorHR-Demo', industry: 'PEO Services', size: '500-1000', status: 'Hot', demoDate: 'Oct 30', focus: ['Resource Planning', 'Multi-Entity', 'Billing'], budget: '$200K-500K', nsId: 3161, website: 'advisorhr.com' },
+    { id: 2, name: 'GSB Group', entityid: 'GSB-Demo', industry: 'Consulting', size: '50-100', status: 'Active', demoDate: 'Nov 5', focus: ['Project Accounting', 'PSA'], budget: '$100K-200K', nsId: 1834, website: 'gsbgroup.com' },
+    { id: 3, name: 'Innovatia Technical', entityid: 'Innovatia-Demo', industry: 'Tech Consulting', size: '200-300', status: 'Active', demoDate: 'Nov 8', focus: ['Resource Utilization', 'Forecasting'], budget: '$150K-300K', nsId: 1938, website: 'innovatia.net' },
+    { id: 4, name: 'Marabou Midstream', entityid: 'Marabou-Demo', industry: 'Energy/Midstream', size: '100-150', status: 'Active', demoDate: 'Nov 12', focus: ['Project Accounting', 'Multi-Entity', 'Consolidation'], budget: '$250K+', nsId: 2662, website: 'maraboumidstream.com' },
+    { id: 5, name: 'Lovse Surveys', entityid: 'Lovse-Demo', industry: 'Professional Services', size: '75-100', status: 'Qualified', demoDate: 'Nov 15', focus: ['Time & Expense', 'Billing'], budget: '$100K-150K', nsId: 1938, website: 'lovsesurveys.com' },
+    { id: 6, name: 'nFront Consulting', entityid: 'nFront-Demo', industry: 'Energy Consulting', size: '150-200', status: 'Proposal', demoDate: 'Pending', focus: ['Resource Planning', 'Project Accounting', 'Multi-Entity'], budget: '$5.2M', nsId: 4285, website: 'nfrontconsulting.com' },
+    { id: 7, name: 'Formative Group', entityid: 'Formative-Demo', industry: 'Salesforce Consulting', size: '80-120', status: 'Active', demoDate: 'Nov 20', focus: ['Scaling Operations', 'Acquisitions', 'Resource Mgmt'], budget: '$200K-400K', nsId: 1938, website: 'formativegroup.com' },
   ]);
   const [newProspect, setNewProspect] = useState({
     name: '',
@@ -45,8 +48,74 @@ export default function DemoDashboard() {
     demoDate: '',
     focus: [],
     budget: '',
-    nsId: null
+    nsId: null,
+    website: ''
   });
+
+  // Load API Key from local storage
+  useEffect(() => {
+    const savedKey = localStorage.getItem('demodashboard_claude_key');
+    if (savedKey) setClaudeApiKey(savedKey);
+  }, []);
+
+  // Save API Key to local storage
+  const saveClaudeKey = (key) => {
+    setClaudeApiKey(key);
+    localStorage.setItem('demodashboard_claude_key', key);
+  };
+
+  // AI Generation Handler
+  const generateFromAI = async (type, content) => {
+    if (!claudeApiKey) {
+      setShowSettingsModal(true);
+      setActionStatus('⚠ Please enter your Claude API Key first');
+      setTimeout(() => setActionStatus(null), 3000);
+      return;
+    }
+
+    setIsGeneratingAI(true);
+    try {
+      const response = await fetch('/api/ai/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type, content, apiKey: claudeApiKey })
+      });
+
+      const data = await response.json();
+      if (data.error) throw new Error(data.error);
+
+      if (type === 'analyze_url') {
+        // Auto-fill prospect form
+        setNewProspect(prev => ({
+          ...prev,
+          name: data.name || prev.name,
+          industry: data.industry || prev.industry,
+          size: data.size || prev.size,
+          budget: data.revenue || prev.budget,
+          focus: data.focus_areas || prev.focus,
+          website: data.website || prev.website
+        }));
+        // Also add AI notes if we have a description
+        if (data.description) {
+           // We can store this temporarily or let user copy it
+           setActionStatus('✓ Data extracted from website!');
+        }
+      } else if (type === 'summarize_clipboard') {
+        // Copy summary to clipboard history as a new item
+        const summary = `## AI Summary\n\n${data.summary}`;
+        setClipboardHistory(prev => [{ text: summary, timestamp: new Date() }, ...prev]);
+        // Also put it in the clipboard
+        navigator.clipboard.writeText(summary);
+        setActionStatus('✓ Summary copied to clipboard!');
+      }
+    } catch (error) {
+      console.error('AI Error:', error);
+      setActionStatus(`⚠ AI Error: ${error.message}`);
+    } finally {
+      setIsGeneratingAI(false);
+      setTimeout(() => setActionStatus(null), 3000);
+    }
+  };
 
   // ============ DATA SOURCES ============
   const accounts = [
@@ -723,6 +792,19 @@ export default function DemoDashboard() {
                 <p className="text-xs text-gray-500 font-semibold uppercase">Demo Date</p>
                 <p className="text-lg font-semibold text-blue-700 mt-1">{selectedCustData.demoDate}</p>
               </div>
+              {selectedCustData.website && (
+                <div className="bg-white rounded-lg border border-gray-200 p-4">
+                  <p className="text-xs text-gray-500 font-semibold uppercase">Website</p>
+                  <a 
+                    href={selectedCustData.website.startsWith('http') ? selectedCustData.website : `https://${selectedCustData.website}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-lg font-semibold text-indigo-600 hover:text-indigo-800 mt-1 block truncate"
+                  >
+                    {selectedCustData.website}
+                  </a>
+                </div>
+              )}
             </div>
 
             {/* Custom Fields from NetSuite */}
@@ -1221,6 +1303,18 @@ export default function DemoDashboard() {
               </div>
             </div>
             
+            {/* Settings Button */}
+            <button 
+              onClick={() => setShowSettingsModal(true)}
+              className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors relative mr-2"
+              title="AI Settings"
+            >
+              <Settings size={20} />
+              {!claudeApiKey && (
+                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+              )}
+            </button>
+
             {/* Clipboard History */}
             <div className="relative">
               <button
@@ -1238,14 +1332,26 @@ export default function DemoDashboard() {
               
               {showClipboardHistory && (
                 <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-50 max-h-96 overflow-y-auto">
-                  <div className="p-3 border-b border-gray-200 flex justify-between items-center bg-gray-50">
-                    <h3 className="font-semibold text-gray-700 text-sm">Clipboard History</h3>
-                    <button 
-                      onClick={() => setClipboardHistory([])}
-                      className="text-xs text-red-600 hover:text-red-800"
-                    >
-                      Clear
-                    </button>
+                  <div className="p-3 border-b border-gray-200 bg-gray-50">
+                    <div className="flex justify-between items-center mb-2">
+                      <h3 className="font-semibold text-gray-700 text-sm">Clipboard History</h3>
+                      <button 
+                        onClick={() => setClipboardHistory([])}
+                        className="text-xs text-red-600 hover:text-red-800"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                    {clipboardHistory.length > 0 && (
+                      <button
+                        onClick={() => generateFromAI('summarize_clipboard', clipboardHistory.map(h => h.text).join('\n\n'))}
+                        disabled={isGeneratingAI}
+                        className="w-full py-1.5 bg-purple-100 text-purple-700 rounded text-xs font-medium hover:bg-purple-200 transition-colors flex items-center justify-center gap-1"
+                      >
+                        {isGeneratingAI ? <Loader size={12} className="animate-spin" /> : <Zap size={12} />}
+                        Summarize with Claude
+                      </button>
+                    )}
                   </div>
                   {clipboardHistory.length === 0 ? (
                     <div className="p-4 text-center text-gray-500 text-sm">
@@ -1351,6 +1457,33 @@ export default function DemoDashboard() {
             </div>
 
             <div className="p-6 space-y-4">
+              {/* Website Analysis */}
+              <div className="mb-6 p-4 bg-indigo-50 rounded-lg border border-indigo-100">
+                <label className="block text-sm font-medium text-indigo-900 mb-2">
+                  🤖 Auto-Fill from Website
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newProspect.website}
+                    onChange={(e) => setNewProspect(prev => ({ ...prev, website: e.target.value }))}
+                    className="flex-1 px-3 py-2 border border-indigo-200 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                    placeholder="https://company.com"
+                  />
+                  <button
+                    onClick={() => generateFromAI('analyze_url', newProspect.website)}
+                    disabled={!newProspect.website || isGeneratingAI}
+                    className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 whitespace-nowrap"
+                  >
+                    {isGeneratingAI ? <Loader className="animate-spin" size={16} /> : <Zap size={16} />}
+                    Analyze
+                  </button>
+                </div>
+                <p className="text-xs text-indigo-600 mt-2">
+                  💡 Enter a website URL to auto-generate company details, industry focus, and project suggestions using Claude AI.
+                </p>
+              </div>
+
               {/* Name */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1489,6 +1622,51 @@ export default function DemoDashboard() {
                 className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
               >
                 Add Prospect
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Settings Modal (Claude API Key) */}
+      {showSettingsModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-md w-full">
+            <div className="p-6 border-b border-gray-200">
+              <h2 className="text-xl font-bold text-gray-900">Claude API Settings</h2>
+            </div>
+            <div className="p-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Claude API Key
+              </label>
+              <input
+                type="password"
+                value={claudeApiKey}
+                onChange={(e) => setClaudeApiKey(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                placeholder="sk-ant-api03-..."
+              />
+              <p className="text-xs text-gray-500 mt-2">
+                Your API key is stored locally in your browser and sent directly to Claude's API.
+              </p>
+            </div>
+            <div className="p-6 border-t border-gray-200 flex gap-3">
+              <button
+                onClick={() => setShowSettingsModal(false)}
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  saveClaudeKey(claudeApiKey);
+                  setShowSettingsModal(false);
+                  setActionStatus('✓ API Key saved!');
+                  setTimeout(() => setActionStatus(null), 2000);
+                }}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                Save
               </button>
             </div>
           </div>
