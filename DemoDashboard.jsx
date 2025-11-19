@@ -3,6 +3,7 @@ import { Search, Settings, User, Users, Zap, ChevronRight, Copy, Check, BookOpen
 // Import the NetSuite service
 // import NetSuiteService from './netsuite-service';
 import { exportViaEmail, createExportData } from './email-export-utils';
+import { ITEM_CONFIG, ESTIMATE_PRESETS, AVAILABLE_ITEMS } from './src/itemConfig';
 
 export default function DemoDashboard() {
   // ============ STATE MANAGEMENT ============
@@ -327,8 +328,12 @@ export default function DemoDashboard() {
           return;
         }
 
-        // Create estimate via email export
+        // Create estimate via email export using configured items
         const budgetAmount = selectedCustData.budget?.split('-')[0]?.replace('$', '').replace('K', '000') || '100000';
+        
+        // Use items from configuration (you can change these in src/itemConfig.js)
+        const lineItems = ITEM_CONFIG.estimateLineItems;
+        
         const estimateData = {
           type: 'T&M',
           customerId: selectedCustData.nsId,
@@ -337,9 +342,24 @@ export default function DemoDashboard() {
           status: 'PENDING',
           dueDate: new Date(Date.now() + 30*24*60*60*1000).toISOString().split('T')[0],
           items: [
-            { name: 'PS - Post Go-Live Support', description: 'Professional Services - Implementation and Configuration', quantity: 1, rate: parseFloat(budgetAmount) * 0.6 },
-            { name: 'PS - Post Go-Live Support', description: 'Travel & Expenses - On-site Support', quantity: 1, rate: parseFloat(budgetAmount) * 0.2 },
-            { name: 'PS - Post Go-Live Support', description: 'Software Licensing - Annual Subscription', quantity: 1, rate: parseFloat(budgetAmount) * 0.2 }
+            { 
+              name: lineItems.professionalServices.name, 
+              description: lineItems.professionalServices.description, 
+              quantity: 1, 
+              rate: parseFloat(budgetAmount) * lineItems.professionalServices.percentOfBudget 
+            },
+            { 
+              name: lineItems.travelExpenses.name, 
+              description: lineItems.travelExpenses.description, 
+              quantity: 1, 
+              rate: parseFloat(budgetAmount) * lineItems.travelExpenses.percentOfBudget 
+            },
+            { 
+              name: lineItems.softwareLicensing.name, 
+              description: lineItems.softwareLicensing.description, 
+              quantity: 1, 
+              rate: parseFloat(budgetAmount) * lineItems.softwareLicensing.percentOfBudget 
+            }
           ]
         };
 
