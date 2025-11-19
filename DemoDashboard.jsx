@@ -25,6 +25,8 @@ export default function DemoDashboard() {
   const [selectedEstimatePreset, setSelectedEstimatePreset] = useState('standard');
   const [customItems, setCustomItems] = useState(ITEM_CONFIG.estimateLineItems);
   const [showAddProspectModal, setShowAddProspectModal] = useState(false);
+  const [clipboardHistory, setClipboardHistory] = useState([]);
+  const [showClipboardHistory, setShowClipboardHistory] = useState(false);
   const [prospects, setProspects] = useState([
     { id: 1, name: 'AdvisorHR', entityid: 'AdvisorHR-Demo', industry: 'PEO Services', size: '500-1000', status: 'Hot', demoDate: 'Oct 30', focus: ['Resource Planning', 'Multi-Entity', 'Billing'], budget: '$200K-500K', nsId: 3161 },
     { id: 2, name: 'GSB Group', entityid: 'GSB-Demo', industry: 'Consulting', size: '50-100', status: 'Active', demoDate: 'Nov 5', focus: ['Project Accounting', 'PSA'], budget: '$100K-200K', nsId: 1834 },
@@ -119,6 +121,13 @@ export default function DemoDashboard() {
   const copyToClipboard = (text, index) => {
     navigator.clipboard.writeText(text);
     setCopiedIndex(index);
+    
+    // Add to history
+    setClipboardHistory(prev => {
+      const newHistory = [{ text, timestamp: new Date() }, ...prev];
+      return newHistory.slice(0, 20); // Keep last 20 items
+    });
+    
     setTimeout(() => setCopiedIndex(null), 2000);
   };
 
@@ -454,7 +463,7 @@ export default function DemoDashboard() {
   ];
 
   const currentAccount = accounts.find(a => a.id === selectedAccount);
-  const selectedCustData = keyProspects.find(c => c.id === selectedCustomer);
+  const selectedCustData = prospects.find(c => c.id === selectedCustomer);
 
   // ============ COMPONENT: QUICK ACTIONS PANEL ============
   const QuickActionsPanel = () => (
@@ -1004,6 +1013,64 @@ export default function DemoDashboard() {
                 <h1 className="text-2xl font-bold text-gray-900">Demo Master Dashboard</h1>
                 <p className="text-sm text-gray-600">NetSuite PSA Demo Prep Hub</p>
               </div>
+            </div>
+            
+            {/* Clipboard History */}
+            <div className="relative">
+              <button
+                onClick={() => setShowClipboardHistory(!showClipboardHistory)}
+                className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors relative"
+                title="Clipboard History"
+              >
+                <Copy size={20} />
+                {clipboardHistory.length > 0 && (
+                  <span className="absolute top-0 right-0 w-4 h-4 bg-blue-600 text-white text-xs flex items-center justify-center rounded-full">
+                    {clipboardHistory.length}
+                  </span>
+                )}
+              </button>
+              
+              {showClipboardHistory && (
+                <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-50 max-h-96 overflow-y-auto">
+                  <div className="p-3 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+                    <h3 className="font-semibold text-gray-700 text-sm">Clipboard History</h3>
+                    <button 
+                      onClick={() => setClipboardHistory([])}
+                      className="text-xs text-red-600 hover:text-red-800"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                  {clipboardHistory.length === 0 ? (
+                    <div className="p-4 text-center text-gray-500 text-sm">
+                      No history yet
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-gray-100">
+                      {clipboardHistory.map((item, idx) => (
+                        <div key={idx} className="p-3 hover:bg-gray-50 group relative">
+                          <p className="text-xs text-gray-800 line-clamp-2 pr-6">{item.text}</p>
+                          <span className="text-[10px] text-gray-400 mt-1 block">
+                            {item.timestamp.toLocaleTimeString()}
+                          </span>
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(item.text);
+                              setShowClipboardHistory(false);
+                              setActionStatus('✓ Copied from history');
+                              setTimeout(() => setActionStatus(null), 2000);
+                            }}
+                            className="absolute right-2 top-3 text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                            title="Copy again"
+                          >
+                            <Copy size={14} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
