@@ -1764,13 +1764,23 @@ export default function DemoDashboard() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Claude API Key (Optional)
               </label>
-              <input
-                type="text"
-                value={claudeApiKey}
-                onChange={(e) => setClaudeApiKey(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-mono text-sm"
-                placeholder="Leave empty to use system key..."
-              />
+              <div className="relative">
+                <input
+                  type="text"
+                  value={claudeApiKey}
+                  onChange={(e) => setClaudeApiKey(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-mono text-sm pr-16"
+                  placeholder="Leave empty to use system key..."
+                />
+                {claudeApiKey && (
+                  <button
+                    onClick={() => setClaudeApiKey('')}
+                    className="absolute right-2 top-1/2 transform -translate-y-1/2 text-xs text-gray-500 hover:text-red-600 bg-gray-100 px-2 py-1 rounded"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
               {!localStorage.getItem('demodashboard_claude_key') && claudeApiKey && (
                 <p className="text-xs text-green-600 mt-2 flex items-center gap-1">
                   ✓ Using default API key. You can change it here if needed.

@@ -75,13 +75,13 @@ export default async function handler(req, res) {
     }
 
     // 2. Call Claude API
-    const anthropicResponse = await fetch('https://api.anthropic.com/v1/messages', {
+    let anthropicResponse = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
         'x-api-key': finalApiKey,
         'anthropic-version': '2023-06-01',
         'content-type': 'application/json',
-        'dangerously-allow-browser': 'true' // Typically server-side doesn't need this, but Vercel functions might behave like browser envs occasionally
+        'dangerously-allow-browser': 'true'
       },
       body: JSON.stringify({
         model: 'claude-3-haiku-20240307',
@@ -91,7 +91,28 @@ export default async function handler(req, res) {
       })
     });
 
-    const data = await anthropicResponse.json();
+    let data = await anthropicResponse.json();
+
+    // 2a. Retry Logic: If 401 Unauthorized AND we used a custom key, try again with system key
+    if (data.error && data.error.type === 'authentication_error' && finalApiKey !== process.env.ANTHROPIC_API_KEY && process.env.ANTHROPIC_API_KEY) {
+      console.log('Authentication failed with custom key. Retrying with system key...');
+      anthropicResponse = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'x-api-key': process.env.ANTHROPIC_API_KEY,
+          'anthropic-version': '2023-06-01',
+          'content-type': 'application/json',
+          'dangerously-allow-browser': 'true'
+        },
+        body: JSON.stringify({
+          model: 'claude-3-haiku-20240307',
+          max_tokens: 4096,
+          system: systemPrompt,
+          messages: [{ role: 'user', content: prompt }]
+        })
+      });
+      data = await anthropicResponse.json();
+    }
 
     if (data.error) {
       throw new Error(data.error.message);
