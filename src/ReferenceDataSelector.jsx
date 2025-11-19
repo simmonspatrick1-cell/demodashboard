@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ChevronDown, X, Building2, Users, MapPin } from 'lucide-react';
-import { getDisplayName } from './netsuiteData';
+import { getDisplayName, NETSUITE_CLASSES, NETSUITE_DEPARTMENTS, NETSUITE_LOCATIONS } from './netsuiteData';
 
 /**
  * Reference Data Selector Component
@@ -13,11 +13,26 @@ export default function ReferenceDataSelector({ value, onChange, type, label, ic
   const [data, setData] = useState([]);
   const [search, setSearch] = useState('');
 
-  // Load data from localStorage
+  // Load data from localStorage or use defaults
   useEffect(() => {
     const savedData = localStorage.getItem(`netsuite_${type}`);
     if (savedData) {
       setData(JSON.parse(savedData));
+    } else {
+      // Fallback to defaults if no local data exists
+      switch (type) {
+        case 'classes':
+          setData(NETSUITE_CLASSES);
+          break;
+        case 'departments':
+          setData(NETSUITE_DEPARTMENTS);
+          break;
+        case 'locations':
+          setData(NETSUITE_LOCATIONS);
+          break;
+        default:
+          setData([]);
+      }
     }
   }, [type]);
 
