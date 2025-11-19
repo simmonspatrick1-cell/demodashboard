@@ -54,13 +54,55 @@ export function formatDataWithHashtags(data) {
     lines.push(`#estimateTotal: ${data.estimate.total || data.estimate.amount || ''}`);
     lines.push(`#estimateStatus: ${data.estimate.status || 'PENDING'}`);
     lines.push(`#estimateDueDate: ${data.estimate.dueDate || data.estimate.duedate || ''}`);
-    
+
+    // Class (optional)
+    if (data.estimate.class || data.estimate.classId) {
+      lines.push(`#estimateClass: ${data.estimate.class || data.estimate.classId || ''}`);
+    }
+
+    // Department (optional)
+    if (data.estimate.department || data.estimate.departmentId) {
+      lines.push(`#estimateDepartment: ${data.estimate.department || data.estimate.departmentId || ''}`);
+    }
+
+    // Location (optional)
+    if (data.estimate.location || data.estimate.locationId) {
+      lines.push(`#estimateLocation: ${data.estimate.location || data.estimate.locationId || ''}`);
+    }
+
     if (data.estimate.items && Array.isArray(data.estimate.items)) {
       const itemLines = data.estimate.items.map((item, idx) => {
         return `  - ${item.name || item.item}: Qty=${item.quantity || 1}, Rate=${item.rate || item.price || ''}`;
       }).join('\n');
       lines.push(`#estimateItems:\n${itemLines}`);
     }
+  }
+
+  // Classes (for renaming/reference)
+  if (data.classes && Array.isArray(data.classes)) {
+    lines.push(`#classes:`);
+    data.classes.forEach(cls => {
+      const displayName = cls.displayName || cls.name;
+      lines.push(`  - ID: ${cls.id}, Name: ${cls.name}, DisplayName: ${displayName}`);
+    });
+  }
+
+  // Departments (for renaming/reference)
+  if (data.departments && Array.isArray(data.departments)) {
+    lines.push(`#departments:`);
+    data.departments.forEach(dept => {
+      const displayName = dept.displayName || dept.name;
+      lines.push(`  - ID: ${dept.id}, Name: ${dept.name}, DisplayName: ${displayName}`);
+    });
+  }
+
+  // Employees (for renaming/reference)
+  if (data.employees && Array.isArray(data.employees)) {
+    lines.push(`#employees:`);
+    data.employees.forEach(emp => {
+      const displayName = emp.displayName || emp.name;
+      lines.push(`  - ID: ${emp.id}, Name: ${emp.name}, DisplayName: ${displayName}, Email: ${emp.email || ''}`);
+    });
   }
   
   // Tasks

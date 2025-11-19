@@ -67,10 +67,10 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { customerId, account = 'services' } = req.body;
+  const { customerId, entityId, companyName, account = 'services' } = req.body;
 
-  if (!customerId) {
-    return res.status(400).json({ error: 'customerId required' });
+  if (!customerId && !entityId && !companyName) {
+    return res.status(400).json({ error: 'customerId, entityId, or companyName required' });
   }
 
   // Check required environment variables
@@ -92,33 +92,60 @@ export default async function handler(req, res) {
 
   const accountId = process.env.NETSUITE_ACCOUNT_ID.toLowerCase().replace(/_/g, '-');
   const realm = process.env.NETSUITE_ACCOUNT_ID.toUpperCase();
-
-  // Build NetSuite REST API URL
   const baseUrl = `https://${accountId}.suitetalk.api.netsuite.com`;
-  const endpoint = `/services/rest/record/v1/customer/${customerId}`;
-  const url = `${baseUrl}${endpoint}`;
 
   try {
-    // Generate OAuth Authorization header
-    const authHeader = generateAuthHeader(
-      'GET',
-      url,
-      process.env.NETSUITE_CONSUMER_KEY,
-      process.env.NETSUITE_CONSUMER_SECRET,
-      process.env.NETSUITE_TOKEN_ID,
-      process.env.NETSUITE_TOKEN_SECRET,
-      realm
-    );
+    let response;
+    let url;
 
-    // Make request to NetSuite REST API
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'Authorization': authHeader,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      }
-    });
+    if (customerId) {
+      // Existing Logic: Fetch by ID
+      const endpoint = `/services/rest/record/v1/customer/${customerId}`;
+      url = `${baseUrl}${endpoint}`;
+
+      const authHeader = generateAuthHeader(
+        'GET',
+        url,
+        process.env.NETSUITE_CONSUMER_KEY,
+        process.env.NETSUITE_CONSUMER_SECRET,
+        process.env.NETSUITE_TOKEN_ID,
+        process.env.NETSUITE_TOKEN_SECRET,
+        realm
+      );
+
+      response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': authHeader,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        }
+      });
+    } else {
+      // New Logic: Search via SuiteQL
+      url = `${baseUrl}/services/rest/query/v1/suiteql`;
+      const query = `SELECT id, entityid, companyname, email, phone, custentity_esc_industry, custentity_esc_annual_revenue, custentity_esc_no_of_employees, custentity_esc_ai_summary FROM customer WHERE entityid = '${entityId || 'xyz'}' OR companyname LIKE '%${companyName || 'xyz'}%'`;
+
+      const authHeader = generateAuthHeader(
+        'POST',
+        url,
+        process.env.NETSUITE_CONSUMER_KEY,
+        process.env.NETSUITE_CONSUMER_SECRET,
+        process.env.NETSUITE_TOKEN_ID,
+        process.env.NETSUITE_TOKEN_SECRET,
+        realm
+      );
+
+      response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': authHeader,
+          'Content-Type': 'application/json',
+          'Prefer': 'transient'
+        },
+        body: JSON.stringify({ q: query })
+      });
+    }
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -130,10 +157,19 @@ export default async function handler(req, res) {
       });
     }
 
-    const customerData = await response.json();
+    const data = await response.json();
 
-    // Return the customer data
-    res.json(customerData);
+    if (!customerId) {
+      // Handle SuiteQL response
+      if (data.items && data.items.length > 0) {
+        res.json(data.items[0]); // Return first match
+      } else {
+        res.status(404).json({ error: 'Customer not found in NetSuite yet. Please try again later.' });
+      }
+    } else {
+      // Handle Record API response
+      res.json(data);
+    }
 
   } catch (error) {
     console.error('Error syncing customer:', error.message);
