@@ -434,25 +434,28 @@ export default function DemoDashboard() {
         }
 
         // Create estimate via email export using configured items
-        const budgetAmount = selectedCustData.budget?.split('-')[0]?.replace('$', '').replace('K', '000') || '100000';
-        
         // Use items from the Items Configuration tab (customItems state)
-        // Falls back to default config if not customized
         const lineItems = customItems;
+        
+        // Calculate total from line items
+        const calculatedTotal = Object.values(lineItems).reduce((sum, item) => {
+          return sum + ((item.quantity || 1) * (item.salesPrice || item.rate || 0));
+        }, 0);
         
         const estimateData = {
           type: 'T&M',
           customerId: selectedCustData.nsId,
           customer: selectedCustData.name,
-          total: budgetAmount,
+          total: calculatedTotal,
           status: 'PENDING',
           dueDate: new Date(Date.now() + 30*24*60*60*1000).toISOString().split('T')[0],
           items: Object.values(lineItems).map(item => ({
             name: item.name,  // NetSuite item ID (for mapping)
             displayName: item.displayName || item.name,  // Display name (for UI/export)
             description: item.description,
-            quantity: 1,
-            rate: parseFloat(budgetAmount) * item.percentOfBudget
+            quantity: item.quantity || 1,
+            rate: item.salesPrice || item.rate || 0,
+            purchasePrice: item.purchasePrice || 0
           }))
         };
 
@@ -825,7 +828,10 @@ export default function DemoDashboard() {
                       presetItems[keys[idx]] = {
                         name: item.name,
                         description: item.description,
-                        percentOfBudget: item.percentOfBudget
+                        quantity: item.quantity || 1,
+                        salesPrice: item.salesPrice || item.rate || 0,
+                        purchasePrice: item.purchasePrice || 0,
+                        rate: item.rate || item.salesPrice || 0
                       };
                     }
                   });
@@ -874,88 +880,131 @@ export default function DemoDashboard() {
                 </p>
               </div>
 
+              {/* NetSuite Item Selector */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  NetSuite Item <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={item.name}
+                  onChange={(e) => {
+                    setCustomItems(prev => ({
+                      ...prev,
+                      [key]: { ...prev[key], name: e.target.value }
+                    }));
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                >
+                  <optgroup label="Professional Services">
+                    <option value="PS - Post Go-Live Support">PS - Post Go-Live Support ($175/hr)</option>
+                    <option value="PS - Go-Live Support">PS - Go-Live Support ($200/hr)</option>
+                    <option value="PS - Training Services">PS - Training Services ($150/hr)</option>
+                    <option value="PS - Data Migration">PS - Data Migration ($140/hr)</option>
+                    <option value="PS - Discovery & Design Strategy">PS - Discovery & Design Strategy ($275/hr)</option>
+                  </optgroup>
+                  <optgroup label="Project Services">
+                    <option value="SVC_PR_Consulting">SVC_PR_Consulting ($200/hr)</option>
+                    <option value="SVC_PR_Project Management">SVC_PR_Project Management ($375/hr)</option>
+                    <option value="SVC_PR_Development">SVC_PR_Development ($220/hr)</option>
+                    <option value="SVC_PR_Testing">SVC_PR_Testing ($200/hr)</option>
+                    <option value="SVC_PR_Training">SVC_PR_Training ($120/hr)</option>
+                    <option value="SVC_PR_Integration">SVC_PR_Integration ($220/hr)</option>
+                    <option value="SVC_PR_Data Migration">SVC_PR_Data Migration ($125/hr)</option>
+                    <option value="SVC_PR_Business Analysis">SVC_PR_Business Analysis ($120/hr)</option>
+                  </optgroup>
+                  <optgroup label="Expenses">
+                    <option value="EXP_Travel Expenses">EXP_Travel Expenses</option>
+                    <option value="SVC_PR_Travel">SVC_PR_Travel ($200/hr)</option>
+                  </optgroup>
+                  <optgroup label="Software/Licensing">
+                    <option value="NIN_AA1: SaaS License A">NIN_AA1: SaaS License A ($24,000)</option>
+                    <option value="NIN_AA1: Perpetual License">NIN_AA1: Perpetual License</option>
+                    <option value="NIN_AA1: Platinum Support">NIN_AA1: Platinum Support ($12,000)</option>
+                  </optgroup>
+                </select>
+              </div>
+
+              {/* Description */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Description
+                </label>
+                <input
+                  type="text"
+                  value={item.description}
+                  onChange={(e) => {
+                    setCustomItems(prev => ({
+                      ...prev,
+                      [key]: { ...prev[key], description: e.target.value }
+                    }));
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="Line item description"
+                />
+              </div>
+
+              {/* Quantity, Purchase Price, Sales Price */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {/* Item Name Selector */}
+                {/* Quantity */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    NetSuite Item <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    value={item.name}
-                    onChange={(e) => {
-                      setCustomItems(prev => ({
-                        ...prev,
-                        [key]: { ...prev[key], name: e.target.value }
-                      }));
-                    }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  >
-                    <optgroup label="Professional Services">
-                      <option value="PS - Post Go-Live Support">PS - Post Go-Live Support ($175/hr)</option>
-                      <option value="PS - Go-Live Support">PS - Go-Live Support ($200/hr)</option>
-                      <option value="PS - Training Services">PS - Training Services ($150/hr)</option>
-                      <option value="PS - Data Migration">PS - Data Migration ($140/hr)</option>
-                      <option value="PS - Discovery & Design Strategy">PS - Discovery & Design Strategy ($275/hr)</option>
-                    </optgroup>
-                    <optgroup label="Project Services">
-                      <option value="SVC_PR_Consulting">SVC_PR_Consulting ($200/hr)</option>
-                      <option value="SVC_PR_Project Management">SVC_PR_Project Management ($375/hr)</option>
-                      <option value="SVC_PR_Development">SVC_PR_Development ($220/hr)</option>
-                      <option value="SVC_PR_Testing">SVC_PR_Testing ($200/hr)</option>
-                      <option value="SVC_PR_Training">SVC_PR_Training ($120/hr)</option>
-                      <option value="SVC_PR_Integration">SVC_PR_Integration ($220/hr)</option>
-                      <option value="SVC_PR_Data Migration">SVC_PR_Data Migration ($125/hr)</option>
-                      <option value="SVC_PR_Business Analysis">SVC_PR_Business Analysis ($120/hr)</option>
-                    </optgroup>
-                    <optgroup label="Expenses">
-                      <option value="EXP_Travel Expenses">EXP_Travel Expenses</option>
-                      <option value="SVC_PR_Travel">SVC_PR_Travel ($200/hr)</option>
-                    </optgroup>
-                    <optgroup label="Software/Licensing">
-                      <option value="NIN_AA1: SaaS License A">NIN_AA1: SaaS License A ($24,000)</option>
-                      <option value="NIN_AA1: Perpetual License">NIN_AA1: Perpetual License</option>
-                      <option value="NIN_AA1: Platinum Support">NIN_AA1: Platinum Support ($12,000)</option>
-                    </optgroup>
-                  </select>
-                </div>
-
-                {/* Description */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Description
-                  </label>
-                  <input
-                    type="text"
-                    value={item.description}
-                    onChange={(e) => {
-                      setCustomItems(prev => ({
-                        ...prev,
-                        [key]: { ...prev[key], description: e.target.value }
-                      }));
-                    }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    placeholder="Line item description"
-                  />
-                </div>
-
-                {/* Percentage */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    % of Budget
+                    Quantity
                   </label>
                   <input
                     type="number"
                     min="0"
-                    max="100"
-                    step="5"
-                    value={item.percentOfBudget * 100}
+                    step="1"
+                    value={item.quantity || 1}
                     onChange={(e) => {
                       setCustomItems(prev => ({
                         ...prev,
-                        [key]: { ...prev[key], percentOfBudget: parseFloat(e.target.value) / 100 }
+                        [key]: { ...prev[key], quantity: parseInt(e.target.value) || 1 }
                       }));
                     }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder="1"
+                  />
+                </div>
+
+                {/* Purchase Price */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Purchase Price
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={item.purchasePrice || 0}
+                    onChange={(e) => {
+                      setCustomItems(prev => ({
+                        ...prev,
+                        [key]: { ...prev[key], purchasePrice: parseFloat(e.target.value) || 0 }
+                      }));
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder="0.00"
+                  />
+                </div>
+
+                {/* Sales Price */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Sales Price (Rate)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={item.salesPrice || item.rate || 0}
+                    onChange={(e) => {
+                      setCustomItems(prev => ({
+                        ...prev,
+                        [key]: { ...prev[key], salesPrice: parseFloat(e.target.value) || 0, rate: parseFloat(e.target.value) || 0 }
+                      }));
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder="0.00"
                   />
                 </div>
               </div>
@@ -963,21 +1012,15 @@ export default function DemoDashboard() {
           ))}
         </div>
 
-        {/* Total Percentage Check */}
+        {/* Total Amount Display */}
         <div className="mt-4 p-4 bg-gray-50 rounded-lg">
           <div className="flex justify-between items-center">
-            <span className="text-sm font-medium text-gray-700">Total Percentage:</span>
-            <span className={`text-lg font-bold ${
-              Math.abs(Object.values(customItems).reduce((sum, item) => sum + item.percentOfBudget, 0) - 1) < 0.01
-                ? 'text-green-600'
-                : 'text-red-600'
-            }`}>
-              {(Object.values(customItems).reduce((sum, item) => sum + item.percentOfBudget, 0) * 100).toFixed(0)}%
+            <span className="text-sm font-medium text-gray-700">Total Estimate Amount:</span>
+            <span className="text-lg font-bold text-green-600">
+              ${Object.values(customItems).reduce((sum, item) => sum + ((item.quantity || 1) * (item.salesPrice || item.rate || 0)), 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
           </div>
-          {Math.abs(Object.values(customItems).reduce((sum, item) => sum + item.percentOfBudget, 0) - 1) >= 0.01 && (
-            <p className="text-xs text-red-600 mt-2">⚠️ Percentages should add up to 100%</p>
-          )}
+          <p className="text-xs text-gray-500 mt-2">💡 This is calculated from: Quantity × Sales Price for each line item</p>
         </div>
 
         {/* Save Button */}

@@ -19,21 +19,30 @@ export const ITEM_CONFIG = {
     professionalServices: {
       name: 'PS - Post Go-Live Support',  // Must match a NetSuite item
       description: 'Professional Services - Implementation and Configuration',
-      percentOfBudget: 0.6  // 60% of total budget
+      quantity: 1,
+      salesPrice: 175,  // Sales price per unit
+      purchasePrice: 0,  // Purchase/cost price
+      rate: 175  // Same as salesPrice for service items
     },
     
     // Travel & Expenses line item
     travelExpenses: {
       name: 'EXP_Travel Expenses',  // Using existing NetSuite expense item
       description: 'Travel & Expenses - On-site Support',
-      percentOfBudget: 0.2  // 20% of total budget
+      quantity: 1,
+      salesPrice: 5000,
+      purchasePrice: 0,
+      rate: 5000
     },
     
     // Software/Licensing line item
     softwareLicensing: {
       name: 'NIN_AA1: SaaS License A',  // Using existing NetSuite license item
       description: 'Software Licensing - Annual Subscription',
-      percentOfBudget: 0.2  // 20% of total budget
+      quantity: 1,
+      salesPrice: 24000,
+      purchasePrice: 0,
+      rate: 24000
     }
   }
 };
@@ -95,17 +104,26 @@ export const ESTIMATE_PRESETS = {
       {
         name: AVAILABLE_ITEMS.PS_POST_GO_LIVE,
         description: 'Professional Services - Implementation and Configuration',
-        percentOfBudget: 0.6
+        quantity: 1,
+        salesPrice: 175,
+        purchasePrice: 0,
+        rate: 175
       },
       {
         name: AVAILABLE_ITEMS.EXP_TRAVEL,
         description: 'Travel & Expenses - On-site Support',
-        percentOfBudget: 0.2
+        quantity: 1,
+        salesPrice: 5000,
+        purchasePrice: 0,
+        rate: 5000
       },
       {
         name: AVAILABLE_ITEMS.LICENSE_SAAS,
         description: 'Software Licensing - Annual Subscription',
-        percentOfBudget: 0.2
+        quantity: 1,
+        salesPrice: 24000,
+        purchasePrice: 0,
+        rate: 24000
       }
     ]
   },
@@ -117,17 +135,26 @@ export const ESTIMATE_PRESETS = {
       {
         name: AVAILABLE_ITEMS.SVC_PR_CONSULTING,
         description: 'Strategic Consulting Services',
-        percentOfBudget: 0.5
+        quantity: 1,
+        salesPrice: 200,
+        purchasePrice: 0,
+        rate: 200
       },
       {
         name: AVAILABLE_ITEMS.SVC_PR_BUSINESS_ANALYSIS,
         description: 'Business Analysis and Process Review',
-        percentOfBudget: 0.3
+        quantity: 1,
+        salesPrice: 120,
+        purchasePrice: 0,
+        rate: 120
       },
       {
         name: AVAILABLE_ITEMS.SVC_PR_TRAVEL,
         description: 'Travel and On-site Support',
-        percentOfBudget: 0.2
+        quantity: 1,
+        salesPrice: 200,
+        purchasePrice: 0,
+        rate: 200
       }
     ]
   },
@@ -139,22 +166,34 @@ export const ESTIMATE_PRESETS = {
       {
         name: AVAILABLE_ITEMS.SVC_PR_DEVELOPMENT,
         description: 'Custom Development Services',
-        percentOfBudget: 0.5
+        quantity: 1,
+        salesPrice: 220,
+        purchasePrice: 0,
+        rate: 220
       },
       {
         name: AVAILABLE_ITEMS.SVC_PR_TESTING,
         description: 'Quality Assurance and Testing',
-        percentOfBudget: 0.2
+        quantity: 1,
+        salesPrice: 200,
+        purchasePrice: 0,
+        rate: 200
       },
       {
         name: AVAILABLE_ITEMS.SVC_PR_TRAINING,
         description: 'End User Training',
-        percentOfBudget: 0.15
+        quantity: 1,
+        salesPrice: 120,
+        purchasePrice: 0,
+        rate: 120
       },
       {
         name: AVAILABLE_ITEMS.SVC_PR_PROJECT_MGMT,
         description: 'Project Management',
-        percentOfBudget: 0.15
+        quantity: 1,
+        salesPrice: 375,
+        purchasePrice: 0,
+        rate: 375
       }
     ]
   },
@@ -166,17 +205,26 @@ export const ESTIMATE_PRESETS = {
       {
         name: AVAILABLE_ITEMS.PS_DATA_MIGRATION,
         description: 'Data Migration Services',
-        percentOfBudget: 0.6
+        quantity: 1,
+        salesPrice: 140,
+        purchasePrice: 0,
+        rate: 140
       },
       {
         name: AVAILABLE_ITEMS.SVC_PR_TESTING,
         description: 'Data Validation and Testing',
-        percentOfBudget: 0.2
+        quantity: 1,
+        salesPrice: 200,
+        purchasePrice: 0,
+        rate: 200
       },
       {
         name: AVAILABLE_ITEMS.SVC_PR_TRAINING,
         description: 'Training on New System',
-        percentOfBudget: 0.2
+        quantity: 1,
+        salesPrice: 120,
+        purchasePrice: 0,
+        rate: 120
       }
     ]
   }
