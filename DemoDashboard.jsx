@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { Search, Settings, User, Users, Zap, ChevronRight, Copy, Check, BookOpen, ChevronDown, Target, Building2, Mail, Phone, MoreVertical, Play, Plus, FileText, Clock, TrendingUp, AlertCircle, Loader, RefreshCw } from 'lucide-react';
 // Import the NetSuite service
 // import NetSuiteService from './netsuite-service';
+import { exportViaEmail, createExportData } from './email-export-utils';
 
 export default function DemoDashboard() {
   // ============ STATE MANAGEMENT ============
@@ -109,23 +110,49 @@ export default function DemoDashboard() {
     setActionStatus('Syncing from NetSuite...');
     
     try {
-      // STEP 1: This would use your Claude MCP tool integration
-      // In a real implementation, this calls your backend which has access to the MCP tools
-      // For now, we'll show the integration pattern
-      
-      const payload = {
-        action: 'fetchCustomer',
-        customerId: selectedCustData.nsId,
-        account: selectedAccount,
-        fields: ['id', 'entityid', 'companyname', 'custentity13', 'custentity16', 'custentity15', 
-                 'custentity_esc_industry', 'custentity_esc_annual_revenue', 'custentity_esc_no_of_employees', 
-                 'email', 'phone']
-      };
+      // Call the Vercel API endpoint to fetch real NetSuite data
+      const response = await fetch('/api/netsuite/sync', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          customerId: selectedCustData.nsId,
+          account: selectedAccount
+        })
+      });
 
-      // In production, this would POST to your backend:
-      // const response = await fetch('/api/netsuite/sync', { method: 'POST', body: JSON.stringify(payload) });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP ${response.status}`);
+      }
+
+      const customerData = await response.json();
+
+      // Map NetSuite fields to display format
+      setCustomFieldsData(prev => ({
+        ...prev,
+        [selectedCustData.id]: {
+          'AI Generated Summary': customerData.custentity13 || customerData.custentity_esc_ai_summary || 'Not populated',
+          'Industry Type': customerData.custentity16 || customerData.custentity_esc_industry || 'Not specified',
+          'Annual Revenue': customerData.custentity_esc_annual_revenue || customerData.custentity16 || 'Not specified',
+          'Employee Count': customerData.custentity_esc_no_of_employees || customerData.custentity_esc_employees || 'Not specified',
+          'Opportunity Summary': customerData.custentity15 || customerData.custentity_esc_opportunity || 'Not specified',
+          'Email': customerData.email || 'Not available',
+          'Phone': customerData.phone || 'Not available'
+        }
+      }));
       
-      // For now, we'll demonstrate with the mock data that would come back
+      setNsData(prev => ({
+        ...prev,
+        [selectedCustData.id]: customerData
+      }));
+
+      setActionStatus('✓ Synced successfully');
+    } catch (error) {
+      console.error('Sync error:', error);
+      
+      // Fallback to mock data if API fails (for demo purposes)
       const mockNsResponse = {
         id: selectedCustData.nsId,
         entityid: selectedCustData.entityid,
@@ -139,9 +166,6 @@ export default function DemoDashboard() {
         email: `contact@${selectedCustData.entityid.toLowerCase()}.com`,
         phone: '(555) 123-4567'
       };
-
-      // Simulate API latency
-      await new Promise(resolve => setTimeout(resolve, 800));
 
       setCustomFieldsData(prev => ({
         ...prev,
@@ -161,10 +185,7 @@ export default function DemoDashboard() {
         [selectedCustData.id]: mockNsResponse
       }));
 
-      setActionStatus('✓ Synced successfully');
-    } catch (error) {
-      console.error('Sync error:', error);
-      setActionStatus('⚠ Sync failed - check console');
+      setActionStatus(`⚠ API unavailable - showing demo data (${error.message})`);
     } finally {
       setSyncLoading(false);
       setLastSyncTime(new Date());
@@ -172,16 +193,116 @@ export default function DemoDashboard() {
     }
   };
 
+  const exportToEmail = () => {
+    if (!selectedCustData) {
+      setActionStatus('⚠ Please select a customer first');
+      setTimeout(() => setActionStatus(null), 2000);
+      return;
+    }
+
+    try {
+      // Get synced NetSuite data if available, otherwise use dashboard data
+      const nsResponse = nsData[selectedCustData.id];
+      const customerData = nsResponse ? {
+        ...selectedCustData,
+        ...nsResponse,
+        custentity_esc_industry: nsResponse.custentity_esc_industry || selectedCustData.industry,
+        custentity_esc_annual_revenue: nsResponse.custentity_esc_annual_revenue || selectedCustData.budget,
+        custentity_esc_no_of_employees: nsResponse.custentity_esc_no_of_employees || selectedCustData.size
+      } : selectedCustData;
+
+      // Prepare export data with hashtags
+      const exportData = createExportData(customerData, null, {
+        modules: selectedCustData.focus || [],
+        estimate: {
+          type: 'T&M',
+          customer: selectedCustData.name,
+          status: 'PENDING'
+        }
+      });
+
+      // Export via email
+      exportViaEmail(exportData, {
+        recipientEmail: 'simmonspatrick1@gmail.com',
+        includeInstructions: true
+      });
+
+      setActionStatus('✓ Opening email client...');
+      setTimeout(() => setActionStatus(null), 3000);
+    } catch (error) {
+      console.error('Email export error:', error);
+      setActionStatus('⚠ Email export failed');
+      setTimeout(() => setActionStatus(null), 3000);
+    }
+  };
+
+  const createNewProspect = () => {
+    // Create a new prospect from current selection or use defaults
+    const prospectData = selectedCustData || {
+      name: 'New Prospect',
+      entityid: `PROSPECT-${Date.now()}`,
+      industry: 'Professional Services',
+      size: '50-100',
+      budget: '$100K-200K',
+      focus: ['Resource Planning', 'Billing']
+    };
+
+    // Prepare export data for new customer creation
+    const exportData = createExportData(prospectData, null, {
+      modules: prospectData.focus || []
+    });
+
+    // Export via email - this will create the customer in NetSuite
+    exportViaEmail(exportData, {
+      recipientEmail: 'simmonspatrick1@gmail.com',
+      includeInstructions: true
+    });
+
+    setActionStatus('✓ Creating prospect via email...');
+    setTimeout(() => setActionStatus(null), 3000);
+  };
+
   const quickActions = [
     {
+      id: 'create-prospect',
+      label: 'Create Prospect',
+      icon: Users,
+      action: createNewProspect
+    },
+    {
       id: 'create-project',
-      label: 'Create Demo Project',
+      label: 'Create Project',
       icon: Plus,
       action: () => {
-        const prompt = `Create a project for ${selectedCustData?.name} titled "[Demo Project Name]" with entity ID [PRJ-DEMO-####]. Add 3-5 task estimates for typical ${selectedCustData?.industry} workflows.`;
-        copyToClipboard(prompt, 'action-project');
-        setActionStatus('✓ Project prompt copied');
-        setTimeout(() => setActionStatus(null), 2000);
+        if (!selectedCustData) {
+          setActionStatus('⚠ Please select a customer first');
+          setTimeout(() => setActionStatus(null), 2000);
+          return;
+        }
+        
+        // Create project via email export (actual NetSuite creation)
+        const projectData = {
+          name: `${selectedCustData.name} - Demo Project`,
+          entityid: `PRJ-${selectedCustData.entityid}-${Date.now()}`,
+          customerId: selectedCustData.nsId,
+          startDate: new Date().toISOString().split('T')[0],
+          endDate: new Date(Date.now() + 90*24*60*60*1000).toISOString().split('T')[0],
+          budget: selectedCustData.budget?.split('-')[0]?.replace('$', '').replace('K', '000') || '100000',
+          status: 'OPEN',
+          description: `Demo project for ${selectedCustData.industry} - ${selectedCustData.focus?.join(', ')}`
+        };
+
+        const exportData = createExportData(selectedCustData, projectData, {
+          modules: selectedCustData.focus || []
+        });
+
+        exportViaEmail(exportData, {
+          recipientEmail: 'simmonspatrick1@gmail.com',
+          includeInstructions: true
+        });
+
+        setActionStatus('✓ Creating project via email...');
+        setTimeout(() => setActionStatus(null), 3000);
       }
     },
     {
@@ -197,13 +318,43 @@ export default function DemoDashboard() {
     },
     {
       id: 'create-estimate',
-      label: 'Generate Estimate',
+      label: 'Create Estimate',
       icon: FileText,
       action: () => {
-        const prompt = `Create an estimate for ${selectedCustData?.name} from the demo project. Include line items for: Professional Services (60%), Travel & Expenses (20%), Software Licensing (20%). Set total value to ${selectedCustData?.budget?.split('-')[0]}.`;
-        copyToClipboard(prompt, 'action-estimate');
-        setActionStatus('✓ Estimate prompt copied');
-        setTimeout(() => setActionStatus(null), 2000);
+        if (!selectedCustData) {
+          setActionStatus('⚠ Please select a customer first');
+          setTimeout(() => setActionStatus(null), 2000);
+          return;
+        }
+
+        // Create estimate via email export
+        const budgetAmount = selectedCustData.budget?.split('-')[0]?.replace('$', '').replace('K', '000') || '100000';
+        const estimateData = {
+          type: 'T&M',
+          customerId: selectedCustData.nsId,
+          customer: selectedCustData.name,
+          total: budgetAmount,
+          status: 'PENDING',
+          dueDate: new Date(Date.now() + 30*24*60*60*1000).toISOString().split('T')[0],
+          items: [
+            { name: 'PS - Post Go-Live Support', description: 'Professional Services - Implementation and Configuration', quantity: 1, rate: parseFloat(budgetAmount) * 0.6 },
+            { name: 'PS - Post Go-Live Support', description: 'Travel & Expenses - On-site Support', quantity: 1, rate: parseFloat(budgetAmount) * 0.2 },
+            { name: 'PS - Post Go-Live Support', description: 'Software Licensing - Annual Subscription', quantity: 1, rate: parseFloat(budgetAmount) * 0.2 }
+          ]
+        };
+
+        const exportData = createExportData(selectedCustData, null, {
+          estimate: estimateData,
+          modules: selectedCustData.focus || []
+        });
+
+        exportViaEmail(exportData, {
+          recipientEmail: 'simmonspatrick1@gmail.com',
+          includeInstructions: true
+        });
+
+        setActionStatus('✓ Creating estimate via email...');
+        setTimeout(() => setActionStatus(null), 3000);
       }
     },
     {
@@ -222,6 +373,12 @@ export default function DemoDashboard() {
       label: 'Sync NetSuite Data',
       icon: Loader,
       action: syncNetsuiteFieFds
+    },
+    {
+      id: 'export-email',
+      label: 'Export to Email',
+      icon: Mail,
+      action: exportToEmail
     }
   ];
 
@@ -237,7 +394,7 @@ export default function DemoDashboard() {
           <span className="text-xs text-green-600 font-medium">{actionStatus}</span>
         )}
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
         {quickActions.map((action) => {
           const Icon = action.icon;
           const isLoading = syncLoading && action.id === 'sync-netsuite';

@@ -537,6 +537,54 @@ app.get('/api/netsuite/customers', async (req, res) => {
 });
 
 /**
+ * POST /api/export/email
+ * Export data to email (server-side email sending option)
+ * Note: This is optional - the frontend can also use mailto: links
+ */
+app.post('/api/export/email', async (req, res) => {
+  try {
+    const { data, recipientEmail = 'simmonspatrick1@gmail.com' } = req.body;
+
+    if (!data) {
+      return res.status(400).json({ error: 'data required' });
+    }
+
+    // Import email export utilities
+    const { formatDataWithHashtags, createEmailSubject, prepareEmailContent } = 
+      await import('./email-export-utils.js');
+
+    const emailContent = prepareEmailContent(data, { 
+      recipientEmail,
+      includeInstructions: true 
+    });
+
+    // In production, you would use a service like SendGrid, AWS SES, etc.
+    // For now, we'll return the formatted email content
+    // The frontend can use mailto: or you can implement server-side sending here
+    
+    console.log(`Email export prepared for ${recipientEmail}`);
+    console.log(`Subject: ${emailContent.subject}`);
+
+    res.json({
+      success: true,
+      message: 'Email content prepared',
+      emailContent: {
+        to: emailContent.to,
+        subject: emailContent.subject,
+        body: emailContent.body
+      },
+      mailtoUrl: `mailto:${emailContent.to}?subject=${encodeURIComponent(emailContent.subject)}&body=${encodeURIComponent(emailContent.body)}`
+    });
+  } catch (error) {
+    console.error('Error preparing email export:', error.message);
+    res.status(500).json({ 
+      error: 'Failed to prepare email export',
+      details: error.message 
+    });
+  }
+});
+
+/**
  * GET /api/health
  * Health check endpoint
  */

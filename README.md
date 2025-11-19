@@ -14,7 +14,8 @@ Your fully-wired dashboard is ready to sync **real data** from your NetSuite acc
 |------|---------|--------|
 | **DemoDashboard.jsx** | React component with UI | ✅ Ready to use |
 | **backend-server.js** | Express API server | ✅ Ready to deploy |
-| **netsuite-service.js** | NetSuite API utilities | ✅ Reference implementation |
+| **email-export-utils.js** | Email export functionality | ✅ Ready to use |
+| **EmailProcessor.suite-script.js** | SuiteScript for importing emails | ✅ Ready to deploy |
 | **package.json** | Backend dependencies | ✅ Ready to install |
 
 ### Documentation
@@ -22,7 +23,8 @@ Your fully-wired dashboard is ready to sync **real data** from your NetSuite acc
 | File | What It Covers |
 |------|---|
 | **QUICK_START.md** | Get running in 5 minutes (start here!) |
-| **INTEGRATION_GUIDE.md** | Deep dive into architecture & setup |
+| **INTEGRATION_GUIDE.md** | Deep dive into architecture & API setup |
+| **EMAIL_EXPORT_GUIDE.md** | How to use the CORS-free Email Integration |
 | **README.md** | This file |
 
 ---
@@ -41,7 +43,18 @@ Perfect for exploring the UI without backend setup.
 **What works:** UI, customer context, quick action prompt copies
 **What doesn't:** Real NetSuite data syncing
 
-### Path 2: Full Setup (Real Data - 10 minutes)
+### Path 2: Email Integration (Bypass CORS - 5 minutes)
+Use email to push data to NetSuite without setting up a backend server.
+
+1. Read **EMAIL_EXPORT_GUIDE.md**
+2. Deploy `EmailProcessor.suite-script.js` to NetSuite
+3. Use "Export to Email" button in dashboard
+4. Emails are processed automatically by NetSuite
+
+**What works:** Pushing data TO NetSuite (Customers, Projects, Estimates)
+**What doesn't:** Pulling data FROM NetSuite (requires Path 3)
+
+### Path 3: Full Setup (Real Data - 10 minutes)
 Get live NetSuite data flowing to your dashboard.
 
 1. Follow **QUICK_START.md** → Option 2 (Full Setup)
@@ -84,6 +97,7 @@ One-click prompts for:
 - **Generate Estimate** - Quote from project data
 - **Resource Allocation** - 12-week forecast builder
 - **Sync NetSuite Data** - Pulls custom fields (real API call)
+- **Export to Email** - Push data to NetSuite via email integration
 
 ### ✅ Demo Prompts Library
 Pre-built SuiteQL prompts organized by:
@@ -109,6 +123,20 @@ NetSuite MCP Tools
 Your NetSuite Account
     ↓ (returns data)
 Dashboard (shows results)
+```
+
+### Alternative Architecture (Email Integration)
+
+```
+Frontend (React)
+    ↓ (mailto link)
+User's Email Client
+    ↓ (sends email)
+Gmail Inbox
+    ↓ (fetched by script)
+NetSuite Scheduled Script
+    ↓ (creates records)
+NetSuite Database
 ```
 
 ---
@@ -149,6 +177,9 @@ npm start
 # Click "Sync NetSuite Data" button - it works immediately!
 ```
 
+### Email Integration
+See **EMAIL_EXPORT_GUIDE.md** for setup instructions.
+
 ### Full Mode (With Backend)
 ```bash
 # Terminal 1 - Backend
@@ -177,6 +208,7 @@ See **QUICK_START.md** for detailed step-by-step instructions.
 | POST | `/api/netsuite/create-time-entries` | Add sample time entries |
 | GET | `/api/health` | Health check |
 | POST | `/api/cache/clear` | Clear data cache |
+| POST | `/api/export/email` | Prepare email content (optional) |
 
 ---
 
@@ -241,6 +273,9 @@ fetch('http://localhost:3001/api/netsuite/sync', {
 ### For Quick Setup
 → Read **QUICK_START.md** first
 
+### For Email Integration (CORS-free)
+→ Read **EMAIL_EXPORT_GUIDE.md**
+
 ### For Deep Understanding
 → Read **INTEGRATION_GUIDE.md**
 
@@ -278,7 +313,7 @@ fetch('http://localhost:3001/api/netsuite/sync', {
 ### Backend won't start
 ```bash
 # Missing dependencies?
-npm install express cors @anthropic-sdk/sdk dotenv
+npm install express cors @anthropic-sdk/sdk dotenv open
 
 # Wrong port?
 # Change PORT in .env file
