@@ -34,3 +34,5 @@ yarn-error.log*
 *.log
 auth_output.txt
 pat_secrets.env
+.env.local
+pat_secrets_env
