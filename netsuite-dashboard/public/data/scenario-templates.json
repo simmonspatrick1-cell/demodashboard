@@ -1,0 +1,57 @@
+[
+  {
+    "id": "services-scale",
+    "name": "Services Scale-Up",
+    "description": "Multi-entity professional services org preparing for PSA roll-out.",
+    "industry": "Professional Services",
+    "focusAreas": ["Resource Planning", "Billing Automation", "Utilization"],
+    "budgetRange": "$250K-$450K",
+    "suggestedSize": "250-400 employees",
+    "prompt": "Create PSA scenario with 3 delivery pods, cross-entity billing, and utilization dashboards.",
+    "defaultStatus": "Active"
+  },
+  {
+    "id": "saas-expansion",
+    "name": "SaaS Expansion Playbook",
+    "description": "Subscription-based services group expanding into new markets.",
+    "industry": "SaaS & Subscription",
+    "focusAreas": ["Revenue Forecasting", "Subscriptions", "Project Financials"],
+    "budgetRange": "$180K-$320K",
+    "suggestedSize": "150-220 employees",
+    "prompt": "Model ARR growth, project delivery, and subscription renewals with SuiteProjects.",
+    "defaultStatus": "Hot"
+  },
+  {
+    "id": "energy-field",
+    "name": "Energy Field Services",
+    "description": "Field operations with heavy resource scheduling and compliance tracking.",
+    "industry": "Energy & Utilities",
+    "focusAreas": ["Resource Scheduling", "Compliance", "Multi-Subsidiary Billing"],
+    "budgetRange": "$300K-$600K",
+    "suggestedSize": "300-500 employees",
+    "prompt": "Create multi-subsidiary field operations scenario with crews, compliance costs, and asset billing.",
+    "defaultStatus": "Qualified"
+  },
+  {
+    "id": "construction-pro",
+    "name": "Construction Pro Services",
+    "description": "Regional construction firm modernizing project delivery and field operations.",
+    "industry": "Construction",
+    "focusAreas": ["Project Controls", "Field Service", "Job Costing"],
+    "budgetRange": "$220K-$400K",
+    "suggestedSize": "180-260 employees",
+    "prompt": "Build construction scenario with job costing, committed cost tracking, and mobile field updates.",
+    "defaultStatus": "Proposal"
+  },
+  {
+    "id": "consulting-growth",
+    "name": "Consulting Growth Engine",
+    "description": "Boutique consultancy scaling sales-to-delivery workflows.",
+    "industry": "Consulting",
+    "focusAreas": ["Sales Handoff", "Project Staffing", "Billing Automation"],
+    "budgetRange": "$150K-$280K",
+    "suggestedSize": "120-180 employees",
+    "prompt": "Create consulting scenario covering discovery to delivery, with staffing boards and milestone billing.",
+    "defaultStatus": "Active"
+  }
+]

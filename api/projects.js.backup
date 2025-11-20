@@ -1,0 +1,153 @@
+const express = require('express');
+const router = express.Router();
+
+const fetchFn = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
+const { buildOAuthHeader } = require('./netsuite-headers');
+
+const buildNetSuiteHeaders = (url, method = 'POST') => {
+  const account = process.env.NETSUITE_ACCOUNT_ID;
+  const consumerKey = process.env.NETSUITE_CONSUMER_KEY;
+  const consumerSecret = process.env.NETSUITE_CONSUMER_SECRET;
+  const tokenId = process.env.NETSUITE_TOKEN_ID;
+  const tokenSecret = process.env.NETSUITE_TOKEN_SECRET;
+
+  if (account && consumerKey && consumerSecret && tokenId && tokenSecret) {
+    return buildOAuthHeader({
+      account,
+      consumerKey,
+      consumerSecret,
+      tokenId,
+      tokenSecret,
+      url,
+      method
+    });
+  }
+
+  if (process.env.NETSUITE_TOKEN) {
+    console.warn('Using bearer token fallback for NetSuite auth.');
+    return {
+      Authorization: `Bearer ${process.env.NETSUITE_TOKEN}`,
+      'Content-Type': 'application/json'
+    };
+  }
+
+  console.warn('NetSuite credentials missing. Requests will likely fail.');
+  return { 'Content-Type': 'application/json' };
+};
+
+const normalizeFocus = (focusAreas = []) =>
+  Array.isArray(focusAreas)
+    ? focusAreas
+    : typeof focusAreas === 'string'
+      ? focusAreas.split(',').map((item) => item.trim()).filter(Boolean)
+      : [];
+
+const buildTasksFromPrompts = (prompts = [], focusAreas = []) => {
+  const defaultOwners = ['Engagement Lead', 'Solution Architect', 'Project Manager', 'Consultant'];
+  return prompts.slice(0, 5).map((prompt, idx, arr) => ({
+    name: `Track ${idx + 1}: ${prompt.slice(0, 60)}${prompt.length > 60 ? '…' : ''}`,
+    owner: defaultOwners[idx] || 'Project Team',
+    status: idx === 0 ? 'Scheduled' : idx === arr.length - 1 ? 'Ready' : 'Pending',
+    focus: focusAreas[idx] || focusAreas[idx % focusAreas.length] || 'Resource Planning'
+  }));
+};
+
+async function syncWithNetSuite(payload) {
+  if (!process.env.NETSUITE_REST_URL) {
+    return { success: false, error: 'NETSUITE_REST_URL not configured' };
+  }
+
+  const headers = buildNetSuiteHeaders(process.env.NETSUITE_REST_URL, 'POST');
+
+  const fetchOptions = {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(payload)
+  };
+
+  try {
+    const response = await fetchFn(process.env.NETSUITE_REST_URL, fetchOptions);
+    const data = await response.json();
+    if (!response.ok || data?.success === false) {
+      throw new Error(data?.error || response.statusText);
+    }
+    return { success: true, data: data.data || data };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+}
+
+router.post('/sync', async (req, res) => {
+  const { customerId, account, prompts, notes, website, prospectName, industry, focusAreas = [] } = req.body || {};
+
+  if (!customerId || !account || !prospectName || !Array.isArray(prompts) || prompts.length === 0) {
+    return res.status(400).json({
+      success: false,
+      error: 'customerId, account, prospectName, and at least one prompt are required.'
+    });
+  }
+
+  const normalizedFocusAreas = normalizeFocus(focusAreas);
+  const timestamp = new Date();
+  const projectId = `PRJ-${String(account).replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 6)}-${timestamp
+    .getTime()
+    .toString()
+    .slice(-4)}`;
+
+  const offlineRecord = {
+    projectId,
+    projectName: `${prospectName} - Demo Build`,
+    syncedAt: timestamp.toISOString(),
+    prompts,
+    notes: notes || '',
+    website,
+    source: 'Scenario Builder',
+    tasks: buildTasksFromPrompts(prompts, normalizedFocusAreas)
+  };
+
+  const shouldMock = process.env.MOCK_NETSUITE_SYNC === 'true' || !process.env.NETSUITE_REST_URL;
+
+  if (shouldMock) {
+    return res.json({
+      success: true,
+      data: { ...offlineRecord, source: 'Mock NetSuite API' },
+      meta: { mocked: true }
+    });
+  }
+
+  try {
+    const payload = {
+      customerId,
+      account,
+      projectId: offlineRecord.projectId,
+      projectName: offlineRecord.projectName,
+      notes,
+      website,
+      prompts,
+      focusAreas: normalizedFocusAreas,
+      industry,
+      tasks: offlineRecord.tasks
+    };
+
+    const netSuiteResult = await syncWithNetSuite(payload);
+    if (!netSuiteResult.success) {
+      throw new Error(netSuiteResult.error || 'NetSuite sync failed');
+    }
+
+    const responseRecord = {
+      ...offlineRecord,
+      ...netSuiteResult.data,
+      tasks:
+        Array.isArray(netSuiteResult.data?.tasks) && netSuiteResult.data.tasks.length > 0
+          ? netSuiteResult.data.tasks
+          : offlineRecord.tasks
+    };
+
+    return res.json({ success: true, data: responseRecord, meta: { mocked: false } });
+  } catch (error) {
+    console.error('NetSuite project sync failed:', error);
+    return res.status(502).json({ success: false, error: error.message, data: offlineRecord });
+  }
+});
+
+module.exports = router;

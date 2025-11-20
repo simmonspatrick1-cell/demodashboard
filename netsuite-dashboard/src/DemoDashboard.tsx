@@ -1,201 +1,279 @@
-import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
-import { X, Building2, Check, BookOpen, ChevronDown, Zap, Clock, FileText, TrendingUp, Loader, Download, Plus, Copy, User, Wand2, Moon, Sun, Star } from 'lucide-react';  // Import all needed icons
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { BookOpen, Building2, Check, ClipboardList, Download, Menu, Moon, Plus, Search, Sun, X, Users, Wand2 } from 'lucide-react';
 import ScenarioGenerator from './ScenarioGenerator';
 import AdvancedSearch from './AdvancedSearch';
 import DataExport from './DataExport';
+import APIService, { ProjectSyncPayload } from './api-service';
 import storageService from './storage-service';
+import PrepMissionBanner from './components/PrepMissionBanner';
+import PromptLibrary from './components/PromptLibrary';
+import QuickActionsDeck from './components/QuickActionsDeck';
+import { PrepWorkflowStep, ProjectRecord, PromptCategory, Prospect, QuickAction } from './types/dashboard';
 
-const KEY_PROSPECTS = [
-  { id: 1, name: 'AdvisorHR', entityid: 'AdvisorHR-Demo', industry: 'PEO Services', size: '500-1000', status: 'Hot', demoDate: 'Oct 30', focus: ['Resource Planning', 'Multi-Entity', 'Billing'], budget: '$200K-500K', nsId: 3161, website: 'https://advisorhr.com' },
-  { id: 2, name: 'GSB Group', entityid: 'GSB-Demo', industry: 'Consulting', size: '50-100', status: 'Active', demoDate: 'Nov 5', focus: ['Project Accounting', 'PSA'], budget: '$100K-200K', nsId: 1834, website: 'https://gsbgroup.com' },
-  { id: 3, name: 'Innovatia Technical', entityid: 'Innovatia-Demo', industry: 'Tech Consulting', size: '200-300', status: 'Active', demoDate: 'Nov 8', focus: ['Resource Utilization', 'Forecasting'], budget: '$150K-300K', nsId: 1938, website: 'https://innovatia.tech' },
-  { id: 4, name: 'Marabou Midstream', entityid: 'Marabou-Demo', industry: 'Energy', size: '100-150', status: 'Proposal', demoDate: 'Pending', focus: ['Pipeline Management', 'Multi-Entity', 'Consolidation'], budget: '$250K+', nsId: 2662, website: 'https://marabou-midstream.com' },
-  { id: 5, name: 'Lovse Surveys', entityid: 'Lovse-Demo', industry: 'Professional Services', size: '75-100', status: 'Qualified', demoDate: 'Nov 15', focus: ['Time & Expense', 'Billing'], budget: '$100K-150K', nsId: 1938, website: 'https://lovse.com' },
-  { id: 6, name: 'nFront Consulting', entityid: 'nFront-Demo', industry: 'Energy Consulting', size: '150-200', status: 'Active', demoDate: 'Nov 20', focus: ['Resource Planning', 'Project Accounting', 'Multi-Entity'], budget: '$5.2M', nsId: 4285, website: 'https://nfront.com' },
-  { id: 7, name: 'Formative Group', entityid: 'Formative-Demo', industry: 'Salesforce Consulting', size: '80-120', status: 'Active', demoDate: 'Nov 25', focus: ['Scaling Operations', 'Acquisitions', 'Resource Mgmt'], budget: '$200K-400K', nsId: 1938, website: 'https://formativegroup.com' },
-];
+const FOCUSABLE_SELECTORS =
+  'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])';
 
-const PROMPT_CATEGORIES = [
-  {
-    name: 'Customer Setup',
-    prompts: [
-      'Create a new customer for [Company Name] in the [Vertical] industry with [company size] employees, annual revenue of [amount], and primary contact [contact info].',
-      'Set up a multi-subsidiary customer structure where the parent company is [Parent Co] and subsidiaries include [List]. Configure consolidated reporting.',
-      'Create a customer with custom fields populated: Industry Type=[X], Annual Revenue=[X], No. of Employees=[X], and AI Generated Summary=[summary].',
-    ]
-  },
-  {
-    name: 'Project & PSA',
-    prompts: [
-      'Create a project for [Customer Name] titled "[Project Name]" with: Project Code=[PRJ####], Customer=[Customer], Project Manager=[Person], Estimated Budget=[Amount], Start=[Date], End=[Date], and add task estimates for: [list tasks].',
-      'Set up resource allocation forecast for project PRJ#### with these roles: [Environmental Engineer-500hrs@$150/hr], [Field Technician-300hrs@$75/hr], [QA Officer-200hrs@$120/hr].',
-      'Create time entries for [Employee Name] on [Project]: [Date] - [Hours] hours for [Task], [Date] - [Hours] hours for [Task]. Mark as approved and billable.',
-    ]
-  },
-  {
-    name: 'Billing & Revenue',
-    prompts: [
-      'Create an estimate for [Customer Name] from project [PRJ####] including: [Item 1-Qty-Rate], [Item 2-Qty-Rate]. Set as pending, customer=[Customer], due date=[Date].',
-      'Generate an invoice from estimate [EST####] with these modifications: remove [Item], add [New Item-Qty-Rate], adjust billing date to [Date].',
-      'Create a purchase order from vendor bill [VB####] for [Vendor Name] totaling $[Amount] for [Description]. Link to project [PRJ####] for cost allocation.',
-    ]
-  },
-  {
-    name: 'Industry Scenarios',
-    prompts: [
-      'Environmental Consulting: Create a complete demo scenario for [Client] including: 5 stream restoration projects, 12 project team members, 2400 billable hours YTD, resource utilization dashboard showing 85% utilization, multi-entity consolidation across 3 regions.',
-      'PEO Services: Set up AdvisorHR demo with: 3 subsidiary companies (staffing, payroll, HR operations), 250+ employees across entities, daily time tracking, multi-entity revenue recognition, compliance tracking.',
-      'Midstream Energy: Build Marabou pipeline scenario with: pipeline segment projects across 4 states, equipment tracking, environmental compliance charges, resource crews with seasonal allocation, multi-entity cost allocation.',
-    ]
+const focusFirstElement = (container: HTMLElement | null) => {
+  if (!container) return;
+  const focusable = container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTORS);
+  const target = focusable[0] || container;
+  target.focus();
+};
+
+const trapFocus = (event: React.KeyboardEvent, container: HTMLElement | null) => {
+  if (event.key !== 'Tab' || !container) return;
+  const focusable = container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTORS);
+  if (focusable.length === 0) return;
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (event.shiftKey) {
+    if (document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    }
+  } else {
+    if (document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
   }
-];
+};
 
-const DASHBOARD_TABS = [
-  { id: 'context', label: 'Customer Context', icon: User },
-  { id: 'prompts', label: 'Demo Prompts', icon: BookOpen },
-  { id: 'demo-builder', label: 'Demo Builder', icon: Zap },
-  { id: 'export', label: 'Export', icon: Download }
-] as const;
-
-
-type ToastMessage = { id: string; message: string; type: 'success' | 'error' | 'info' };
+const handleOverlayKeyDown = (
+  event: React.KeyboardEvent,
+  onClose: () => void,
+  container: HTMLElement | null
+) => {
+  if (event.key === 'Escape') {
+    event.stopPropagation();
+    onClose();
+  } else if (event.key === 'Tab') {
+    trapFocus(event, container);
+  }
+};
 
 interface SearchFilters {
   query: string;
   status?: string;
 }
 
-export default function DemoDashboard() {
-  // State management
-  const [activeTab, setActiveTab] = useState('context');
-  const [selectedAccount, setSelectedAccount] = useState('services');
-  const [selectedCustomer, setSelectedCustomer] = useState<number | null>(null);
-  const [globalSearchQuery, setGlobalSearchQuery] = useState('');
-  const [promptSearch, setPromptSearch] = useState('');
-  const [copiedIndex, setCopiedIndex] = useState<string | null>(null);
-  const [expandedCategory, setExpandedCategory] = useState<number | null>(null);
-  const [favorites, setFavorites] = useState<string[]>([]);
-  const [demoNotes, setDemoNotes] = useState<{[key: number]: string}>({});
-  const [syncLoading, setSyncLoading] = useState<boolean>(false);
-  const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
-  const [customFieldsData, setCustomFieldsData] = useState<{[key: number]: any}>({});
-  const [actionStatus, setActionStatus] = useState<string | {type: string, message: string} | null>(null);
-  const [nsData, setNsData] = useState<any>({});
-  const [showScenarioGenerator, setShowScenarioGenerator] = useState<boolean>(false);
-  const [dynamicCustomers, setDynamicCustomers] = useState<any[]>([]);
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [clipboardHistory, setClipboardHistory] = useState<{ id: string; label: string; text: string; timestamp: Date }[]>([]);
-  const [syncHistory, setSyncHistory] = useState<{[key: number]: Date}>({});
-  const [showQuickCreate, setShowQuickCreate] = useState(false);
-  const [quickProspect, setQuickProspect] = useState({
-    name: '',
-    industry: '',
-    status: 'Active',
-    size: '100-200',
-    budget: '$150K+',
-    focusText: 'Resource Planning',
-    nsId: '',
-    demoDate: 'TBD',
-    website: ''
-  });
+type Tab = 'context' | 'prompts' | 'demo-builder' | 'export';
 
-  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+type ToastMessage = { id: string; message: string; type: 'success' | 'error' | 'info' };
+
+const KEY_PROSPECTS: Prospect[] = [
+  { id: 1, name: 'AdvisorHR', entityid: 'AdvisorHR-Demo', industry: 'PEO Services', size: '500-1000', status: 'Hot', demoDate: 'Oct 30', focus: ['Resource Planning', 'Multi-Entity', 'Billing'], budget: '$200K-500K', nsId: 3161, website: 'https://advisorhr.com' },
+  { id: 2, name: 'GSB Group', entityid: 'GSB-Demo', industry: 'Consulting', size: '50-100', status: 'Active', demoDate: 'Nov 5', focus: ['Project Accounting', 'PSA'], budget: '$100K-200K', nsId: 1834, website: 'https://gsbgroup.com' },
+  { id: 3, name: 'Innovatia Technical', entityid: 'Innovatia-Demo', industry: 'Tech Consulting', size: '200-300', status: 'Active', demoDate: 'Nov 8', focus: ['Resource Utilization', 'Forecasting'], budget: '$150K-300K', nsId: 1938, website: 'https://innovatia.tech' },
+  { id: 4, name: 'Marabou Midstream', entityid: 'Marabou-Demo', industry: 'Energy', size: '100-150', status: 'Proposal', demoDate: 'Pending', focus: ['Pipeline Management', 'Multi-Entity', 'Consolidation'], budget: '$250K+', nsId: 2662, website: 'https://marabou-midstream.com' },
+  { id: 5, name: 'Lovse Surveys', entityid: 'Lovse-Demo', industry: 'Professional Services', size: '75-100', status: 'Qualified', demoDate: 'Nov 15', focus: ['Time & Expense', 'Billing'], budget: '$100K-150K', nsId: 1938, website: 'https://lovse.com' },
+  { id: 6, name: 'nFront Consulting', entityid: 'nFront-Demo', industry: 'Energy Consulting', size: '150-200', status: 'Proposal', demoDate: 'Pending', focus: ['Resource Planning', 'Project Accounting', 'Multi-Entity'], budget: '$5.2M', nsId: 4285, website: 'https://nfront.com' },
+  { id: 7, name: 'Formative Group', entityid: 'Formative-Demo', industry: 'Salesforce Consulting', size: '80-120', status: 'Active', demoDate: 'Nov 25', focus: ['Scaling Operations', 'Acquisitions', 'Resource Mgmt'], budget: '$200K-400K', nsId: 1938, website: 'https://formativegroup.com' }
+];
+
+const PROMPT_CATEGORIES: PromptCategory[] = [
+  {
+    name: 'Customer Setup',
+    prompts: [
+      'Create a new customer for [Company Name] in the [Vertical] industry with [company size] employees, annual revenue of [amount], and primary contact [contact info].',
+      'Set up a multi-subsidiary structure with parent [Parent Co] and subsidiaries [List]; enable consolidated reporting.',
+      'Create a customer with custom fields populated: Industry Type=[X], Annual Revenue=[X], No. of Employees=[X], and AI Generated Summary=[summary].'
+    ]
+  },
+  {
+    name: 'Project & PSA',
+    prompts: [
+      'Create a project for [Customer Name] titled "[Project Name]" with code [PRJ####], PM=[Person], Budget=[Amount], Start=[Date], End=[Date], plus 4-5 tasks.',
+      'Set up resource allocation forecast for project PRJ#### with roles: [Engineer-500hrs@$150/hr], [Technician-300hrs@$75/hr], [QA-200hrs@$120/hr].',
+      'Create time entries for [Employee Name] on [Project]: [Date] - [Hours] for [Task]. Mark entries approved + billable.'
+    ]
+  },
+  {
+    name: 'Billing & Revenue',
+    prompts: [
+      'Create an estimate for [Customer Name] including [Item 1-Qty-Rate], [Item 2-Qty-Rate]; set status pending with due date [Date].',
+      'Generate an invoice from estimate [EST####]; remove [Item], add [New Item-Qty-Rate], adjust billing date to [Date].',
+      'Create a purchase order from vendor bill [VB####] for [Vendor Name] totaling $[Amount]. Link to project [PRJ####].'
+    ]
+  },
+  {
+    name: 'Industry Scenarios',
+    prompts: [
+      'Environmental Consulting: build demo with 5 stream restoration projects, 12 team members, 2400 billable hours YTD, 85% utilization, multi-entity consolidation.',
+      'PEO Services: set up AdvisorHR demo with 3 subsidiaries, 250+ employees, daily time tracking, multi-entity revenue recognition, compliance tracking.',
+      'Midstream Energy: model pipeline scenario with 4-state operations, equipment tracking, compliance charges, resource crews, multi-entity allocations.'
+    ]
+  }
+];
+
+const ACCOUNTS = [
+  { id: 'services', name: 'Services Stairway', instance: 'td3049589', vertical: 'Professional Services' },
+  { id: 'software', name: 'Software Stairway', instance: 'td3049589-soft', vertical: 'SaaS' },
+  { id: 'saas', name: 'NS Services SaaS', instance: 'td3049589-saas', vertical: 'Hybrid Services' }
+];
+
+const DASHBOARD_TABS = [
+  { id: 'context', label: 'Customer Context', icon: Users },
+  { id: 'prompts', label: 'Demo Prompts', icon: BookOpen },
+  { id: 'demo-builder', label: 'Demo Builder', icon: Wand2 },
+  { id: 'export', label: 'Exports', icon: Download }
+] as const;
+
+const formatStatus = (status: string) => {
+  switch (status) {
+    case 'Hot':
+      return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300';
+    case 'Active':
+      return 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300';
+    case 'Qualified':
+      return 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300';
+    case 'Proposal':
+      return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300';
+    default:
+      return 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300';
+  }
+};
+
+const DemoDashboard: React.FC = () => {
+  const preferencesRef = useRef(storageService.getPreferences());
+  const [activeTab, setActiveTab] = useState<Tab>('context');
+  const [selectedAccount, setSelectedAccount] = useState<string>(preferencesRef.current.lastAccountId || 'services');
+  const [dynamicCustomers, setDynamicCustomers] = useState<Prospect[]>(() => storageService.getProspects());
+  const [selectedCustomer, setSelectedCustomer] = useState<number | null>(
+    preferencesRef.current.lastCustomerId ?? KEY_PROSPECTS[0].id
+  );
+  const [globalSearchQuery, setGlobalSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [promptSearch, setPromptSearch] = useState('');
+  const [favorites, setFavorites] = useState<string[]>(storageService.getFavorites());
+  const [clipboardHistory, setClipboardHistory] = useState<{ id: string; label: string; text: string; timestamp: Date }[]>([]);
+  const [demoNotes, setDemoNotes] = useState<{ [key: number]: string }>(storageService.getNoteDrafts());
+  const [appliedPrompts, setAppliedPrompts] = useState<Record<number, string[]>>(storageService.getAppliedPrompts());
+  const [nsData, setNsData] = useState<Record<number, any>>({});
+  const [customFieldsData, setCustomFieldsData] = useState<Record<number, any>>({});
+  const [syncHistory, setSyncHistory] = useState<Record<number, Date>>({});
+  const [projectSyncs, setProjectSyncs] = useState<Record<number, ProjectRecord>>(storageService.getProjectSyncs());
+  const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
+  const [syncLoading, setSyncLoading] = useState(false);
+  const [projectSyncLoading, setProjectSyncLoading] = useState(false);
+  const [actionStatus, setActionStatus] = useState<string | { type: 'success' | 'error' | 'info'; message: string } | null>(null);
+  const [showQuickCreate, setShowQuickCreate] = useState(false);
+  const [showScenarioGenerator, setShowScenarioGenerator] = useState(false);
+  const [theme, setTheme] = useState<'light' | 'dark'>(preferencesRef.current.theme === 'dark' ? 'dark' : 'light');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
-  const [showClipboardPanel, setShowClipboardPanel] = useState(true);
-
-  const accounts = [
-    { id: 'services', name: 'Services', instance: 'td3049589' },
-    { id: 'demo', name: 'Demo Sandbox', instance: 'td3049589' }
-  ];
-
-  const notesRef = useRef<HTMLTextAreaElement>(null);
-
-  // Data sources
-  useEffect(() => {
-    const saved = storageService.getProspects();
-    if (saved.length) {
-      setDynamicCustomers(saved);
-    }
-  }, []);
+  const [showClipboardPanel, setShowClipboardPanel] = useState(false);
+  const quickCreateRef = useRef<HTMLDivElement | null>(null);
+  const scenarioRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     storageService.saveProspects(dynamicCustomers);
   }, [dynamicCustomers]);
 
   useEffect(() => {
-    const pref = storageService.getPreferences().theme;
-    setTheme(pref === 'light' ? 'light' : 'dark');
-  }, []);
+    Object.entries(demoNotes).forEach(([id, value]) => {
+      storageService.saveNoteDraft(Number(id), value || '');
+    });
+  }, [demoNotes]);
 
   useEffect(() => {
-    document.body.classList.remove('theme-light', 'theme-dark');
-    document.body.classList.add(theme === 'light' ? 'theme-light' : 'theme-dark');
+    storageService.saveAppliedPrompts(appliedPrompts);
+  }, [appliedPrompts]);
+
+  useEffect(() => {
+    storageService.saveProjectSyncs(projectSyncs);
+  }, [projectSyncs]);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', theme === 'dark');
     storageService.setPreferences({ theme });
   }, [theme]);
 
-  // Global keyboard shortcuts
   useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      // Focus main search with "/"
+    storageService.setPreferences({ lastAccountId: selectedAccount });
+  }, [selectedAccount]);
+
+  useEffect(() => {
+    storageService.setPreferences({ lastCustomerId: selectedCustomer });
+  }, [selectedCustomer]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'c') {
+        e.preventDefault();
+        setShowClipboardPanel((prev) => !prev);
+        return;
+      }
+
       if (e.key === '/' && !e.metaKey && !e.ctrlKey) {
-        const input = document.querySelector('input[placeholder="Search scenarios, prompts, or descriptions..."]') as HTMLInputElement | null;
+        const input = document.querySelector<HTMLInputElement>('input[placeholder="Search prospects or industries"]');
         if (input) {
           e.preventDefault();
           input.focus();
         }
+        return;
       }
-      // Quick create with "n"
+
       if ((e.key === 'n' || e.key === 'N') && !e.metaKey && !e.ctrlKey) {
-        // avoid when typing in inputs
-        const el = document.activeElement as HTMLElement | null;
-        if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA')) return;
+        const active = document.activeElement;
+        if (active && ['INPUT', 'TEXTAREA'].includes(active.tagName)) return;
+        e.preventDefault();
         setShowQuickCreate(true);
-      }
-      // Toggle filters with "f"
-      if ((e.key === 'f' || e.key === 'F') && !e.metaKey && !e.ctrlKey) {
-        const filterBtn = document.querySelector('button[aria-label="Toggle filters"]') as HTMLButtonElement | null;
-        if (filterBtn) {
-          e.preventDefault();
-          filterBtn.click();
-        }
+        return;
       }
     };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // Global search & filtering
-  const allCustomers = useMemo(() => {
-    return [...KEY_PROSPECTS, ...dynamicCustomers];
-  }, [dynamicCustomers]);
+  useEffect(() => {
+    if (showQuickCreate) {
+      focusFirstElement(quickCreateRef.current);
+    }
+  }, [showQuickCreate]);
+
+  useEffect(() => {
+    if (showScenarioGenerator) {
+      focusFirstElement(scenarioRef.current);
+    }
+  }, [showScenarioGenerator]);
+
+  const allCustomers = useMemo(() => [...KEY_PROSPECTS, ...dynamicCustomers], [dynamicCustomers]);
 
   const filteredCustomers = useMemo(() => {
-    return allCustomers.filter((cust: any) => {
-      const matchesGlobalSearch =
+    return allCustomers.filter((cust) => {
+      const matchesSearch =
         cust.name.toLowerCase().includes(globalSearchQuery.toLowerCase()) ||
         cust.industry.toLowerCase().includes(globalSearchQuery.toLowerCase()) ||
         cust.entityid.toLowerCase().includes(globalSearchQuery.toLowerCase());
       const matchesStatus = statusFilter === 'all' || cust.status === statusFilter;
-      return matchesGlobalSearch && matchesStatus;
+      return matchesSearch && matchesStatus;
     });
-  }, [globalSearchQuery, allCustomers, statusFilter]);
+  }, [allCustomers, globalSearchQuery, statusFilter]);
 
-  // Filter prompts for prompts tab
-  const filteredPrompts = useMemo(() => {
-    if (!promptSearch) return PROMPT_CATEGORIES;
-    return PROMPT_CATEGORIES.map((cat: any) => ({
-      ...cat,
-      prompts: cat.prompts.filter((p: string) => p.toLowerCase().includes(promptSearch.toLowerCase()))
-    })).filter((cat: any) => cat.prompts.length > 0);
-  }, [promptSearch]);
+  useEffect(() => {
+    if (!selectedCustomer && filteredCustomers.length > 0) {
+      setSelectedCustomer(filteredCustomers[0].id);
+    }
+  }, [filteredCustomers, selectedCustomer]);
+
+  const selectedCustData = useMemo(() => allCustomers.find((cust) => cust.id === selectedCustomer) || null, [allCustomers, selectedCustomer]);
+
+  const statusCounts = useMemo(() => {
+    return allCustomers.reduce<Record<string, number>>((acc, cust) => {
+      acc[cust.status] = (acc[cust.status] || 0) + 1;
+      return acc;
+    }, {});
+  }, [allCustomers]);
 
   const netsuiteExportData = useMemo(() => {
-    return Object.entries(nsData).map(([custId, recordData]: [string, any]) => {
+    return Object.entries(nsData).map(([custId, recordData]) => {
       const numericId = Number(custId);
-      const customer = allCustomers.find((c: any) => c.id === numericId);
+      const customer = allCustomers.find((c) => c.id === numericId);
       const syncedAt = recordData?.syncedAt || syncHistory[numericId]?.toISOString() || '';
       const customFields = customFieldsData[numericId] || {};
+      const projectRecord = projectSyncs[numericId];
       return {
         customerId: numericId,
         name: customer?.name || recordData?.companyname,
@@ -208,890 +286,1206 @@ export default function DemoDashboard() {
         email: recordData?.email,
         phone: recordData?.phone,
         customFields,
+        projectId: projectRecord?.projectId,
+        projectName: projectRecord?.projectName,
+        projectPrompts: projectRecord?.prompts,
+        projectTasks: projectRecord?.tasks,
+        projectSyncedAt: projectRecord?.syncedAt,
+        projectSource: projectRecord?.source,
         source: 'NetSuite',
         raw: recordData
       };
-    }).sort((a, b) => new Date(b.syncedAt || 0).getTime() - new Date(a.syncedAt || 0).getTime());
-  }, [nsData, allCustomers, customFieldsData, syncHistory, selectedAccount]);
+    });
+  }, [nsData, allCustomers, customFieldsData, syncHistory, selectedAccount, projectSyncs]);
 
-  useEffect(() => {
-    if (!selectedCustomer && filteredCustomers.length > 0) {
-      setSelectedCustomer(filteredCustomers[0].id);
-    }
-  }, [filteredCustomers, selectedCustomer]);
-
-  const statusCounts = useMemo(() => {
-    return allCustomers.reduce((acc: Record<string, number>, cust: any) => {
-      acc[cust.status] = (acc[cust.status] || 0) + 1;
-      return acc;
-    }, {});
-  }, [allCustomers]);
-
-  const selectedCustData = allCustomers.find((c: any) => c.id === selectedCustomer);
-
-  const checklistState = useMemo(() => {
+  const prepWorkflow: PrepWorkflowStep[] = useMemo(() => {
+    const hasProspect = Boolean(selectedCustData);
     const hasSyncedFields = selectedCustData ? Boolean(customFieldsData[selectedCustData.id]) : false;
-    const hasNotes = selectedCustData ? Boolean(demoNotes[selectedCustData.id]?.trim()) : false;
-    return [
-      { id: 'account', label: 'Choose demo account', done: Boolean(selectedAccount) },
-      { id: 'customer', label: 'Select a prospect', done: Boolean(selectedCustomer) },
-      { id: 'sync', label: 'Sync NetSuite data', done: hasSyncedFields },
-      { id: 'notes', label: 'Capture demo notes', done: hasNotes },
-    ];
-  }, [selectedAccount, selectedCustomer, customFieldsData, selectedCustData, demoNotes]);
-
-  const lastSyncDisplay = useMemo(() => {
-    const activeSync = selectedCustData ? syncHistory[selectedCustData.id] : lastSyncTime;
-    if (!activeSync) return 'Not synced yet';
-    return activeSync.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-  }, [lastSyncTime, selectedCustData, syncHistory]);
-
-  const prepWorkflow = useMemo(() => {
-    const hasProspect = Boolean(selectedCustomer);
-    const hasSyncedFields = selectedCustData ? Boolean(customFieldsData[selectedCustData.id]) : false;
-    const hasGeneratedScenario = dynamicCustomers.some((cust: any) => cust.aiGenerated);
-    const hasCopiedPrompt = clipboardHistory.length > 0;
+    const hasScenario = dynamicCustomers.some((cust) => cust.aiGenerated);
+    const hasClipboard = clipboardHistory.length > 0;
     const hasExport = netsuiteExportData.length > 0;
 
     return [
-      {
-        id: 'prospect',
-        title: 'Capture Discovery',
-        description: 'Add a prospect with industry, size, and focus areas.',
-        done: hasProspect
-      },
-      {
-        id: 'sync',
-        title: 'Sync NetSuite',
-        description: 'Pull NetSuite data or AI summaries for context.',
-        done: hasSyncedFields
-      },
-      {
-        id: 'generate',
-        title: 'Generate Scenario',
-        description: 'Build AI-driven prompts & prep assets.',
-        done: hasGeneratedScenario
-      },
-      {
-        id: 'share',
-        title: 'Share Assets',
-        description: 'Copy prompts or export SuiteQL/talk tracks.',
-        done: hasCopiedPrompt || hasExport
-      }
+      { id: 'prospect', label: 'Capture Discovery', done: hasProspect },
+      { id: 'sync', label: 'Sync NetSuite', done: hasSyncedFields },
+      { id: 'build', label: 'Generate Scenario', done: hasScenario },
+      { id: 'share', label: 'Share Assets', done: hasClipboard || hasExport }
     ];
-  }, [selectedCustomer, selectedCustData, customFieldsData, dynamicCustomers, clipboardHistory, netsuiteExportData]);
+  }, [selectedCustData, customFieldsData, dynamicCustomers, clipboardHistory, netsuiteExportData]);
 
-  const completedPrepSteps = prepWorkflow.filter((step) => step.done).length;
-  const prepCompletion = Math.round((completedPrepSteps / prepWorkflow.length) * 100);
+  const completedSteps = prepWorkflow.filter((step) => step.done).length;
+  const prepCompletion = Math.round((completedSteps / prepWorkflow.length) * 100);
 
-  const nextPrepAction = (() => {
-    if (!selectedCustomer) {
-      return {
-        label: 'Add Prospect',
-        description: 'Capture discovery data to anchor the rest of the workflow.',
-        action: () => setShowQuickCreate(true)
-      };
-    }
-
-    if (selectedCustData && !customFieldsData[selectedCustData.id]) {
-      return {
-        label: 'Sync NetSuite Data',
-        description: 'Pull context fields and summaries for this account.',
-        action: () => syncNetsuiteFields()
-      };
-    }
-
-    if (!clipboardHistory.length) {
-      return {
-        label: 'Copy Demo Prompt',
-        description: 'Hop into Demo Prompts to seed SuiteQL or data creation.',
-        action: () => setActiveTab('prompts')
-      };
-    }
-
-    if (!netsuiteExportData.length) {
-      return {
-        label: 'Export Assets',
-        description: 'Download SuiteQL, talk tracks, or sync logs to share.',
-        action: () => setActiveTab('export')
-      };
-    }
-
-    return {
-      label: 'Open Demo Builder',
-      description: 'Fine-tune prompts & generate scenario collateral.',
-      action: () => setActiveTab('demo-builder')
-    };
-  })();
-
-  // Helper functions
-  const handleScenarioGenerated = useCallback((newScenario: any) => {
-    // Add the new AI-generated scenario to the dynamic customers list
-    setDynamicCustomers((prev: any) => [newScenario, ...prev]);
-
-    // Auto-select the new scenario
-    setSelectedCustomer(newScenario.id);
-
-    // close AI builder sheet if open
-    setShowScenarioGenerator(false);
-
-    // Show success message
-    setActionStatus({
-      type: 'success',
-      message: `AI scenario "${newScenario.name}" generated successfully!`
-    });
-
-    // Clear success message after 5 seconds
-    setTimeout(() => setActionStatus(null), 5000);
-  }, []);
+  const lastSyncDisplay = useMemo(() => {
+    if (!selectedCustData) return 'Select a prospect to sync data';
+    const date = syncHistory[selectedCustData.id] || lastSyncTime;
+    return date ? date.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Not synced yet';
+  }, [lastSyncTime, selectedCustData, syncHistory]);
 
   const pushToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'info') => {
-    const id = `toast-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-    setToasts((prev: any) => [...prev, { id, message, type }]);
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    setToasts((prev) => [...prev, { id, message, type }]);
     setTimeout(() => {
-      setToasts((prev: any) => prev.filter((toast: any) => toast.id !== id));
-    }, 3200);
+      setToasts((prev) => prev.filter((toast) => toast.id !== id));
+    }, 3500);
   }, []);
 
-  const copyToClipboard = useCallback((text: string, index: string, label: string = 'Copied') => {
-    navigator.clipboard.writeText(text)
-      .then(() => {
-        setCopiedIndex(index);
-        setClipboardHistory((prev: any) => {
-          const entry = { id: `${index}-${Date.now()}`, label, text, timestamp: new Date() };
-          return [entry, ...prev].slice(0, 10);
-        });
-        setTimeout(() => setCopiedIndex(null), 2000);
-        pushToast('✓ Copied to clipboard', 'success');
-      })
-      .catch((err) => {
-        console.error('Failed to copy to clipboard:', err);
-        pushToast('Failed to copy to clipboard', 'error');
-      });
-  }, [pushToast]);
+  const copyToClipboard = useCallback(
+    (text: string, index: string, label: string) => {
+      navigator.clipboard.writeText(text)
+        .then(() => {
+          setClipboardHistory((prev) => {
+            const entry = { id: `${index}-${Date.now()}`, label, text, timestamp: new Date() };
+            return [entry, ...prev].slice(0, 12);
+          });
+          pushToast('Copied to clipboard', 'success');
+        })
+        .catch(() => pushToast('Clipboard copy failed', 'error'));
+    },
+    [pushToast]
+  );
+
+  const handlePromptCopy = useCallback(
+    (prompt: string, index: string) => copyToClipboard(prompt, index, 'Prompt copied'),
+    [copyToClipboard]
+  );
 
   const toggleFavorite = useCallback((prompt: string) => {
-    setFavorites((prev: string[]) =>
-      prev.includes(prompt) ? prev.filter((p: string) => p !== prompt) : [...prev, prompt]
-    );
+    setFavorites((prev) => {
+      if (prev.includes(prompt)) {
+        storageService.removeFavorite(prompt);
+        return prev.filter((item) => item !== prompt);
+      }
+      storageService.addFavorite(prompt);
+      return [...prev, prompt];
+    });
   }, []);
+
+  const handleScenarioGenerated = useCallback(
+    (newScenario: Prospect) => {
+      setDynamicCustomers((prev) => [newScenario, ...prev]);
+      setSelectedCustomer(newScenario.id);
+      if (newScenario.description) {
+        setDemoNotes((prev) => ({ ...prev, [newScenario.id]: newScenario.description || '' }));
+      }
+      if (newScenario.prompt) {
+        setAppliedPrompts((prev) => {
+          const existing = prev[newScenario.id] || [];
+          if (existing.includes(newScenario.prompt as string)) {
+            return prev;
+          }
+          return { ...prev, [newScenario.id]: [...existing, newScenario.prompt as string] };
+        });
+      }
+      pushToast(`Scenario "${newScenario.name}" added`, 'success');
+    },
+    [pushToast]
+  );
 
   const syncNetsuiteFields = useCallback(async () => {
     if (!selectedCustData) return;
     setSyncLoading(true);
-    setActionStatus('Syncing from NetSuite...');
+    setActionStatus('Syncing NetSuite data...');
 
     try {
-      // Simulate API call or use actual NetSuite API integration
       const mockNsResponse = {
         id: selectedCustData.nsId,
         companyname: selectedCustData.name,
-        custentity13: `AI Summary for ${selectedCustData.name}: Generated on ${new Date().toLocaleDateString()}. Key focus: ${selectedCustData.focus.join(', ')}. Revenue projection: ${selectedCustData.budget}.`,
+        custentity13: `AI Summary for ${selectedCustData.name}: Focus on ${selectedCustData.focus.join(', ')}.`,
         custentity16: selectedCustData.industry,
         custentity15: selectedCustData.size,
-        email: selectedCustData.email || `contact@${selectedCustData.entityid.toLowerCase()}.com`,
-        phone: selectedCustData.phone || '(555) 123-4567'
+        email: `contact@${selectedCustData.entityid.toLowerCase()}.com`,
+        phone: '(555) 123-4567'
       };
-
-      const syncTimestamp = new Date();
-
-      setCustomFieldsData((prev: any) => ({
+      const timestamp = new Date();
+      setCustomFieldsData((prev) => ({
         ...prev,
         [selectedCustData.id]: {
           'AI Generated Summary': mockNsResponse.custentity13,
           'Industry Type': mockNsResponse.custentity16,
-          'Annual Revenue': selectedCustData.budget,
-          'Employee Count': mockNsResponse.custentity15,
+          'Company Size': mockNsResponse.custentity15,
           'Email': mockNsResponse.email,
           'Phone': mockNsResponse.phone
         }
       }));
-
-      setNsData((prev: any) => ({
+      setNsData((prev) => ({
         ...prev,
-        [selectedCustData.id]: {
-          ...mockNsResponse,
-          account: selectedAccount,
-          syncedAt: syncTimestamp.toISOString()
-        }
+        [selectedCustData.id]: { ...mockNsResponse, syncedAt: timestamp.toISOString(), account: selectedAccount }
       }));
-      setSyncHistory((prev: any) => ({
-        ...prev,
-        [selectedCustData.id]: syncTimestamp
-      }));
-      setLastSyncTime(syncTimestamp);
-      setActionStatus('✓ Synced successfully');
+      setSyncHistory((prev) => ({ ...prev, [selectedCustData.id]: timestamp }));
+      setLastSyncTime(timestamp);
+      setActionStatus({ type: 'success', message: 'NetSuite data synced' });
       pushToast('NetSuite data synced', 'success');
-    } catch (error) {
-      setActionStatus('⚠ Sync failed - check console');
-      pushToast('Sync failed - check settings', 'error');
+    } catch (err) {
+      console.error(err);
+      setActionStatus({ type: 'error', message: 'Sync failed - check console' });
+      pushToast('Sync failed', 'error');
     } finally {
       setSyncLoading(false);
-      setTimeout(() => setActionStatus(null), 3000);
+      setTimeout(() => setActionStatus(null), 4000);
     }
   }, [selectedCustData, selectedAccount, pushToast]);
 
-  const quickActions = useMemo(() => [
-    {
-      id: 'create-project',
-      label: 'Create Demo Project',
-      icon: Plus,
-      action: () => {
-        if (!selectedCustData) return;
-        const prompt = `Create a project for ${selectedCustData.name} titled "[Demo Project Name]" with entity ID [PRJ-DEMO-####]. Add 3-5 task estimates for typical ${selectedCustData.industry} workflows.`;
-        copyToClipboard(prompt, 'action-project', 'Project creation prompt');
-        setActionStatus('✓ Project prompt copied');
-        setTimeout(() => setActionStatus(null), 2000);
-      }
-    },
-    {
-      id: 'time-entries',
-      label: 'Add Sample Time Entries',
-      icon: Clock,
-      action: () => {
-        if (!selectedCustData) return;
-        const prompt = `Create 10 approved time entries for the demo project for ${selectedCustData.name} across 3 different team members. Include billable hours, task assignments, and realistic dates spread across ${new Date().getFullYear()}.`;
-        copyToClipboard(prompt, 'action-time', 'Time entry prompt');
-        setActionStatus('✓ Time entry prompt copied');
-        setTimeout(() => setActionStatus(null), 2000);
-      }
-    },
-    {
-      id: 'create-estimate',
-      label: 'Generate Estimate',
-      icon: FileText,
-      action: () => {
-        if (!selectedCustData) return;
-        const prompt = `Create an estimate for ${selectedCustData.name} from the demo project. Include line items for: Professional Services (60%), Travel & Expenses (20%), Software Licensing (20%). Set total value to ${selectedCustData.budget?.split('-')[0]}.`;
-        copyToClipboard(prompt, 'action-estimate', 'Estimate prompt');
-        setActionStatus('✓ Estimate prompt copied');
-        setTimeout(() => setActionStatus(null), 2000);
-      }
-    },
-    {
-      id: 'resource-forecast',
-      label: 'Resource Allocation',
-      icon: TrendingUp,
-      action: () => {
-        if (!selectedCustData) return;
-        const prompt = `Create resource allocation forecast for ${selectedCustData.name} demo project with these roles: ${selectedCustData.focus.join(', ')}. Include 10-15 team members with varied utilization rates (60-100%) across 12 weeks.`;
-        copyToClipboard(prompt, 'action-resource', 'Resource allocation prompt');
-        setActionStatus('✓ Resource prompt copied');
-        setTimeout(() => setActionStatus(null), 2000);
-      }
-    },
-    {
-      id: 'sync-netsuite',
-      label: 'Sync NetSuite Data',
-      icon: Loader,
-      action: syncNetsuiteFields
-    }
-  ], [selectedCustData, copyToClipboard, syncNetsuiteFields]);
-
-  // Component: Global Search
-  const GlobalSearch = React.memo(() => (
-    <div className="global-search mb-6">
-      <AdvancedSearch
-        onFiltersChange={(filters: SearchFilters) => {
-          setGlobalSearchQuery(filters.query);
-          if (filters.status) setStatusFilter(filters.status);
-        }}
-        className="w-full"
-        showAdvancedFilters={true}
-      />
-    </div>
-  ));
-
-  // Component: Quick Create Form
-  const QuickCreateForm = () => {
-    const isFormValid = quickProspect.name.trim() && quickProspect.industry.trim();
-
-    const handleSubmit = (e: React.FormEvent) => {
-      e.preventDefault();
-      if (!isFormValid) return;
-      const newProspect = {
-        ...quickProspect,
-        id: Date.now(),
-        entityid: `${quickProspect.name.replace(/\s+/g, '-').toLowerCase()}-demo`,
-        focus: quickProspect.focusText.split(',').map(f => f.trim()),
-        aiGenerated: false
-      };
-      setDynamicCustomers(prev => [newProspect, ...prev]);
-      setSelectedCustomer(newProspect.id);
-      setShowQuickCreate(false);
-      setQuickProspect({
-        name: '',
-        industry: '',
-        status: 'Active',
-        size: '100-200',
-        budget: '$150K+',
-        focusText: 'Resource Planning',
-        nsId: '',
-        demoDate: 'TBD',
-        website: ''
-      });
-      pushToast('Prospect created successfully!', 'success');
-    };
-
-    const handleChange = (field: string, value: string) => {
-      setQuickProspect(prev => ({ ...prev, [field]: value }));
-    };
-
-    return (
-      <div className="modal-backdrop fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" role="dialog" aria-modal="true" aria-label="Quick prospect">
-        <div className="quick-create-modal bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
-          <div className="quick-create-hero p-6 border-b bg-gradient-to-r from-blue-600 to-indigo-600">
-            <div className="flex justify-between items-center">
-              <div>
-                <h3 className="text-xl font-bold text-white">Create New Prospect</h3>
-                <p className="text-blue-100 text-sm mt-1">Add a custom demo scenario to your workspace</p>
-              </div>
-              <button
-                onClick={() => setShowQuickCreate(false)}
-                aria-label="Close quick prospect"
-                className="text-white hover:bg-white/20 rounded-lg p-2 transition-colors"
-              >
-                <X size={24} />
-              </button>
-            </div>
-          </div>
-          <form onSubmit={handleSubmit} className="p-6 space-y-5">
-            {/* Required Fields Section */}
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <h4 className="text-sm font-semibold text-blue-900 mb-2">Required Fields</h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Company Name *</label>
-                  <input
-                    type="text"
-                    value={quickProspect.name}
-                    onChange={(e) => handleChange('name', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="e.g., Acme Corp"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Industry *</label>
-                  <select
-                    value={quickProspect.industry}
-                    onChange={(e) => handleChange('industry', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    required
-                  >
-                    <option value="">Select Industry</option>
-                    <option value="Consulting">Consulting</option>
-                    <option value="PEO Services">PEO Services</option>
-                    <option value="Energy">Energy</option>
-                    <option value="Tech Consulting">Tech Consulting</option>
-                    <option value="Professional Services">Professional Services</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            {/* Optional Fields Section */}
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                <select
-                  value={quickProspect.status}
-                  onChange={(e) => handleChange('status', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="Active">Active</option>
-                  <option value="Hot">Hot</option>
-                  <option value="Proposal">Proposal</option>
-                  <option value="Qualified">Qualified</option>
-                </select>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Company Size</label>
-                  <select
-                    value={quickProspect.size}
-                    onChange={(e) => handleChange('size', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="50-100">50-100</option>
-                    <option value="100-200">100-200</option>
-                    <option value="200-500">200-500</option>
-                    <option value="500-1000">500-1000</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Budget Range</label>
-                  <input
-                    type="text"
-                    value={quickProspect.budget}
-                    onChange={(e) => handleChange('budget', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="e.g., $150K+"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Focus Areas (comma-separated)</label>
-                <input
-                  type="text"
-                  value={quickProspect.focusText}
-                  onChange={(e) => handleChange('focusText', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="e.g., Resource Planning, Billing"
-                />
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Demo Date</label>
-                  <input
-                    type="text"
-                    value={quickProspect.demoDate}
-                    onChange={(e) => handleChange('demoDate', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="e.g., Nov 20"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Website</label>
-                  <input
-                    type="url"
-                    value={quickProspect.website}
-                    onChange={(e) => handleChange('website', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="https://example.com"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">NetSuite ID (optional)</label>
-                <input
-                  type="text"
-                  value={quickProspect.nsId}
-                  onChange={(e) => handleChange('nsId', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="e.g., 1234"
-                />
-              </div>
-            </div>
-
-            {/* Actions */}
-            <div className="flex justify-end space-x-3 pt-4 border-t">
-              <button
-                type="button"
-                onClick={() => setShowQuickCreate(false)}
-                className="px-4 py-2 text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={!isFormValid}
-                className={`px-4 py-2 rounded-lg transition-colors ${
-                  isFormValid
-                    ? 'bg-blue-600 text-white hover:bg-blue-700'
-                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                }`}
-              >
-                Create Prospect
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    );
+  const handleNoteChange = (value: string) => {
+    if (!selectedCustData) return;
+    setDemoNotes((prev) => ({ ...prev, [selectedCustData.id]: value }));
   };
 
-  // Main Dashboard JSX
+  const appliedPromptsForSelected = useMemo(() => {
+    if (!selectedCustData) return [] as string[];
+    return appliedPrompts[selectedCustData.id] || [];
+  }, [appliedPrompts, selectedCustData]);
+
+  const handleApplyPromptToProspect = useCallback(
+    (prompt: string) => {
+      if (!selectedCustData) {
+        pushToast('Select a prospect before applying prompts.', 'info');
+        return;
+      }
+      const currentPrompts = appliedPrompts[selectedCustData.id] || [];
+      if (currentPrompts.includes(prompt)) {
+        pushToast('Prompt already applied to this prospect.', 'info');
+        return;
+      }
+      setAppliedPrompts((prev) => ({
+        ...prev,
+        [selectedCustData.id]: [...currentPrompts, prompt]
+      }));
+      pushToast('Prompt attached to prospect', 'success');
+    },
+    [appliedPrompts, selectedCustData, pushToast]
+  );
+
+  const handleRemoveAppliedPrompt = useCallback(
+    (prompt: string) => {
+      if (!selectedCustData) return;
+      setAppliedPrompts((prev) => {
+        const currentPrompts = prev[selectedCustData.id] || [];
+        const nextPrompts = currentPrompts.filter((item) => item !== prompt);
+        const updated = { ...prev };
+        if (nextPrompts.length === 0) {
+          delete updated[selectedCustData.id];
+        } else {
+          updated[selectedCustData.id] = nextPrompts;
+        }
+        return updated;
+      });
+      pushToast('Prompt removed from prospect', 'info');
+    },
+    [selectedCustData, pushToast]
+  );
+
+  const handleClearAppliedPrompts = useCallback(() => {
+    if (!selectedCustData) return;
+    setAppliedPrompts((prev) => {
+      if (!prev[selectedCustData.id]) return prev;
+      const updated = { ...prev };
+      delete updated[selectedCustData.id];
+      return updated;
+    });
+    pushToast('Cleared applied prompts', 'info');
+  }, [selectedCustData, pushToast]);
+
+  const handleProjectSync = useCallback(async () => {
+    if (!selectedCustData) return;
+    if (appliedPromptsForSelected.length === 0) {
+      pushToast('Apply prompts before creating a project.', 'info');
+      setActionStatus({ type: 'info', message: 'Add at least one prompt to build a project plan.' });
+      setTimeout(() => setActionStatus(null), 3500);
+      return;
+    }
+
+    const snapshotCustomer = selectedCustData;
+    const promptsSnapshot = [...appliedPromptsForSelected];
+    const noteSnapshot = demoNotes[snapshotCustomer.id] || '';
+    const syncedAt = new Date();
+    const projectId = `PRJ-${snapshotCustomer.entityid.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 6)}-${syncedAt
+      .getTime()
+      .toString()
+      .slice(-4)}`;
+
+    const generateTasksFromPrompts = (prompts: string[]): ProjectRecord['tasks'] =>
+      prompts.slice(0, 4).map((promptText, index, arr) => {
+        const status: ProjectRecord['tasks'][number]['status'] =
+          index === 0 ? 'Scheduled' : index === arr.length - 1 ? 'Ready' : 'Pending';
+        return {
+          name: `Track ${index + 1}: ${promptText.slice(0, 50)}${promptText.length > 50 ? '…' : ''}`,
+          owner: ['Engagement Lead', 'Solution Architect', 'Project Manager', 'Consultant'][index] || 'Project Team',
+          status
+        };
+      });
+
+    const offlineRecord: ProjectRecord = {
+      projectId,
+      projectName: `${snapshotCustomer.name} - Demo Build`,
+      syncedAt: syncedAt.toISOString(),
+      prompts: promptsSnapshot,
+      notes: noteSnapshot,
+      website: snapshotCustomer.website,
+      source: snapshotCustomer.aiGenerated ? 'Scenario Builder' : 'Manual',
+      tasks: generateTasksFromPrompts(promptsSnapshot)
+    };
+
+    const payload: ProjectSyncPayload = {
+      customerId: snapshotCustomer.nsId,
+      account: selectedAccount,
+      prompts: promptsSnapshot,
+      notes: noteSnapshot,
+      website: snapshotCustomer.website,
+      prospectName: snapshotCustomer.name,
+      industry: snapshotCustomer.industry,
+      focusAreas: snapshotCustomer.focus
+    };
+
+    setProjectSyncLoading(true);
+    setActionStatus('Creating NetSuite project...');
+
+    try {
+      const apiResult = await APIService.syncProject(payload);
+      if (!apiResult?.success || !apiResult.data) {
+        throw new Error(apiResult?.error || 'Project API response missing data');
+      }
+
+      const serverRecord = apiResult.data;
+      const normalizeStatus = (
+        status?: string
+      ): ProjectRecord['tasks'][number]['status'] =>
+        status === 'Ready' || status === 'Scheduled' ? status : 'Pending';
+
+      const serverTasks = Array.isArray(serverRecord.tasks) && serverRecord.tasks.length
+        ? serverRecord.tasks.map((task: any, idx: number) => ({
+            name: task?.name || offlineRecord.tasks[idx]?.name || `Task ${idx + 1}`,
+            owner: task?.owner || offlineRecord.tasks[idx]?.owner || 'Project Team',
+            status: normalizeStatus(task?.status)
+          }))
+        : offlineRecord.tasks;
+
+      const projectRecord: ProjectRecord = {
+        projectId: serverRecord.projectId || offlineRecord.projectId,
+        projectName: serverRecord.projectName || offlineRecord.projectName,
+        syncedAt: serverRecord.syncedAt || offlineRecord.syncedAt,
+        prompts: Array.isArray(serverRecord.prompts) && serverRecord.prompts.length ? serverRecord.prompts : offlineRecord.prompts,
+        notes: serverRecord.notes ?? offlineRecord.notes,
+        website: serverRecord.website ?? offlineRecord.website,
+        source: serverRecord.source === 'Scenario Builder' ? 'Scenario Builder' : 'Manual',
+        tasks: serverTasks
+      };
+
+      setProjectSyncs((prev) => ({
+        ...prev,
+        [snapshotCustomer.id]: projectRecord
+      }));
+      setActionStatus({ type: 'success', message: 'NetSuite project created' });
+      pushToast('NetSuite project created', 'success');
+    } catch (err) {
+      console.error('Project sync failed:', err);
+      setProjectSyncs((prev) => ({
+        ...prev,
+        [snapshotCustomer.id]: offlineRecord
+      }));
+      setActionStatus({ type: 'error', message: 'API unavailable — stored offline project plan' });
+      pushToast('Project saved offline', 'info');
+    } finally {
+      setProjectSyncLoading(false);
+      setTimeout(() => setActionStatus(null), 4000);
+    }
+  }, [
+    appliedPromptsForSelected,
+    demoNotes,
+    selectedCustData,
+    pushToast,
+    selectedAccount
+  ]);
+
+  const selectedProjectRecord = useMemo(() => {
+    if (!selectedCustData) return undefined;
+    return projectSyncs[selectedCustData.id];
+  }, [projectSyncs, selectedCustData]);
+
+  const projectSyncedDisplay = useMemo(() => {
+    if (!selectedProjectRecord) return 'Not synced yet';
+    return new Date(selectedProjectRecord.syncedAt).toLocaleString([], {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  }, [selectedProjectRecord]);
+
+  const quickActions: QuickAction[] = useMemo(() => {
+    if (!selectedCustData) {
+      return [];
+    }
+    const canSyncProject = appliedPromptsForSelected.length > 0;
+    const projectActionLabel = projectSyncLoading
+      ? 'Building Project...'
+      : selectedProjectRecord
+        ? 'Resync NetSuite Project'
+        : 'Create NetSuite Project';
+    const projectActionDescription = selectedProjectRecord
+      ? `Synced ${projectSyncedDisplay}`
+      : canSyncProject
+        ? 'Convert applied prompts into SuiteProjects tasks'
+        : 'Apply prompts to enable project sync';
+    return [
+      {
+        id: 'project',
+        label: 'Create Demo Project',
+        description: 'Seed SuiteProjects with scoped tasks',
+        action: () =>
+          copyToClipboard(
+            `Create a project for ${selectedCustData.name} titled "[Demo Project]" with entity ID [PRJ-DEMO-####] and 5 tasks tied to ${selectedCustData.industry}.`,
+            'quick-project',
+            'Project prompt'
+          )
+      },
+      {
+        id: 'time',
+        label: 'Generate Time Entries',
+        description: '10 entries across 3 consultants',
+        action: () =>
+          copyToClipboard(
+            `Create 10 approved time entries for ${selectedCustData.name} demo covering 3 resources with realistic hours across ${new Date().getFullYear()}.`,
+            'quick-time',
+            'Time entry prompt'
+          )
+      },
+      {
+        id: 'estimate',
+        label: 'Draft Estimate',
+        description: 'Services + T&E mix',
+        action: () =>
+          copyToClipboard(
+            `Create an estimate for ${selectedCustData.name} with Professional Services (60%), Travel (20%), and Software (20%) totaling ${
+              selectedCustData.budget.split('-')[0] || '$150K'
+            }.`,
+            'quick-estimate',
+            'Estimate prompt'
+          )
+      },
+      {
+        id: 'resource',
+        label: 'Resource Forecast',
+        description: '12-week utilization model',
+        action: () =>
+          copyToClipboard(
+            `Build resource allocation forecast for ${selectedCustData.name} with roles ${selectedCustData.focus.join(', ')} at 60-100% utilization across 12 weeks.`,
+            'quick-resource',
+            'Resource prompt'
+          )
+      },
+      {
+        id: 'sync',
+        label: syncLoading ? 'Syncing...' : 'Sync NetSuite',
+        description: lastSyncDisplay,
+        action: syncNetsuiteFields,
+        disabled: syncLoading
+      },
+      {
+        id: 'project-sync',
+        label: projectActionLabel,
+        description: projectActionDescription,
+        action: handleProjectSync,
+        disabled: projectSyncLoading || !canSyncProject
+      }
+    ];
+  }, [
+    selectedCustData,
+    syncLoading,
+    lastSyncDisplay,
+    copyToClipboard,
+    syncNetsuiteFields,
+    appliedPromptsForSelected,
+    projectSyncLoading,
+    selectedProjectRecord,
+    projectSyncedDisplay,
+    handleProjectSync
+  ]);
+
+  const filteredPrompts: PromptCategory[] = useMemo(() => {
+    if (!promptSearch) return PROMPT_CATEGORIES;
+    return PROMPT_CATEGORIES.map((cat) => ({
+      ...cat,
+      prompts: cat.prompts.filter((prompt) => prompt.toLowerCase().includes(promptSearch.toLowerCase()))
+    })).filter((cat) => cat.prompts.length > 0);
+  }, [promptSearch]);
+
   return (
     <div className={`min-h-screen ${theme === 'dark' ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-900'}`}>
-      {/* Header */}
-      <header className="sticky top-0 z-30 bg-white/80 dark:bg-gray-800/80 backdrop-blur border-b shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            <div className="flex items-center space-x-3">
-              <Building2 className="h-8 w-8 text-blue-600" />
-              <h1 className="text-2xl font-bold">NetSuite Demo Dashboard</h1>
+      <header className={`sticky top-0 z-40 border-b ${theme === 'dark' ? 'bg-gray-900/90 border-gray-800' : 'bg-white/90 border-gray-200'} backdrop-blur` }>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Building2 className="h-9 w-9 text-blue-600" />
+            <div>
+              <p className="text-xs uppercase tracking-[0.3em] text-gray-500 dark:text-gray-400">Demo Prep</p>
+              <h1 className="text-2xl font-semibold">NetSuite Resource Planner</h1>
             </div>
-            <div className="flex items-center space-x-4">
-              <select
-                value={selectedAccount}
-                onChange={(e) => setSelectedAccount(e.target.value)}
-                className="select max-w-[260px]"
-              >
-                {accounts.map((acc) => (
-                  <option key={acc.id} value={acc.id}>
-                    {acc.name} ({acc.instance})
-                  </option>
-                ))}
-              </select>
+          </div>
+          <div className="hidden md:flex items-center gap-2">
+            {ACCOUNTS.map((account) => (
               <button
-                onClick={() => setShowQuickCreate(true)}
-                className="btn-primary flex items-center space-x-2"
+                key={account.id}
+                onClick={() => setSelectedAccount(account.id)}
+                className={`px-4 py-2 rounded-full text-sm font-medium border transition-colors ${
+                  account.id === selectedAccount
+                    ? 'bg-blue-600 text-white border-blue-600'
+                    : 'bg-transparent text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800'
+                }`}
               >
-                <Plus size={16} />
-                <span>Add Prospect</span>
+                {account.name}
+              </button>
+            ))}
+            <button
+              onClick={() => setShowClipboardPanel(true)}
+              className="px-4 py-2 rounded-full border border-gray-300 dark:border-gray-700 text-sm font-medium"
+            >
+              Clipboard ({clipboardHistory.length})
+            </button>
+            <button
+              onClick={() => setShowQuickCreate(true)}
+              className="px-4 py-2 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-sm font-semibold shadow"
+            >
+              <Plus size={16} /> Add Prospect
+            </button>
+            <button
+              onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
+              className="p-2 rounded-full border border-gray-300 dark:border-gray-700"
+            >
+              {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
+            </button>
+          </div>
+          <button
+            className="md:hidden p-2 rounded-lg border border-gray-300"
+            onClick={() => setIsMobileMenuOpen((prev) => !prev)}
+          >
+            <Menu size={20} />
+          </button>
+        </div>
+        {isMobileMenuOpen && (
+          <div className="md:hidden border-t border-gray-200 dark:border-gray-800 px-4 py-3 space-y-2">
+            <div className="flex flex-wrap gap-2">
+              {ACCOUNTS.map((account) => (
+                <button
+                  key={account.id}
+                  onClick={() => setSelectedAccount(account.id)}
+                  className={`flex-1 min-w-[150px] px-4 py-2 rounded-full text-sm font-medium border ${
+                    account.id === selectedAccount
+                      ? 'bg-blue-600 text-white border-blue-600'
+                      : 'border-gray-300 dark:border-gray-700'
+                  }`}
+                >
+                  {account.name}
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                className="flex-1 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700"
+                onClick={() => setShowClipboardPanel(true)}
+                aria-label="Open clipboard history"
+              >
+                Clipboard ({clipboardHistory.length})
+              </button>
+              <button className="flex-1 px-4 py-2 rounded-lg bg-blue-600 text-white" onClick={() => setShowQuickCreate(true)}>
+                <Plus size={16} className="inline mr-2" /> Add Prospect
               </button>
               <button
+                className="p-2 rounded-lg border border-gray-300 dark:border-gray-700"
                 onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
-                className="btn-ghost p-2"
               >
-                {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
+                {theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
               </button>
             </div>
           </div>
-        </div>
+        )}
       </header>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Global Search */}
-        <GlobalSearch />
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+        <PrepMissionBanner
+          selectedCustomer={selectedCustData}
+          prepCompletion={prepCompletion}
+          completedSteps={completedSteps}
+          prepWorkflow={prepWorkflow}
+          lastSyncDisplay={lastSyncDisplay}
+          statusCounts={statusCounts}
+        />
 
-        {/* Status Filter */}
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-semibold">Prospects ({filteredCustomers.length})</h2>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="select max-w-[220px]"
-          >
-            <option value="all">All Statuses</option>
-            {Object.keys(statusCounts).map((status) => (
-              <option key={status} value={status}>
-                {status} ({statusCounts[status]})
-              </option>
-            ))}
-          </select>
-        </div>
+        <AdvancedSearch
+          onFiltersChange={(filters: SearchFilters) => {
+            setGlobalSearchQuery(filters.query);
+            if (filters.status) {
+              setStatusFilter(filters.status);
+            }
+          }}
+          className="mb-4"
+          showAdvancedFilters
+        />
 
-        {/* Tabs */}
-        <div className="border-b border-gray-200 dark:border-gray-700 mb-6">
-          <nav className="flex space-x-8">
+        <div className="flex items-center justify-between border-b pb-2">
+          <div className="flex gap-4">
             {DASHBOARD_TABS.map((tab) => (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center space-x-2 ${
+                onClick={() => setActiveTab(tab.id as Tab)}
+                className={`flex items-center gap-2 text-sm font-semibold border-b-2 pb-2 ${
                   activeTab === tab.id
-                    ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
+                    ? 'border-blue-600 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
                 }`}
               >
-                <tab.icon size={18} />
-                <span>{tab.label}</span>
+                <tab.icon size={16} />
+                {tab.label}
               </button>
             ))}
-          </nav>
+          </div>
         </div>
 
-        {/* Tab Content */}
-        <div className="space-y-8">
-          {activeTab === 'context' && (
-            <div>
-              {/* Customer List */}
-              {filteredCustomers.length === 0 ? (
-                <div className="p-10 border rounded-lg bg-white dark:bg-gray-800 dark:border-gray-700 text-center">
-                  <h3 className="text-lg font-semibold mb-2">No prospects found</h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">Try adjusting filters or create a new prospect to get started.</p>
-                  <div className="flex items-center justify-center gap-3">
-                    <button
-                      onClick={() => setShowQuickCreate(true)}
-                      className="btn-primary"
-                    >
-                      Add Prospect
-                    </button>
-                    <button
-                      onClick={() => { setGlobalSearchQuery(''); setStatusFilter('all'); }}
-                      className="btn-secondary"
-                    >
-                      Clear Filters
-                    </button>
+        {activeTab === 'context' && (
+          <section className="grid gap-6 lg:grid-cols-3">
+            <div className="lg:col-span-1 space-y-4">
+              <div className="rounded-2xl border bg-white dark:bg-gray-900 shadow-sm">
+                <div className="p-4 border-b border-gray-200 dark:border-gray-800 flex items-center gap-2">
+                  <Users className="h-5 w-5 text-blue-600" />
+                  <div>
+                    <h3 className="font-semibold">Prospects</h3>
+                    <p className="text-xs text-gray-500">{ACCOUNTS.find((a) => a.id === selectedAccount)?.vertical}</p>
                   </div>
                 </div>
-              ) : (
-                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                  {filteredCustomers.map((customer) => (
-                    <div
-                      key={customer.id}
-                      onClick={() => setSelectedCustomer(customer.id)}
-                      className={`p-6 rounded-lg border cursor-pointer transition-colors ${
-                        selectedCustomer === customer.id
-                          ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                          : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                <div className="p-4 border-b border-gray-200 dark:border-gray-800">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                    <input
+                      value={globalSearchQuery}
+                      onChange={(e) => setGlobalSearchQuery(e.target.value)}
+                      placeholder="Search prospects or industries"
+                      className="pl-9 pr-3 py-2 w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent"
+                    />
+                  </div>
+                </div>
+                <div className="max-h-[480px] overflow-y-auto divide-y divide-gray-200 dark:divide-gray-800">
+                  {filteredCustomers.map((prospect) => (
+                    <button
+                      key={prospect.id}
+                      onClick={() => setSelectedCustomer(prospect.id)}
+                      className={`w-full text-left px-4 py-3 flex flex-col gap-1 transition-colors ${
+                        selectedCustomer === prospect.id ? 'bg-blue-50 dark:bg-blue-900/20' : 'hover:bg-gray-50 dark:hover:bg-gray-800'
                       }`}
                     >
-                      <div className="flex justify-between items-start mb-3">
-                        <h3 className="font-semibold text-lg">{customer.name}</h3>
-                        <span
-                          className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            customer.status === 'Hot'
-                              ? 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400'
-                              : customer.status === 'Active'
-                              ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
-                              : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300'
-                          }`}
-                        >
-                          {customer.status}
+                      <div className="flex items-center justify-between">
+                        <p className="font-semibold">{prospect.name}</p>
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${formatStatus(prospect.status)}`}>
+                          {prospect.status}
                         </span>
                       </div>
-                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">{customer.industry}</p>
-                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">{customer.size}</p>
-                      <p className="text-xs text-gray-500 dark:text-gray-500 mb-4">{customer.entityid}</p>
-                      <div className="space-y-1 text-xs text-gray-500 dark:text-gray-500">
-                        <p>Budget: {customer.budget}</p>
-                        <p>Demo: {customer.demoDate}</p>
-                        {customer.website && (
-                          <p>
-                            <a href={customer.website} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">
-                              Website
-                            </a>
-                          </p>
-                        )}
-                        {customer.focus && (
-                          <p>Focus: {customer.focus.join(', ')}</p>
-                        )}
-                      </div>
-                      {selectedCustData?.id === customer.id && (
-                        <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-                          <textarea
-                            ref={notesRef}
-                            value={demoNotes[customer.id] || ''}
-                            onChange={(e) => setDemoNotes({ ...demoNotes, [customer.id]: e.target.value })}
-                            placeholder="Demo notes..."
-                            className="input"
-                            rows={3}
-                          />
-                        </div>
-                      )}
-                    </div>
+                      <p className="text-xs text-gray-500">{prospect.industry}</p>
+                      <p className="text-xs text-gray-400">Budget {prospect.budget} • Demo {prospect.demoDate}</p>
+                    </button>
                   ))}
                 </div>
-              )}
+              </div>
 
-              {/* Quick Actions for Selected Customer */}
-              {selectedCustData && (
-                <div className="mt-8 p-6 bg-white dark:bg-gray-800 rounded-lg border">
-                  <h3 className="text-lg font-semibold mb-4">Quick Actions for {selectedCustData.name}</h3>
-                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                    {quickActions.map((action) => (
-                      <button
-                        key={action.id}
-                        onClick={action.action}
-                        className="flex flex-col items-center p-3 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                      >
-                        <action.icon size={20} className="mb-2 text-gray-500" />
-                        <span className="text-sm text-center">{action.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                  {actionStatus && (
-                    <div className={`mt-4 p-3 rounded-lg ${
-                      typeof actionStatus === 'string' 
-                        ? 'bg-blue-50 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400'
-                        : actionStatus.type === 'success' 
-                          ? 'bg-green-50 text-green-800 dark:bg-green-900/20 dark:text-green-400'
-                          : 'bg-red-50 text-red-800 dark:bg-red-900/20 dark:text-red-400'
-                    }`}>
-                      {typeof actionStatus === 'string' ? actionStatus : actionStatus.message}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Prep Workflow */}
-              <div className="mt-8 p-6 bg-white dark:bg-gray-800 rounded-lg border">
-                <h3 className="text-lg font-semibold mb-4">Demo Prep Workflow</h3>
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center space-x-2">
-                    <div className="w-4 h-4 bg-blue-600 rounded-full"></div>
-                    <span className="text-sm font-medium">Progress: {prepCompletion}%</span>
-                  </div>
-                  <span className="text-sm text-gray-500 dark:text-gray-400">{completedPrepSteps}/{prepWorkflow.length} steps</span>
+              <div className="rounded-2xl border bg-white dark:bg-gray-900 p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <ClipboardList className="h-4 w-4 text-blue-600" />
+                  <h4 className="font-semibold text-sm">Guided Checklist</h4>
                 </div>
                 <div className="space-y-3">
                   {prepWorkflow.map((step) => (
-                    <div key={step.id} className={`flex items-center space-x-3 p-3 rounded-lg ${
-                      step.done ? 'bg-green-50 dark:bg-green-900/20' : 'bg-gray-50 dark:bg-gray-800'
-                    }`}>
-                      <Check className={`h-5 w-5 ${step.done ? 'text-green-600' : 'text-gray-400'}`} />
-                      <div>
-                        <p className="font-medium">{step.title}</p>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">{step.description}</p>
+                    <div key={step.id} className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2">
+                        <Check className={`h-4 w-4 ${step.done ? 'text-green-500' : 'text-gray-400'}`} />
+                        <span>{step.label}</span>
                       </div>
+                      <span className="text-xs text-gray-500">{step.done ? 'Done' : 'Pending'}</span>
                     </div>
                   ))}
                 </div>
-                {nextPrepAction && (
-                  <button
-                    onClick={nextPrepAction.action}
-                    className="mt-4 w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
-                  >
-                    Next: {nextPrepAction.label}
-                  </button>
-                )}
               </div>
             </div>
-          )}
 
-          {activeTab === 'prompts' && (
-            <div>
-              <input
-                type="text"
-                value={promptSearch}
-                onChange={(e) => setPromptSearch(e.target.value)}
-                placeholder="Search prompts..."
-                className="input mb-6"
-              />
-              {filteredPrompts.length === 0 ? (
-                <div className="p-8 border rounded-lg text-center bg-white dark:bg-gray-800 dark:border-gray-700">
-                  <h3 className="font-semibold mb-2">No prompts match your search</h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Try different keywords or clear the search.</p>
-                </div>
-              ) : (
+            <div className="lg:col-span-2 space-y-6">
+              {selectedCustData ? (
                 <div className="space-y-6">
-                  {filteredPrompts.map((category, index) => (
-                    <div key={category.name} className="border rounded-lg">
-                      <button
-                        onClick={() => setExpandedCategory(expandedCategory === index ? null : index)}
-                        className="w-full flex justify-between items-center p-4 font-medium text-left hover:bg-gray-50 dark:hover:bg-gray-700"
-                      >
-                        <span>{category.name}</span>
-                        <ChevronDown className={`h-5 w-5 transition-transform ${expandedCategory === index ? 'rotate-180' : ''}`} />
-                      </button>
-                      {expandedCategory === index && (
-                        <div className="space-y-2 p-4 border-t">
-                          {category.prompts.map((prompt: string, promptIndex: number) => (
-                            <div key={promptIndex} className="p-3 bg-gray-50 dark:bg-gray-800 rounded border-l-4 border-blue-500">
-                              <div className="flex justify-between items-start mb-2">
-                                <h4 className="font-medium">{prompt.substring(0, 60)}...</h4>
-                                <div className="flex space-x-2">
-                                  <button
-                                    onClick={() => copyToClipboard(prompt, `prompt-${index}-${promptIndex}`, 'Prompt copied')}
-                                    className={`p-1 rounded hover:bg-gray-200 ${copiedIndex === `prompt-${index}-${promptIndex}` ? 'text-green-600' : ''}`}
-                                  >
-                                    <Copy size={16} />
-                                  </button>
-                                  <button
-                                    onClick={() => toggleFavorite(prompt)}
-                                    className={`p-1 rounded hover:bg-gray-200 ${favorites.includes(prompt) ? 'text-yellow-500 fill-current' : ''}`}
-                                  >
-                                    <Star size={16} />
-                                  </button>
-                                </div>
-                              </div>
-                              <p className="text-sm text-gray-600 dark:text-gray-400">{prompt}</p>
-                            </div>
-                          ))}
+                  <div className="rounded-2xl border bg-white dark:bg-gray-900 shadow-sm">
+                    <div className="p-6 border-b border-gray-200 dark:border-gray-800 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-t-2xl">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <p className="text-xs uppercase tracking-[0.3em] text-blue-100">Active Prospect</p>
+                          <h2 className="text-2xl font-semibold">{selectedCustData.name}</h2>
+                          <p className="text-blue-100">{selectedCustData.industry}</p>
                         </div>
+                        <span className={`px-3 py-1 rounded-full text-sm font-semibold ${formatStatus(selectedCustData.status)}`}>
+                          {selectedCustData.status}
+                        </span>
+                      </div>
+                      {selectedCustData.website && (
+                        <a
+                          href={selectedCustData.website}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center text-xs text-blue-100 underline mt-2"
+                        >
+                          View company site
+                        </a>
                       )}
                     </div>
-                  ))}
-                </div>
-              )}
-              {favorites.length > 0 && (
-                <div className="mt-8">
-                  <h3 className="text-lg font-semibold mb-4">Favorites</h3>
-                  <div className="space-y-3">
-                    {favorites.map((prompt: string, index: number) => (
-                      <div key={index} className="p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded border">
-                        <p className="text-sm">{prompt}</p>
+
+                    <div className="p-6 space-y-6">
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div className="rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+                          <p className="text-xs uppercase tracking-[0.2em] text-gray-500">Entity ID</p>
+                          <p className="text-lg font-semibold">{selectedCustData.entityid}</p>
+                        </div>
+                        <div className="rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+                          <p className="text-xs uppercase tracking-[0.2em] text-gray-500">Company Size</p>
+                          <p className="text-lg font-semibold">{selectedCustData.size}</p>
+                        </div>
+                        <div className="rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+                          <p className="text-xs uppercase tracking-[0.2em] text-gray-500">Budget</p>
+                          <p className="text-lg font-semibold">{selectedCustData.budget}</p>
+                        </div>
+                        <div className="rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+                          <p className="text-xs uppercase tracking-[0.2em] text-gray-500">Demo Date</p>
+                          <p className="text-lg font-semibold">{selectedCustData.demoDate}</p>
+                        </div>
                       </div>
-                    ))}
+
+                      <div>
+                        <p className="text-xs uppercase tracking-[0.2em] text-gray-500 mb-2">Focus Areas</p>
+                        <div className="flex flex-wrap gap-2">
+                          {selectedCustData.focus.map((item) => (
+                            <span key={item} className="px-3 py-1 text-sm rounded-full bg-blue-50 text-blue-700 dark:bg-blue-900/40 dark:text-blue-200 border border-blue-200">
+                              {item}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+
+                      <QuickActionsDeck actions={quickActions} actionStatus={actionStatus} />
+
+                      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                        <div className="rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+                          <p className="text-xs uppercase tracking-[0.2em] text-gray-500 mb-2">Demo Notes</p>
+                          <textarea
+                            value={demoNotes[selectedCustData.id] || ''}
+                            onChange={(e) => handleNoteChange(e.target.value)}
+                            className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent p-3"
+                            rows={4}
+                            placeholder="Capture storylines, objections, or next steps"
+                          />
+                        </div>
+                        <div className="rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+                          <div className="flex items-center justify-between mb-3">
+                            <p className="text-xs uppercase tracking-[0.2em] text-gray-500">Applied Prompts</p>
+                            {appliedPromptsForSelected.length > 0 && (
+                              <button className="text-xs text-blue-600" onClick={handleClearAppliedPrompts}>
+                                Clear
+                              </button>
+                            )}
+                          </div>
+                          {appliedPromptsForSelected.length === 0 ? (
+                            <div className="text-sm text-gray-500">
+                              Use the Prompts tab to attach guided scripts.
+                              <button
+                                className="mt-2 text-blue-600 text-xs underline"
+                                onClick={() => setActiveTab('prompts')}
+                              >
+                                Open Prompt Library
+                              </button>
+                            </div>
+                          ) : (
+                            <ul className="space-y-3 text-sm">
+                              {appliedPromptsForSelected.map((prompt, idx) => (
+                                <li key={`${prompt}-${idx}`} className="border-b border-dashed border-gray-200 dark:border-gray-700 pb-2 last:border-0 last:pb-0">
+                                  <div className="flex items-start gap-2">
+                                    <span className="text-xs text-gray-400">{idx + 1}.</span>
+                                    <div className="flex-1">
+                                      <p className="text-gray-700 dark:text-gray-200 whitespace-pre-wrap">{prompt}</p>
+                                      <button
+                                        className="text-xs text-blue-600 mt-1"
+                                        onClick={() => handleRemoveAppliedPrompt(prompt)}
+                                      >
+                                        Remove
+                                      </button>
+                                    </div>
+                                  </div>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                        <div className="rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+                          <div className="flex items-center justify-between mb-3">
+                            <p className="text-xs uppercase tracking-[0.2em] text-gray-500">Custom Fields</p>
+                            <button
+                              onClick={syncNetsuiteFields}
+                              className="text-xs text-blue-600 hover:underline"
+                            >
+                              Refresh
+                            </button>
+                          </div>
+                          {!customFieldsData[selectedCustData.id] ? (
+                            <div className="text-sm text-gray-500">Sync NetSuite to load AI summaries + contact info.</div>
+                          ) : (
+                            <div className="space-y-2 text-sm">
+                              {Object.entries(customFieldsData[selectedCustData.id]).map(([key, value]) => (
+                                <div key={key} className="flex justify-between text-xs border-b border-dashed border-gray-200 dark:border-gray-700 pb-1">
+                                  <span className="text-gray-500">{key}</span>
+                                  <span className="font-semibold">{String(value)}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="rounded-2xl border border-dashed border-gray-300 dark:border-gray-700 p-4 bg-gray-50 dark:bg-gray-900/40">
+                        <div className="flex items-center justify-between mb-3">
+                          <div>
+                            <p className="text-xs uppercase tracking-[0.2em] text-gray-500">NetSuite Project Sync</p>
+                            <h4 className="text-lg font-semibold">
+                              {selectedProjectRecord?.projectName || 'SuiteProjects not synced'}
+                            </h4>
+                          </div>
+                          <span className="text-xs text-gray-500">{projectSyncedDisplay}</span>
+                        </div>
+                        {selectedProjectRecord ? (
+                          <div className="space-y-4 text-sm">
+                            <div className="flex flex-wrap gap-6 text-xs text-gray-500">
+                              <span>
+                                Project ID:{' '}
+                                <span className="font-semibold text-gray-900 dark:text-gray-100">
+                                  {selectedProjectRecord.projectId}
+                                </span>
+                              </span>
+                              <span>Source: {selectedProjectRecord.source}</span>
+                            </div>
+                            <div>
+                              <p className="text-xs uppercase tracking-[0.2em] text-gray-500 mb-2">Tasks</p>
+                              <div className="space-y-2">
+                                {selectedProjectRecord.tasks.map((task, idx) => (
+                                  <div key={`${task.name}-${idx}`} className="flex items-center justify-between gap-4 border border-gray-200 dark:border-gray-800 rounded-lg p-3">
+                                    <div>
+                                      <p className="font-semibold text-sm text-gray-900 dark:text-gray-100">{task.name}</p>
+                                      <p className="text-xs text-gray-500">Owner: {task.owner}</p>
+                                    </div>
+                                    <span
+                                      className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                                        task.status === 'Ready'
+                                          ? 'bg-green-100 text-green-700'
+                                          : task.status === 'Scheduled'
+                                          ? 'bg-blue-100 text-blue-700'
+                                          : 'bg-yellow-100 text-yellow-700'
+                                      }`}
+                                    >
+                                      {task.status}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                            <div>
+                              <p className="text-xs uppercase tracking-[0.2em] text-gray-500 mb-2">Prompt Bundle</p>
+                              <ul className="list-disc pl-5 space-y-1 text-xs text-gray-500">
+                                {selectedProjectRecord.prompts.map((prompt, idx) => (
+                                  <li key={`project-prompt-${idx}`}>{prompt}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="text-sm text-gray-500">
+                            Apply prompts and run the NetSuite project quick action to seed SuiteProjects.
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex flex-wrap gap-3">
+                        <a
+                          href={`https://${ACCOUNTS.find((a) => a.id === selectedAccount)?.instance}.app.netsuite.com/app/common/entity/customer.nl?id=${selectedCustData.nsId}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="px-5 py-2 rounded-full bg-blue-600 text-white text-sm font-medium"
+                        >
+                          Open in NetSuite
+                        </a>
+                        <button
+                          onClick={syncNetsuiteFields}
+                          className="px-5 py-2 rounded-full border border-blue-600 text-blue-600 text-sm font-medium"
+                          disabled={syncLoading}
+                        >
+                          {syncLoading ? 'Syncing...' : 'Sync NetSuite Data'}
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              )}
-            </div>
-          )}
-
-          {activeTab === 'demo-builder' && (
-            <div>
-              <button
-                onClick={() => setShowScenarioGenerator(true)}
-                className="mb-6 px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg font-medium hover:from-purple-700 hover:to-indigo-700 transition-all"
-              >
-                <Wand2 className="inline mr-2 h-5 w-5" />
-                Generate AI Scenario
-              </button>
-              {showScenarioGenerator && (
-                <ScenarioGenerator onScenarioGenerated={handleScenarioGenerated} onClose={() => setShowScenarioGenerator(false)} />
-              )}
-              {/* Checklist for current customer */}
-              {selectedCustData && (
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Prep Checklist for {selectedCustData.name}</h3>
-                  {checklistState.map((item) => (
-                    <div key={item.id} className={`flex items-center space-x-3 p-3 rounded-lg ${
-                      item.done ? 'bg-green-50 dark:bg-green-900/20 border-green-200' : 'bg-gray-50 dark:bg-gray-800 border-gray-200'
-                    }`}>
-                      <Check className={`h-5 w-5 ${item.done ? 'text-green-600' : 'text-gray-400'}`} />
-                      <span>{item.label}</span>
-                    </div>
-                  ))}
-                  {syncLoading && <Loader className="h-5 w-5 animate-spin text-blue-600" />}
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Last sync: {lastSyncDisplay}</p>
-                  <button
-                    onClick={syncNetsuiteFields}
-                    disabled={syncLoading}
-                    className="btn-primary disabled:opacity-50"
-                  >
-                    {syncLoading ? 'Syncing...' : 'Sync NetSuite Data'}
+              ) : (
+                <div className="rounded-2xl border bg-white dark:bg-gray-900 p-10 text-center">
+                  <Users className="mx-auto h-12 w-12 text-gray-400" />
+                  <h3 className="text-lg font-semibold mt-4">Select a prospect to get started</h3>
+                  <p className="text-gray-500 mt-2">Choose a customer from the list to view quick actions, custom fields, and prep guidance.</p>
+                  <button className="mt-6 px-6 py-3 rounded-full bg-blue-600 text-white" onClick={() => setShowQuickCreate(true)}>
+                    Add New Prospect
                   </button>
                 </div>
               )}
             </div>
-          )}
+          </section>
+        )}
 
-          {activeTab === 'export' && (
-            <div>
-              <DataExport data={netsuiteExportData} />
-              {clipboardHistory.length > 0 && showClipboardPanel && (
-                <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                  <h3 className="text-lg font-semibold mb-4 flex items-center justify-between">
-                    Clipboard History
-                    <button onClick={() => setShowClipboardPanel(false)} className="text-gray-500 hover:text-gray-700">
-                      <X size={16} />
-                    </button>
-                  </h3>
-                  <div className="space-y-2 max-h-60 overflow-y-auto">
-                    {clipboardHistory.map((item) => (
-                      <div key={item.id} className="p-3 bg-white dark:bg-gray-700 rounded border-l-4 border-blue-500">
-                        <div className="flex justify-between items-start mb-1">
-                          <span className="text-sm font-medium">{item.label}</span>
-                          <span className="text-xs text-gray-500">{item.timestamp.toLocaleString()}</span>
-                        </div>
-                        <p className="text-xs text-gray-600 dark:text-gray-400 truncate" title={item.text}>{item.text}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+        {activeTab === 'prompts' && (
+          <PromptLibrary
+            promptSearch={promptSearch}
+            onPromptSearchChange={setPromptSearch}
+            filteredPrompts={filteredPrompts}
+            favorites={favorites}
+            toggleFavorite={toggleFavorite}
+            copyPrompt={handlePromptCopy}
+            onApplyPrompt={selectedCustData ? handleApplyPromptToProspect : undefined}
+            appliedPrompts={selectedCustData ? appliedPromptsForSelected : []}
+            activeProspectName={selectedCustData?.name}
+          />
+        )}
+
+        {activeTab === 'demo-builder' && (
+          <section className="space-y-6">
+            <div className="rounded-2xl border bg-white dark:bg-gray-900 p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <Wand2 className="h-5 w-5 text-purple-600" />
+                <h3 className="text-lg font-semibold">AI Scenario Builder</h3>
+              </div>
+              <p className="text-sm text-gray-500 mb-4">Generate website-specific prompts, module recommendations, and demo talk tracks.</p>
+              <button
+                className="px-4 py-2 rounded-full bg-purple-600 text-white"
+                onClick={() => setShowScenarioGenerator(true)}
+              >
+                Launch Scenario Generator
+              </button>
             </div>
-          )}
-        </div>
-      </div>
+          </section>
+        )}
 
-      {/* Toast Notifications */}
-      <div className="fixed bottom-4 right-4 space-y-2 z-50">
-        {toasts.map((toast) => (
+        {activeTab === 'export' && (
+          <section className="space-y-6">
+            <div className="rounded-2xl border bg-white dark:bg-gray-900 p-6 shadow-sm">
+              <div className="flex items-center gap-2 mb-4">
+                <Download className="h-5 w-5 text-blue-600" />
+                <h3 className="text-lg font-semibold">Export Synced Records</h3>
+              </div>
+              <DataExport data={netsuiteExportData} onExportComplete={(success) => pushToast(success ? 'Export complete' : 'Export failed', success ? 'success' : 'error')} />
+            </div>
+          </section>
+        )}
+      </main>
+
+      {showQuickCreate && (
+        <div
+          className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center px-4"
+          role="dialog"
+          aria-modal="true"
+          onKeyDown={(event) => handleOverlayKeyDown(event, () => setShowQuickCreate(false), quickCreateRef.current)}
+        >
           <div
-            key={toast.id}
-            role="status"
-            aria-live="polite"
-            className={`p-4 rounded-lg shadow-lg max-w-sm ${
-              toast.type === 'success' ? 'bg-green-500 text-white' :
-              toast.type === 'error' ? 'bg-red-500 text-white' :
-              'bg-blue-500 text-white'
-            } animate-slide-in-right`}
+            ref={quickCreateRef}
+            tabIndex={-1}
+            className="bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-2xl shadow-2xl"
           >
-            {toast.message}
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-xl font-semibold">Create New Prospect</h3>
+                <p className="text-sm text-gray-500">Capture discovery context so you can build demos faster.</p>
+              </div>
+              <button className="p-2" onClick={() => setShowQuickCreate(false)} aria-label="Close quick create modal">
+                <X size={18} />
+              </button>
+            </div>
+            <QuickCreateForm
+              onCreate={(prospect) => {
+                setDynamicCustomers((prev) => [prospect, ...prev]);
+                setSelectedCustomer(prospect.id);
+                if (prospect.notes) {
+                  setDemoNotes((prev) => ({ ...prev, [prospect.id]: prospect.notes || '' }));
+                }
+                setShowQuickCreate(false);
+                pushToast(`${prospect.name} added`, 'success');
+              }}
+            />
           </div>
-        ))}
-      </div>
-
-      {/* Mobile Menu */}
-      {isMobileMenuOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden" onClick={() => setIsMobileMenuOpen(false)} />
+        </div>
       )}
-      {showQuickCreate && <QuickCreateForm />}
+
+      {showScenarioGenerator && (
+        <div
+          className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center px-4"
+          onKeyDown={(event) => handleOverlayKeyDown(event, () => setShowScenarioGenerator(false), scenarioRef.current)}
+        >
+          <div
+            ref={scenarioRef}
+            tabIndex={-1}
+            className="bg-white dark:bg-gray-900 rounded-2xl p-4 max-w-3xl w-full shadow-2xl"
+          >
+            <button
+              className="ml-auto mb-2 p-2 text-gray-500 hover:text-gray-700"
+              onClick={() => setShowScenarioGenerator(false)}
+              aria-label="Close scenario generator"
+            >
+              <X size={18} />
+            </button>
+            <ScenarioGenerator
+              onScenarioGenerated={handleScenarioGenerated}
+              onClose={() => setShowScenarioGenerator(false)}
+              defaultCompanyName={selectedCustData?.name}
+              defaultIndustry={selectedCustData?.industry}
+              defaultWebsite={selectedCustData?.website}
+            />
+          </div>
+        </div>
+      )}
+
+      <ClipboardHistoryPanel
+        show={showClipboardPanel}
+        history={clipboardHistory}
+        onClose={() => setShowClipboardPanel(false)}
+        onClear={() => setClipboardHistory([])}
+        onCopy={(text) => copyToClipboard(text, 'history', 'Re-copied prompt')}
+      />
+
+      <ToastStack toasts={toasts} />
     </div>
   );
+};
+
+interface QuickCreateFormProps {
+  onCreate: (prospect: Prospect) => void;
 }
+
+const QuickCreateForm: React.FC<QuickCreateFormProps> = ({ onCreate }) => {
+  const [form, setForm] = useState({
+    name: '',
+    industry: '',
+    status: 'Active',
+    size: '100-200',
+    budget: '$150K+',
+    focus: 'Resource Planning, Billing',
+    website: '',
+    demoDate: 'TBD',
+    notes: ''
+  });
+
+  const isValid = form.name.trim() && form.industry.trim();
+
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-4 md:grid-cols-2">
+        <div>
+          <label className="text-xs uppercase text-gray-500">Company Name *</label>
+          <input
+            value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
+            className="input"
+            placeholder="Acme Corp"
+          />
+        </div>
+        <div>
+          <label className="text-xs uppercase text-gray-500">Industry *</label>
+          <input
+            value={form.industry}
+            onChange={(e) => setForm({ ...form, industry: e.target.value })}
+            className="input"
+            placeholder="Professional Services"
+          />
+        </div>
+        <div>
+          <label className="text-xs uppercase text-gray-500">Company Size</label>
+          <input
+            value={form.size}
+            onChange={(e) => setForm({ ...form, size: e.target.value })}
+            className="input"
+            placeholder="100-200"
+          />
+        </div>
+        <div>
+          <label className="text-xs uppercase text-gray-500">Budget</label>
+          <input
+            value={form.budget}
+            onChange={(e) => setForm({ ...form, budget: e.target.value })}
+            className="input"
+            placeholder="$250K"
+          />
+        </div>
+        <div>
+          <label className="text-xs uppercase text-gray-500">Focus Areas</label>
+          <input
+            value={form.focus}
+            onChange={(e) => setForm({ ...form, focus: e.target.value })}
+            className="input"
+            placeholder="Resource Planning, Billing"
+          />
+        </div>
+        <div>
+          <label className="text-xs uppercase text-gray-500">Website</label>
+          <input
+            value={form.website}
+            onChange={(e) => setForm({ ...form, website: e.target.value })}
+            className="input"
+            placeholder="https://example.com"
+          />
+        </div>
+        <div>
+          <label className="text-xs uppercase text-gray-500">Demo Date</label>
+          <input
+            value={form.demoDate}
+            onChange={(e) => setForm({ ...form, demoDate: e.target.value })}
+            className="input"
+          />
+        </div>
+        <div>
+          <label className="text-xs uppercase text-gray-500">Status</label>
+          <select
+            value={form.status}
+            onChange={(e) => setForm({ ...form, status: e.target.value })}
+            className="input"
+          >
+            <option value="Hot">Hot</option>
+            <option value="Active">Active</option>
+            <option value="Qualified">Qualified</option>
+            <option value="Proposal">Proposal</option>
+          </select>
+        </div>
+        <div className="md:col-span-2">
+          <label className="text-xs uppercase text-gray-500">Discovery Notes</label>
+          <textarea
+            value={form.notes}
+            onChange={(e) => setForm({ ...form, notes: e.target.value })}
+            className="input min-h-[90px]"
+            placeholder="What are they trying to solve? Key website observations?"
+          />
+        </div>
+      </div>
+      <div className="flex justify-end gap-3">
+        <button className="px-4 py-2 rounded-full border" onClick={() => setForm({
+          name: '',
+          industry: '',
+          status: 'Active',
+          size: '100-200',
+          budget: '$150K+',
+          focus: 'Resource Planning, Billing',
+          website: '',
+          demoDate: 'TBD',
+          notes: ''
+        })}>
+          Reset
+        </button>
+        <button
+          className="px-4 py-2 rounded-full border"
+          disabled={!isValid}
+          onClick={() => onCreate({
+            id: Date.now(),
+            name: form.name,
+            entityid: `${form.name.replace(/\s+/g, '-')}-Demo`,
+            industry: form.industry,
+            size: form.size,
+            status: form.status,
+            demoDate: form.demoDate || 'TBD',
+            focus: form.focus.split(',').map((item) => item.trim()).filter(Boolean),
+            budget: form.budget || '$150K+',
+            nsId: Math.floor(Math.random() * 4000) + 2000,
+            website: form.website,
+            notes: form.notes.trim() || undefined
+          })}
+        >
+          Create Prospect
+        </button>
+      </div>
+    </div>
+  );
+};
+
+interface ClipboardHistoryProps {
+  show: boolean;
+  history: { id: string; label: string; text: string; timestamp: Date }[];
+  onClose: () => void;
+  onClear: () => void;
+  onCopy: (text: string) => void;
+}
+
+const ClipboardHistoryPanel: React.FC<ClipboardHistoryProps> = ({ show, history, onClose, onClear, onCopy }) => {
+  const panelRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (show) {
+      focusFirstElement(panelRef.current);
+    }
+  }, [show]);
+
+  return (
+    <div
+      className={`fixed right-0 top-0 h-full w-full max-w-sm transform duration-300 z-40 ${
+        show ? 'translate-x-0' : 'translate-x-full'
+      }`}
+      role="dialog"
+      aria-modal="true"
+      onKeyDown={(event) => handleOverlayKeyDown(event, onClose, panelRef.current)}
+    >
+      <div
+        ref={panelRef}
+        tabIndex={-1}
+        className="h-full bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-800 shadow-xl flex flex-col"
+      >
+        <div className="p-4 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between gap-3">
+          <div>
+            <h4 className="font-semibold">Clipboard History</h4>
+            <p className="text-xs text-gray-500">Recently copied prompts</p>
+          </div>
+          <div className="flex items-center gap-2">
+            {history.length > 0 && (
+              <button className="text-xs text-blue-600" onClick={onClear}>
+                Clear
+              </button>
+            )}
+            <button className="p-1" onClick={onClose} aria-label="Close clipboard history">
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+          {history.length === 0 && (
+            <p className="text-sm text-gray-500">Copy prompts to see them here.</p>
+          )}
+          {history.map((item) => (
+            <div key={item.id} className="border rounded-xl p-3">
+              <p className="text-xs tracking-[0.2em] uppercase text-gray-500">{item.label}</p>
+              <p className="text-sm mt-2 text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{item.text}</p>
+              <div className="flex items-center justify-between mt-3 text-xs text-gray-500">
+                <span>{item.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                <button className="text-blue-600" onClick={() => onCopy(item.text)}>Copy Again</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const ToastStack: React.FC<{ toasts: ToastMessage[] }> = ({ toasts }) => (
+  <div className="fixed bottom-6 right-6 space-y-3 z-50">
+    {toasts.map((toast) => (
+      <div
+        key={toast.id}
+        className={`px-4 py-3 rounded-xl shadow-lg text-white ${
+          toast.type === 'success'
+            ? 'bg-green-500'
+            : toast.type === 'error'
+            ? 'bg-red-500'
+            : 'bg-blue-500'
+        }`}
+      >
+        {toast.message}
+      </div>
+    ))}
+  </div>
+);
+
+export default DemoDashboard;

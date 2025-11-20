@@ -1,5 +1,6 @@
 // Storage utility service for user preferences and data persistence
 import { config } from './config';
+import { ProjectRecord } from './types/dashboard';
 
 export interface UserPreferences {
   theme: 'light' | 'dark' | 'auto';
@@ -10,6 +11,8 @@ export interface UserPreferences {
   compactMode: boolean;
   favoriteCategories: string[];
   recentSearches: string[];
+  lastCustomerId?: number | null;
+  lastAccountId?: string | null;
 }
 
 export interface DemoNote {
@@ -76,13 +79,37 @@ class StorageService {
       showNotifications: true,
       compactMode: false,
       favoriteCategories: [],
-      recentSearches: []
+      recentSearches: [],
+      lastCustomerId: null,
+      lastAccountId: 'services'
     });
   }
 
   setPreferences(preferences: Partial<UserPreferences>): void {
     const current = this.getPreferences();
     this.setItem(config.storage.preferences, { ...current, ...preferences });
+  }
+
+  // Note drafts (quick notes)
+  getNoteDrafts(): Record<number, string> {
+    return this.getItem(config.storage.noteDrafts, {});
+  }
+
+  saveNoteDraft(customerId: number, content: string): void {
+    const drafts = this.getNoteDrafts();
+    if (!content.trim()) {
+      if (drafts[customerId]) {
+        delete drafts[customerId];
+        this.setItem(config.storage.noteDrafts, drafts);
+      }
+      return;
+    }
+    drafts[customerId] = content;
+    this.setItem(config.storage.noteDrafts, drafts);
+  }
+
+  clearNoteDrafts(): void {
+    this.removeItem(config.storage.noteDrafts);
   }
 
   // Favorites Management
@@ -165,6 +192,24 @@ class StorageService {
 
   saveProspects(prospects: any[]): void {
     this.setItem(config.storage.prospects, prospects);
+  }
+
+  // Applied prompts per prospect
+  getAppliedPrompts(): Record<number, string[]> {
+    return this.getItem(config.storage.appliedPrompts, {});
+  }
+
+  saveAppliedPrompts(promptsMap: Record<number, string[]>): void {
+    this.setItem(config.storage.appliedPrompts, promptsMap);
+  }
+
+  // Project sync records
+  getProjectSyncs(): Record<number, ProjectRecord> {
+    return this.getItem(config.storage.projectSyncs, {} as Record<number, ProjectRecord>);
+  }
+
+  saveProjectSyncs(syncs: Record<number, ProjectRecord>): void {
+    this.setItem(config.storage.projectSyncs, syncs);
   }
 
   // Recent Items Management
@@ -258,6 +303,7 @@ class StorageService {
     this.removeItem(config.storage.favorites);
     this.removeItem(config.storage.demoNotes);
     this.removeItem(config.storage.recentItems);
+    this.removeItem(config.storage.noteDrafts);
   }
 }
 

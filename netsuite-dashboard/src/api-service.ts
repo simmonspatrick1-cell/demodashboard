@@ -1,5 +1,6 @@
 // Enhanced API service with retry logic and error handling
 import { config } from './config';
+import { ProjectRecord } from './types/dashboard';
 
 const API_BASE_URL = config.api.baseUrl;
 
@@ -40,6 +41,17 @@ export interface FilterOptions {
     start?: Date;
     end?: Date;
   };
+}
+
+export interface ProjectSyncPayload {
+  customerId: number;
+  account: string;
+  prompts: string[];
+  notes?: string;
+  website?: string;
+  prospectName: string;
+  industry: string;
+  focusAreas?: string[];
 }
 
 /**
@@ -99,6 +111,22 @@ class APIService {
       return await response.json();
     } catch (error: any) {
       console.error('Failed to fetch templates:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Persist a scenario template to the managed API (optional)
+   */
+  static async saveTemplate(template: any): Promise<ApiResponse> {
+    try {
+      const response = await fetchWithRetry(`${API_BASE_URL}/scenarios/templates`, {
+        method: 'POST',
+        body: JSON.stringify(template)
+      });
+      return await response.json();
+    } catch (error: any) {
+      console.error('Failed to save template:', error);
       throw error;
     }
   }
@@ -179,6 +207,22 @@ class APIService {
       return await response.json();
     } catch (error: any) {
       console.error('Analytics fetch failed:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Sync NetSuite project records and tasks via backend
+   */
+  static async syncProject(payload: ProjectSyncPayload): Promise<ApiResponse<ProjectRecord>> {
+    try {
+      const response = await fetchWithRetry(`${API_BASE_URL}/projects/sync`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+      return await response.json();
+    } catch (error: any) {
+      console.error('Project sync failed:', error);
       return { success: false, error: error.message };
     }
   }

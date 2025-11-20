@@ -1,0 +1,290 @@
+/**
+ * NetSuite RESTlet for Demo Dashboard Integration
+ *
+ * This RESTlet handles:
+ * - GET: Customer search functionality
+ * - POST: Project creation and task management
+ *
+ * @NApiVersion 2.1
+ * @NScriptType Restlet
+ *
+ * Deployment URL Pattern:
+ * https://{accountId}.restlets.api.netsuite.com/app/site/hosting/restlet.nl?script={scriptId}&deploy={deployId}
+ *
+ * Example:
+ * GET  - Search customers: ?script=5147&deploy=2&q=ecotone
+ * POST - Sync project: ?script=5147&deploy=2 (with JSON body)
+ */
+
+define(['N/search', 'N/record', 'N/log'], function(search, record, log) {
+
+    /**
+     * GET Handler - Search for customers
+     *
+     * Query Parameters:
+     * - q: Search term (optional, searches in customer name/entityid)
+     *
+     * @param {Object} context - Request parameters from query string
+     * @returns {Array|Object} Array of customer objects or error object
+     */
+    function get(context) {
+        var searchTerm = context.q || "";
+        var results = [];
+
+        log.audit('Customer Search', 'Searching for: ' + searchTerm);
+
+        try {
+            // Create customer search
+            var customerSearch = search.create({
+                type: search.Type.CUSTOMER,
+                filters: searchTerm ? [
+                    ['entityid', 'contains', searchTerm],
+                    'OR',
+                    ['email', 'contains', searchTerm],
+                    'OR',
+                    ['companyname', 'contains', searchTerm]
+                ] : [],
+                columns: [
+                    search.createColumn({ name: 'entityid', sort: search.Sort.ASC }),
+                    search.createColumn({ name: 'internalid' }),
+                    search.createColumn({ name: 'email' }),
+                    search.createColumn({ name: 'companyname' }),
+                    search.createColumn({ name: 'phone' })
+                ]
+            });
+
+            // Execute search and collect results
+            customerSearch.run().each(function(result) {
+                results.push({
+                    id: result.getValue('internalid'),
+                    name: result.getValue('entityid'),
+                    companyName: result.getValue('companyname') || result.getValue('entityid'),
+                    email: result.getValue('email') || '',
+                    phone: result.getValue('phone') || ''
+                });
+                // Limit to 50 results for performance
+                return results.length < 50;
+            });
+
+            log.audit('Customer Search Complete', 'Found ' + results.length + ' customers');
+            return results;
+
+        } catch (e) {
+            log.error('Customer Search Error', e.message + '\n' + e.stack);
+            return {
+                success: false,
+                error: e.message,
+                details: e.stack
+            };
+        }
+    }
+
+    /**
+     * POST Handler - Create/Update Project with Tasks
+     *
+     * Expected Request Body:
+     * {
+     *   customerId: number,
+     *   account: string,
+     *   projectId?: string,
+     *   projectName: string,
+     *   prompts: string[],
+     *   notes?: string,
+     *   website?: string,
+     *   industry?: string,
+     *   focusAreas?: string[],
+     *   tasks?: Array<{
+     *     name: string,
+     *     owner: string,
+     *     status: string,
+     *     focus: string
+     *   }>
+     * }
+     *
+     * @param {Object} context - Request body
+     * @returns {Object} Success response with created project data
+     */
+    function post(context) {
+        log.audit('Project Sync Started', JSON.stringify(context));
+
+        try {
+            // Validate required fields
+            if (!context.customerId) {
+                throw new Error('customerId is required');
+            }
+            if (!context.projectName) {
+                throw new Error('projectName is required');
+            }
+
+            // Create or update project record
+            var projectRecord;
+            var isNewProject = !context.projectId;
+
+            if (isNewProject) {
+                // Create new project
+                projectRecord = record.create({
+                    type: record.Type.JOB // Projects are "Jobs" in NetSuite
+                });
+            } else {
+                // Update existing project (if you have internal ID)
+                // projectRecord = record.load({
+                //     type: record.Type.JOB,
+                //     id: context.projectId
+                // });
+
+                // For now, always create new projects
+                projectRecord = record.create({
+                    type: record.Type.JOB
+                });
+            }
+
+            // Set project fields
+            projectRecord.setValue({
+                fieldId: 'parent',
+                value: context.customerId
+            });
+
+            projectRecord.setValue({
+                fieldId: 'companyname',
+                value: context.projectName || 'Demo Project'
+            });
+
+            // Set custom fields if they exist in your NetSuite instance
+            // Uncomment and adjust field IDs as needed
+            /*
+            if (context.industry) {
+                projectRecord.setValue({
+                    fieldId: 'custentity_industry',
+                    value: context.industry
+                });
+            }
+
+            if (context.website) {
+                projectRecord.setValue({
+                    fieldId: 'url',
+                    value: context.website
+                });
+            }
+
+            if (context.notes) {
+                projectRecord.setValue({
+                    fieldId: 'comments',
+                    value: context.notes
+                });
+            }
+            */
+
+            // Save the project
+            var projectInternalId = projectRecord.save();
+
+            log.audit('Project Created', 'Project ID: ' + projectInternalId);
+
+            // Create tasks if provided
+            var createdTasks = [];
+            if (context.tasks && Array.isArray(context.tasks)) {
+                context.tasks.forEach(function(taskData, index) {
+                    try {
+                        var taskRecord = record.create({
+                            type: record.Type.TASK
+                        });
+
+                        taskRecord.setValue({
+                            fieldId: 'title',
+                            value: taskData.name || 'Task ' + (index + 1)
+                        });
+
+                        taskRecord.setValue({
+                            fieldId: 'company',
+                            value: projectInternalId
+                        });
+
+                        // Set task status if field mapping exists
+                        // Adjust status values based on your NetSuite configuration
+                        /*
+                        var statusMap = {
+                            'Pending': 'NOTSTART',
+                            'Scheduled': 'PROGRESS',
+                            'Ready': 'PROGRESS',
+                            'Complete': 'COMPLETE'
+                        };
+
+                        if (taskData.status && statusMap[taskData.status]) {
+                            taskRecord.setValue({
+                                fieldId: 'status',
+                                value: statusMap[taskData.status]
+                            });
+                        }
+                        */
+
+                        var taskId = taskRecord.save();
+
+                        createdTasks.push({
+                            id: taskId,
+                            name: taskData.name,
+                            status: taskData.status
+                        });
+
+                        log.debug('Task Created', 'Task ID: ' + taskId + ', Name: ' + taskData.name);
+                    } catch (taskError) {
+                        log.error('Task Creation Error', 'Failed to create task: ' + taskData.name + '\n' + taskError.message);
+                    }
+                });
+            }
+
+            // Return success response
+            var response = {
+                success: true,
+                data: {
+                    projectId: projectInternalId,
+                    projectName: context.projectName,
+                    customerId: context.customerId,
+                    tasks: createdTasks,
+                    tasksCreated: createdTasks.length,
+                    syncedAt: new Date().toISOString()
+                }
+            };
+
+            log.audit('Project Sync Complete', JSON.stringify(response));
+            return response;
+
+        } catch (e) {
+            log.error('Project Sync Error', e.message + '\n' + e.stack);
+            return {
+                success: false,
+                error: e.message,
+                details: e.stack,
+                context: context
+            };
+        }
+    }
+
+    /**
+     * PUT Handler (Optional) - Update existing project
+     */
+    function put(context) {
+        log.audit('PUT Request', JSON.stringify(context));
+        return {
+            success: false,
+            error: 'PUT method not implemented yet'
+        };
+    }
+
+    /**
+     * DELETE Handler (Optional) - Delete project
+     */
+    function doDelete(context) {
+        log.audit('DELETE Request', JSON.stringify(context));
+        return {
+            success: false,
+            error: 'DELETE method not implemented yet'
+        };
+    }
+
+    // Export handlers
+    return {
+        get: get,
+        post: post,
+        put: put,
+        delete: doDelete
+    };
+});
