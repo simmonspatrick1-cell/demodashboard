@@ -8,7 +8,6 @@ import storageService from './storage-service';
 import PrepMissionBanner from './components/PrepMissionBanner';
 import PromptLibrary from './components/PromptLibrary';
 import QuickActionsDeck from './components/QuickActionsDeck';
-import QuickCreateForm from './components/QuickCreateForm';
 import { PrepWorkflowStep, ProjectRecord, PromptCategory, Prospect, QuickAction } from './types/dashboard';
 
 const FOCUSABLE_SELECTORS =
@@ -1185,32 +1184,20 @@ const DemoDashboard: React.FC = () => {
           className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center px-4"
           role="dialog"
           aria-modal="true"
-          aria-labelledby="quick-create-title"
-          aria-describedby="quick-create-description"
           onKeyDown={(event) => handleOverlayKeyDown(event, () => setShowQuickCreate(false), quickCreateRef.current)}
-          onClick={(e) => {
-            if (e.target === e.currentTarget) {
-              setShowQuickCreate(false);
-            }
-          }}
         >
           <div
             ref={quickCreateRef}
             tabIndex={-1}
             className="bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-2xl shadow-2xl"
-            role="document"
           >
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h3 id="quick-create-title" className="text-xl font-semibold">Create New Prospect</h3>
-                <p id="quick-create-description" className="text-sm text-gray-500">Capture discovery context so you can build demos faster.</p>
+                <h3 className="text-xl font-semibold">Create New Prospect</h3>
+                <p className="text-sm text-gray-500">Capture discovery context so you can build demos faster.</p>
               </div>
-              <button
-                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors"
-                onClick={() => setShowQuickCreate(false)}
-                aria-label="Close create prospect dialog"
-              >
-                <X size={18} aria-hidden="true" />
+              <button className="p-2" onClick={() => setShowQuickCreate(false)} aria-label="Close quick create modal">
+                <X size={18} />
               </button>
             </div>
             <QuickCreateForm
@@ -1265,6 +1252,270 @@ const DemoDashboard: React.FC = () => {
       />
 
       <ToastStack toasts={toasts} />
+    </div>
+  );
+};
+
+interface QuickCreateFormProps {
+  onCreate: (prospect: Prospect) => void;
+}
+
+const QuickCreateForm: React.FC<QuickCreateFormProps> = ({ onCreate }) => {
+  const [form, setForm] = useState({
+    name: '',
+    industry: '',
+    status: 'Active',
+    size: '100-200',
+    budget: '$150K+',
+    focus: 'Resource Planning, Billing',
+    website: '',
+    demoDate: 'TBD',
+    notes: '',
+    salesRep: 'Will Clark',
+    leadSource: '',
+    subsidiary: 'Internal ID 2',
+    phone: '',
+    email: '',
+    invoiceEmail: '',
+    paymentNotificationEmail: ''
+  });
+
+  // Function to generate demo contact info
+  const generateDemoContactInfo = (companyName: string, website: string) => {
+    const domain = website.replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
+    const firstName = 'John';
+    const lastName = 'Smith';
+
+    setForm(prev => ({
+      ...prev,
+      phone: '(555) 123-4567',
+      email: `contact@${domain}`,
+      invoiceEmail: `ap@${domain}`,
+      paymentNotificationEmail: `payments@${domain}`,
+      leadSource: 'Web'
+    }));
+  };
+
+  // Auto-populate when website changes
+  const handleWebsiteChange = (newWebsite: string) => {
+    setForm(prev => ({ ...prev, website: newWebsite }));
+
+    if (newWebsite.trim() && form.name.trim()) {
+      generateDemoContactInfo(form.name, newWebsite);
+    }
+  };
+
+  const isValid = form.name.trim() && form.industry.trim();
+
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-4 md:grid-cols-2">
+        <div>
+          <label className="text-xs uppercase text-gray-500">Company Name *</label>
+          <input
+            value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
+            className="input"
+            placeholder="Acme Corp"
+          />
+        </div>
+        <div>
+          <label className="text-xs uppercase text-gray-500">Industry *</label>
+          <input
+            value={form.industry}
+            onChange={(e) => setForm({ ...form, industry: e.target.value })}
+            className="input"
+            placeholder="Professional Services"
+          />
+        </div>
+        <div>
+          <label className="text-xs uppercase text-gray-500">Company Size</label>
+          <input
+            value={form.size}
+            onChange={(e) => setForm({ ...form, size: e.target.value })}
+            className="input"
+            placeholder="100-200"
+          />
+        </div>
+        <div>
+          <label className="text-xs uppercase text-gray-500">Budget</label>
+          <input
+            value={form.budget}
+            onChange={(e) => setForm({ ...form, budget: e.target.value })}
+            className="input"
+            placeholder="$250K"
+          />
+        </div>
+        <div>
+          <label className="text-xs uppercase text-gray-500">Focus Areas</label>
+          <input
+            value={form.focus}
+            onChange={(e) => setForm({ ...form, focus: e.target.value })}
+            className="input"
+            placeholder="Resource Planning, Billing"
+          />
+        </div>
+        <div>
+          <label className="text-xs uppercase text-gray-500">Website</label>
+          <input
+            value={form.website}
+            onChange={(e) => handleWebsiteChange(e.target.value)}
+            className="input"
+            placeholder="https://example.com"
+          />
+        </div>
+        <div>
+          <label className="text-xs uppercase text-gray-500">Sales Rep</label>
+          <input
+            value={form.salesRep}
+            onChange={(e) => setForm({ ...form, salesRep: e.target.value })}
+            className="input"
+            placeholder="e.g., Will Clark"
+          />
+        </div>
+        <div>
+          <label className="text-xs uppercase text-gray-500">Lead Source</label>
+          <input
+            value={form.leadSource}
+            onChange={(e) => setForm({ ...form, leadSource: e.target.value })}
+            className="input"
+            placeholder="e.g., Web"
+          />
+        </div>
+        <div>
+          <label className="text-xs uppercase text-gray-500">Subsidiary</label>
+          <input
+            value={form.subsidiary}
+            onChange={(e) => setForm({ ...form, subsidiary: e.target.value })}
+            className="input"
+            placeholder="e.g., Parent Company"
+          />
+        </div>
+        <div>
+          <label className="text-xs uppercase text-gray-500">Demo Date</label>
+          <input
+            value={form.demoDate}
+            onChange={(e) => setForm({ ...form, demoDate: e.target.value })}
+            className="input"
+          />
+        </div>
+        <div>
+          <label className="text-xs uppercase text-gray-500">Status</label>
+          <select
+            value={form.status}
+            onChange={(e) => setForm({ ...form, status: e.target.value })}
+            className="input"
+          >
+            <option value="Hot">Hot</option>
+            <option value="Active">Active</option>
+            <option value="Qualified">Qualified</option>
+            <option value="Proposal">Proposal</option>
+          </select>
+        </div>
+      </div>
+
+      <div className="mt-4">
+        <h4 className="text-sm font-semibold mb-3 text-gray-700 dark:text-gray-300">Contact Information</h4>
+        <div className="grid gap-4 md:grid-cols-2">
+          <div>
+            <label className="text-xs uppercase text-gray-500">Phone</label>
+            <input
+              value={form.phone}
+              onChange={(e) => setForm({ ...form, phone: e.target.value })}
+              className="input"
+              placeholder="(555) 123-4567"
+            />
+          </div>
+          <div>
+            <label className="text-xs uppercase text-gray-500">Email</label>
+            <input
+              value={form.email}
+              onChange={(e) => setForm({ ...form, email: e.target.value })}
+              className="input"
+              placeholder="contact@company.com"
+            />
+          </div>
+          <div>
+            <label className="text-xs uppercase text-gray-500">Invoice Email</label>
+            <input
+              value={form.invoiceEmail}
+              onChange={(e) => setForm({ ...form, invoiceEmail: e.target.value })}
+              className="input"
+              placeholder="ap@company.com"
+            />
+          </div>
+          <div>
+            <label className="text-xs uppercase text-gray-500">Payment Notification Email</label>
+            <input
+              value={form.paymentNotificationEmail}
+              onChange={(e) => setForm({ ...form, paymentNotificationEmail: e.target.value })}
+              className="input"
+              placeholder="payments@company.com"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-4">
+        <div className="md:col-span-2">
+          <label className="text-xs uppercase text-gray-500">Discovery Notes</label>
+          <textarea
+            value={form.notes}
+            onChange={(e) => setForm({ ...form, notes: e.target.value })}
+            className="input min-h-[90px]"
+            placeholder="What are they trying to solve? Key website observations?"
+          />
+        </div>
+      </div>
+      <div className="flex justify-end gap-3">
+        <button className="px-4 py-2 rounded-full border" onClick={() => setForm({
+          name: '',
+          industry: '',
+          status: 'Active',
+          size: '100-200',
+          budget: '$150K+',
+          focus: 'Resource Planning, Billing',
+          website: '',
+          demoDate: 'TBD',
+          notes: '',
+          salesRep: 'Will Clark',
+          leadSource: '',
+          subsidiary: 'Internal ID 2',
+          phone: '',
+          email: '',
+          invoiceEmail: '',
+          paymentNotificationEmail: ''
+        })}>
+          Reset
+        </button>
+        <button
+          className="px-4 py-2 rounded-full border"
+          disabled={!isValid}
+          onClick={() => onCreate({
+            id: Date.now(),
+            name: form.name,
+            entityid: `${form.name.replace(/\s+/g, '-')}-Demo`,
+            industry: form.industry,
+            size: form.size,
+            status: form.status,
+            demoDate: form.demoDate || 'TBD',
+            focus: form.focus.split(',').map((item) => item.trim()).filter(Boolean),
+            budget: form.budget || '$150K+',
+            nsId: Math.floor(Math.random() * 4000) + 2000,
+            website: form.website,
+            notes: form.notes.trim() || undefined,
+            salesRep: form.salesRep || undefined,
+            leadSource: form.leadSource || undefined,
+            subsidiary: form.subsidiary || undefined,
+            phone: form.phone || undefined,
+            email: form.email || undefined,
+            invoiceEmail: form.invoiceEmail || undefined,
+            paymentNotificationEmail: form.paymentNotificationEmail || undefined
+          })}
+        >
+          Create Prospect
+        </button>
+      </div>
     </div>
   );
 };
