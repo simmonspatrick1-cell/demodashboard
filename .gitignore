@@ -36,3 +36,7 @@ auth_output.txt
 pat_secrets.env
 .env.local
 pat_secrets_env
+
+# Environment Variables
+.env
+.env.example
