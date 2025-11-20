@@ -42,6 +42,7 @@ export default function DemoDashboard() {
   const nameInputRef = useRef(null);
   const modalRef = useRef(null);
   const settingsModalRef = useRef(null);
+  const statusRegionRef = useRef(null);
   const [prospects, setProspects] = useState([
     { id: 1, name: 'AdvisorHR', entityid: 'AdvisorHR-Demo', industry: 'PEO Services', size: '500-1000', status: 'Hot', demoDate: 'Oct 30', focus: ['Resource Planning', 'Multi-Entity', 'Billing'], budget: '$200K-500K', nsId: 3161, website: 'advisorhr.com' },
     { id: 2, name: 'GSB Group', entityid: 'GSB-Demo', industry: 'Consulting', size: '50-100', status: 'Active', demoDate: 'Nov 5', focus: ['Project Accounting', 'PSA'], budget: '$100K-200K', nsId: 1834, website: 'gsbgroup.com' },
@@ -147,6 +148,14 @@ export default function DemoDashboard() {
         setModal(false);
         setFormErrors({});
       }
+    }
+  }, [isGeneratingAI]);
+
+  // Helper function to close Add Prospect modal
+  const closeAddProspectModal = useCallback(() => {
+    if (!isGeneratingAI) {
+      setShowAddProspectModal(false);
+      setFormErrors({});
     }
   }, [isGeneratingAI]);
 
@@ -357,8 +366,36 @@ export default function DemoDashboard() {
   };
 
   const handleAddProspect = () => {
-    if (!newProspect.name || !newProspect.entityid) {
-      setActionStatus('⚠️ Please fill in Name and Entity ID');
+    const errors = {};
+    
+    // Validate required fields
+    if (!newProspect.name || !newProspect.name.trim()) {
+      errors.name = 'Company Name is required';
+    }
+    if (!newProspect.entityid || !newProspect.entityid.trim()) {
+      errors.entityid = 'Entity ID is required';
+    }
+    
+    // Validate email format if provided
+    if (newProspect.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newProspect.email)) {
+      errors.email = 'Please enter a valid email address';
+    }
+    if (newProspect.invoiceEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newProspect.invoiceEmail)) {
+      errors.invoiceEmail = 'Please enter a valid email address';
+    }
+    if (newProspect.paymentEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newProspect.paymentEmail)) {
+      errors.paymentEmail = 'Please enter a valid email address';
+    }
+    
+    // Validate Entity ID format (alphanumeric with dashes/underscores)
+    if (newProspect.entityid && !/^[A-Za-z0-9_-]+$/.test(newProspect.entityid)) {
+      errors.entityid = 'Entity ID can only contain letters, numbers, dashes, and underscores';
+    }
+    
+    setFormErrors(errors);
+    
+    if (Object.keys(errors).length > 0) {
+      setActionStatus('⚠️ Please fix the errors below');
       setTimeout(() => setActionStatus(null), 3000);
       return;
     }
@@ -371,6 +408,7 @@ export default function DemoDashboard() {
 
     setProspects(prev => [...prev, prospectToAdd]);
     setShowAddProspectModal(false);
+    setFormErrors({});
     setActionStatus('✓ Prospect added to list!');
     setTimeout(() => setActionStatus(null), 3000);
 
@@ -395,6 +433,11 @@ export default function DemoDashboard() {
       invoiceEmail: '',
       paymentEmail: ''
     });
+    
+    // Reset focus
+    if (nameInputRef.current) {
+      nameInputRef.current.blur();
+    }
   };
 
   const toggleFocusArea = (area) => {
@@ -1505,6 +1548,17 @@ export default function DemoDashboard() {
   // ============ RENDER ============
   return (
     <div className="min-h-screen bg-gray-50 font-sans text-gray-900">
+      {/* Aria-live region for status updates */}
+      <div
+        ref={statusRegionRef}
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        className="sr-only"
+      >
+        {actionStatus}
+      </div>
+      
       {/* Header */}
       <div className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -1702,19 +1756,53 @@ export default function DemoDashboard() {
 
       {/* Add Prospect Modal */}
       {showAddProspectModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white">
-              <h2 className="text-xl font-bold text-gray-900">Add New Prospect</h2>
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+          onClick={(e) => handleModalClickOutside(e, modalRef, setShowAddProspectModal)}
+          aria-modal="true"
+          aria-labelledby="modal-title"
+          role="dialog"
+        >
+          <div 
+            ref={modalRef}
+            className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-6 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white z-10">
+              <h2 id="modal-title" className="text-xl font-bold text-gray-900">Add New Prospect</h2>
               <button
-                onClick={() => setShowAddProspectModal(false)}
-                className="text-gray-400 hover:text-gray-600"
+                onClick={() => {
+                  if (!isGeneratingAI) {
+                    setShowAddProspectModal(false);
+                    setFormErrors({});
+                  }
+                }}
+                disabled={isGeneratingAI}
+                className="text-gray-400 hover:text-gray-600 disabled:opacity-50 disabled:cursor-not-allowed p-1 rounded hover:bg-gray-100 transition-colors"
+                aria-label="Close modal"
               >
-                ✕
+                <X size={20} />
               </button>
             </div>
 
             <div className="p-6 space-y-4">
+              {/* Form Error Summary */}
+              {Object.keys(formErrors).length > 0 && (
+                <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg" role="alert">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle size={20} className="text-red-600 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="text-sm font-semibold text-red-900 mb-1">Please fix the following errors:</p>
+                      <ul className="text-xs text-red-800 list-disc list-inside space-y-1">
+                        {Object.values(formErrors).filter(e => e).map((error, idx) => (
+                          <li key={idx}>{error}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
               {/* Website Analysis */}
               <div className="mb-6 p-4 bg-indigo-50 rounded-lg border border-indigo-100">
                 <label className="block text-sm font-medium text-indigo-900 mb-2">
@@ -1748,28 +1836,55 @@ export default function DemoDashboard() {
                 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label htmlFor="company-name" className="block text-sm font-medium text-gray-700 mb-1">
                       Company Name <span className="text-red-500">*</span>
                     </label>
                     <input
+                      id="company-name"
+                      ref={nameInputRef}
                       type="text"
                       value={newProspect.name}
-                      onChange={(e) => setNewProspect(prev => ({ ...prev, name: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      onChange={(e) => {
+                        setNewProspect(prev => ({ ...prev, name: e.target.value }));
+                        if (formErrors.name) setFormErrors(prev => ({ ...prev, name: null }));
+                      }}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
+                        formErrors.name ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                      }`}
                       placeholder="e.g., Acme Corporation"
+                      aria-invalid={!!formErrors.name}
+                      aria-describedby={formErrors.name ? 'name-error' : undefined}
                     />
+                    {formErrors.name && (
+                      <p id="name-error" className="mt-1 text-xs text-red-600" role="alert">
+                        {formErrors.name}
+                      </p>
+                    )}
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label htmlFor="entity-id" className="block text-sm font-medium text-gray-700 mb-1">
                       Entity ID <span className="text-red-500">*</span>
                     </label>
                     <input
+                      id="entity-id"
                       type="text"
                       value={newProspect.entityid}
-                      onChange={(e) => setNewProspect(prev => ({ ...prev, entityid: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      onChange={(e) => {
+                        setNewProspect(prev => ({ ...prev, entityid: e.target.value }));
+                        if (formErrors.entityid) setFormErrors(prev => ({ ...prev, entityid: null }));
+                      }}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
+                        formErrors.entityid ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                      }`}
                       placeholder="e.g., ACME-Demo"
+                      aria-invalid={!!formErrors.entityid}
+                      aria-describedby={formErrors.entityid ? 'entityid-error' : undefined}
                     />
+                    {formErrors.entityid && (
+                      <p id="entityid-error" className="mt-1 text-xs text-red-600" role="alert">
+                        {formErrors.entityid}
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -1866,43 +1981,82 @@ export default function DemoDashboard() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
                       Email
                     </label>
                     <input
+                      id="email"
                       type="email"
                       value={newProspect.email}
-                      onChange={(e) => setNewProspect(prev => ({ ...prev, email: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      onChange={(e) => {
+                        setNewProspect(prev => ({ ...prev, email: e.target.value }));
+                        if (formErrors.email) setFormErrors(prev => ({ ...prev, email: null }));
+                      }}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
+                        formErrors.email ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                      }`}
                       placeholder="contact@company.com"
+                      aria-invalid={!!formErrors.email}
+                      aria-describedby={formErrors.email ? 'email-error' : undefined}
                     />
+                    {formErrors.email && (
+                      <p id="email-error" className="mt-1 text-xs text-red-600" role="alert">
+                        {formErrors.email}
+                      </p>
+                    )}
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label htmlFor="invoice-email" className="block text-sm font-medium text-gray-700 mb-1">
                       Invoice Email
                     </label>
                     <input
+                      id="invoice-email"
                       type="email"
                       value={newProspect.invoiceEmail}
-                      onChange={(e) => setNewProspect(prev => ({ ...prev, invoiceEmail: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      onChange={(e) => {
+                        setNewProspect(prev => ({ ...prev, invoiceEmail: e.target.value }));
+                        if (formErrors.invoiceEmail) setFormErrors(prev => ({ ...prev, invoiceEmail: null }));
+                      }}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
+                        formErrors.invoiceEmail ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                      }`}
                       placeholder="ap@company.com"
+                      aria-invalid={!!formErrors.invoiceEmail}
+                      aria-describedby={formErrors.invoiceEmail ? 'invoice-email-error' : undefined}
                     />
+                    {formErrors.invoiceEmail && (
+                      <p id="invoice-email-error" className="mt-1 text-xs text-red-600" role="alert">
+                        {formErrors.invoiceEmail}
+                      </p>
+                    )}
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label htmlFor="payment-email" className="block text-sm font-medium text-gray-700 mb-1">
                       Payment Notification Email
                     </label>
                     <input
+                      id="payment-email"
                       type="email"
                       value={newProspect.paymentEmail}
-                      onChange={(e) => setNewProspect(prev => ({ ...prev, paymentEmail: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      onChange={(e) => {
+                        setNewProspect(prev => ({ ...prev, paymentEmail: e.target.value }));
+                        if (formErrors.paymentEmail) setFormErrors(prev => ({ ...prev, paymentEmail: null }));
+                      }}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
+                        formErrors.paymentEmail ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                      }`}
                       placeholder="payments@company.com"
+                      aria-invalid={!!formErrors.paymentEmail}
+                      aria-describedby={formErrors.paymentEmail ? 'payment-email-error' : undefined}
                     />
+                    {formErrors.paymentEmail && (
+                      <p id="payment-email-error" className="mt-1 text-xs text-red-600" role="alert">
+                        {formErrors.paymentEmail}
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1910,15 +2064,25 @@ export default function DemoDashboard() {
 
             <div className="p-6 border-t border-gray-200 flex gap-3">
               <button
-                onClick={() => setShowAddProspectModal(false)}
-                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                onClick={() => {
+                  if (!isGeneratingAI) {
+                    setShowAddProspectModal(false);
+                    setFormErrors({});
+                  }
+                }}
+                disabled={isGeneratingAI}
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                aria-label="Cancel and close modal"
               >
                 Cancel
               </button>
               <button
                 onClick={handleAddProspect}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                disabled={isGeneratingAI}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                aria-label="Add new prospect to list"
               >
+                {isGeneratingAI && <Loader size={16} className="animate-spin" />}
                 Add Prospect
               </button>
             </div>
@@ -1928,10 +2092,27 @@ export default function DemoDashboard() {
 
       {/* Settings Modal (Claude API Key) */}
       {showSettingsModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-md w-full">
-            <div className="p-6 border-b border-gray-200">
-              <h2 className="text-xl font-bold text-gray-900">Claude API Settings</h2>
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+          onClick={(e) => handleModalClickOutside(e, settingsModalRef, setShowSettingsModal)}
+          aria-modal="true"
+          aria-labelledby="settings-modal-title"
+          role="dialog"
+        >
+          <div 
+            ref={settingsModalRef}
+            className="bg-white rounded-lg max-w-md w-full shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-6 border-b border-gray-200 flex items-center justify-between">
+              <h2 id="settings-modal-title" className="text-xl font-bold text-gray-900">Claude API Settings</h2>
+              <button
+                onClick={() => setShowSettingsModal(false)}
+                className="text-gray-400 hover:text-gray-600 p-1 rounded hover:bg-gray-100 transition-colors"
+                aria-label="Close settings modal"
+              >
+                <X size={20} />
+              </button>
             </div>
             <div className="p-6">
               <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-100">
