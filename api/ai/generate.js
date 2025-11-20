@@ -7,8 +7,13 @@ export default async function handler(req, res) {
 
   const { type, content, apiKey } = req.body;
   
-  // Use environment variable if apiKey is not provided or empty
-  const finalApiKey = (apiKey && apiKey.trim()) ? apiKey.trim() : process.env.ANTHROPIC_API_KEY;
+  // Use environment variable if apiKey is not provided, empty, or looks invalid
+  // Only accept frontend key if it starts with 'sk-ant-'
+  let finalApiKey = process.env.ANTHROPIC_API_KEY;
+  
+  if (apiKey && typeof apiKey === 'string' && apiKey.trim().startsWith('sk-ant-')) {
+      finalApiKey = apiKey.trim();
+  }
 
   if (!finalApiKey) {
     return res.status(400).json({ error: 'Claude API Key is required (in settings or env vars)' });
