@@ -48,6 +48,7 @@ export default function DemoDashboard() {
   const [newProspect, setNewProspect] = useState({
     name: '',
     entityid: '',
+    type: 'Company',
     industry: '',
     size: '',
     status: 'Qualified',
@@ -55,7 +56,14 @@ export default function DemoDashboard() {
     focus: [],
     budget: '',
     nsId: null,
-    website: ''
+    website: '',
+    salesRep: '',
+    leadSource: '',
+    subsidiary: '',
+    phone: '',
+    email: '',
+    invoiceEmail: '',
+    paymentEmail: ''
   });
 
   // Load Prospects from local storage
@@ -318,13 +326,22 @@ export default function DemoDashboard() {
     setNewProspect({
       name: '',
       entityid: '',
+      type: 'Company',
       industry: '',
       size: '',
       status: 'Qualified',
       demoDate: '',
       focus: [],
       budget: '',
-      nsId: null
+      nsId: null,
+      website: '',
+      salesRep: '',
+      leadSource: '',
+      subsidiary: '',
+      phone: '',
+      email: '',
+      invoiceEmail: '',
+      paymentEmail: ''
     });
   };
 
@@ -1673,128 +1690,168 @@ export default function DemoDashboard() {
                 </p>
               </div>
 
-              {/* Name */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Company Name <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={newProspect.name}
-                  onChange={(e) => setNewProspect(prev => ({ ...prev, name: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="e.g., Acme Corporation"
-                />
-              </div>
-
-              {/* Entity ID */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Entity ID <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={newProspect.entityid}
-                  onChange={(e) => setNewProspect(prev => ({ ...prev, entityid: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="e.g., ACME-Demo"
-                />
-              </div>
-
-              {/* Industry */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Industry
-                </label>
-                <input
-                  type="text"
-                  value={newProspect.industry}
-                  onChange={(e) => setNewProspect(prev => ({ ...prev, industry: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="e.g., Professional Services"
-                />
-              </div>
-
-              {/* Size and Status */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Company Size
-                  </label>
-                  <input
-                    type="text"
-                    value={newProspect.size}
-                    onChange={(e) => setNewProspect(prev => ({ ...prev, size: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    placeholder="e.g., 100-200"
-                  />
+              {/* Primary Information */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wide border-b border-gray-100 pb-2">Primary Information</h3>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Company Name <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={newProspect.name}
+                      onChange={(e) => setNewProspect(prev => ({ ...prev, name: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      placeholder="e.g., Acme Corporation"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Entity ID <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={newProspect.entityid}
+                      onChange={(e) => setNewProspect(prev => ({ ...prev, entityid: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      placeholder="e.g., ACME-Demo"
+                    />
+                  </div>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Status
-                  </label>
-                  <select
-                    value={newProspect.status}
-                    onChange={(e) => setNewProspect(prev => ({ ...prev, status: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="Qualified">Qualified</option>
-                    <option value="Active">Active</option>
-                    <option value="Hot">Hot</option>
-                    <option value="Proposal">Proposal</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Budget and Demo Date */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Budget
-                  </label>
-                  <input
-                    type="text"
-                    value={newProspect.budget}
-                    onChange={(e) => setNewProspect(prev => ({ ...prev, budget: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    placeholder="e.g., $100K-200K"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Demo Date
-                  </label>
-                  <input
-                    type="text"
-                    value={newProspect.demoDate}
-                    onChange={(e) => setNewProspect(prev => ({ ...prev, demoDate: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    placeholder="e.g., Dec 15"
-                  />
-                </div>
-              </div>
-
-              {/* Focus Areas */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Focus Areas
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  {['Resource Planning', 'Project Accounting', 'Multi-Entity', 'Billing', 'Time & Expense', 'Forecasting', 'PSA', 'Consolidation'].map(area => (
-                    <button
-                      key={area}
-                      onClick={() => toggleFocusArea(area)}
-                      className={`px-3 py-2 rounded-lg border-2 text-sm transition-all ${
-                        newProspect.focus.includes(area)
-                          ? 'border-blue-600 bg-blue-50 text-blue-700 font-semibold'
-                          : 'border-gray-200 hover:border-gray-300 text-gray-700'
-                      }`}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Type
+                    </label>
+                    <select
+                      value={newProspect.type}
+                      onChange={(e) => setNewProspect(prev => ({ ...prev, type: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                     >
-                      {area}
-                    </button>
-                  ))}
+                      <option value="Company">Company</option>
+                      <option value="Individual">Individual</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Status
+                    </label>
+                    <select
+                      value={newProspect.status}
+                      onChange={(e) => setNewProspect(prev => ({ ...prev, status: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="Qualified">Qualified</option>
+                      <option value="Active">Active</option>
+                      <option value="Hot">Hot</option>
+                      <option value="Proposal">Proposal</option>
+                      <option value="Customer-Closed Won">Customer-Closed Won</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Sales Rep
+                    </label>
+                    <input
+                      type="text"
+                      value={newProspect.salesRep}
+                      onChange={(e) => setNewProspect(prev => ({ ...prev, salesRep: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      placeholder="e.g., Will Clark"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Lead Source
+                    </label>
+                    <input
+                      type="text"
+                      value={newProspect.leadSource}
+                      onChange={(e) => setNewProspect(prev => ({ ...prev, leadSource: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      placeholder="e.g., Web"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Subsidiary
+                    </label>
+                    <input
+                      type="text"
+                      value={newProspect.subsidiary}
+                      onChange={(e) => setNewProspect(prev => ({ ...prev, subsidiary: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      placeholder="e.g., Parent Company"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Contact Information */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wide border-b border-gray-100 pb-2 pt-2">Contact Information</h3>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Phone
+                    </label>
+                    <input
+                      type="text"
+                      value={newProspect.phone}
+                      onChange={(e) => setNewProspect(prev => ({ ...prev, phone: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      placeholder="(555) 123-4567"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Email
+                    </label>
+                    <input
+                      type="email"
+                      value={newProspect.email}
+                      onChange={(e) => setNewProspect(prev => ({ ...prev, email: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      placeholder="contact@company.com"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Invoice Email
+                    </label>
+                    <input
+                      type="email"
+                      value={newProspect.invoiceEmail}
+                      onChange={(e) => setNewProspect(prev => ({ ...prev, invoiceEmail: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      placeholder="ap@company.com"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Payment Notification Email
+                    </label>
+                    <input
+                      type="email"
+                      value={newProspect.paymentEmail}
+                      onChange={(e) => setNewProspect(prev => ({ ...prev, paymentEmail: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      placeholder="payments@company.com"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
