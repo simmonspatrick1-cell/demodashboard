@@ -1,5 +1,5 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { Search, Settings, User, Users, Zap, ChevronRight, Copy, Check, BookOpen, ChevronDown, Target, Building2, Mail, Phone, MoreVertical, Play, Plus, FileText, Clock, TrendingUp, AlertCircle, Loader, RefreshCw, Database, Globe } from 'lucide-react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import { Search, Settings, User, Users, Zap, ChevronRight, Copy, Check, BookOpen, ChevronDown, Target, Building2, Mail, Phone, MoreVertical, Play, Plus, FileText, Clock, TrendingUp, AlertCircle, Loader, RefreshCw, Database, Globe, X } from 'lucide-react';
 // Import the NetSuite service
 // import NetSuiteService from './netsuite-service';
 import { exportViaEmail, createExportData } from './email-export-utils';
@@ -36,6 +36,12 @@ export default function DemoDashboard() {
   const [selectedClass, setSelectedClass] = useState(null);
   const [selectedDepartment, setSelectedDepartment] = useState(null);
   const [selectedLocation, setSelectedLocation] = useState(null);
+  const [formErrors, setFormErrors] = useState({});
+  
+  // Refs for auto-focus
+  const nameInputRef = useRef(null);
+  const modalRef = useRef(null);
+  const settingsModalRef = useRef(null);
   const [prospects, setProspects] = useState([
     { id: 1, name: 'AdvisorHR', entityid: 'AdvisorHR-Demo', industry: 'PEO Services', size: '500-1000', status: 'Hot', demoDate: 'Oct 30', focus: ['Resource Planning', 'Multi-Entity', 'Billing'], budget: '$200K-500K', nsId: 3161, website: 'advisorhr.com' },
     { id: 2, name: 'GSB Group', entityid: 'GSB-Demo', industry: 'Consulting', size: '50-100', status: 'Active', demoDate: 'Nov 5', focus: ['Project Accounting', 'PSA'], budget: '$100K-200K', nsId: 1834, website: 'gsbgroup.com' },
