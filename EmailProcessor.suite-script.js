@@ -78,18 +78,18 @@
  * ==========================================================================
  */
 
-define(['N/record', 'N/search', 'N/log', 'N/https', 'N/email', 'N/encode'], 
-function(record, search, log, https, email, encode) {
+define(['N/record', 'N/search', 'N/log', 'N/https', 'N/email', 'N/encode', 'N/runtime'], 
+function(record, search, log, https, email, encode, runtime) {
     
     /**
      * Gmail API Configuration
      * Set these as script parameters or in a configuration file
      */
     var GMAIL_CONFIG = {
-        CLIENT_ID: 'YOUR_CLIENT_ID_HERE', // Set as script parameter
-        CLIENT_SECRET: 'YOUR_CLIENT_SECRET_HERE', // Set as script parameter
-        REFRESH_TOKEN: 'YOUR_REFRESH_TOKEN_HERE', // Set as script parameter
-        INBOX_EMAIL: 'your-email@gmail.com',
+        CLIENT_ID: '',
+        CLIENT_SECRET: '',
+        REFRESH_TOKEN: '',
+        INBOX_EMAIL: '',
         QUERY: 'subject:"NetSuite Export" has:nouserlabels',
         USER_ID: 'me',
         ACCESS_TOKEN: ''    // Will be populated at runtime
@@ -100,7 +100,18 @@ function(record, search, log, https, email, encode) {
      */
     function execute(scriptContext) {
         try {
-            log.audit('Email Processor', 'Starting email processing...');
+            // Initialize config from script parameters
+            var currentScript = runtime.getCurrentScript();
+            GMAIL_CONFIG.CLIENT_ID = currentScript.getParameter({ name: 'custscript_gmail_client_id' });
+            GMAIL_CONFIG.CLIENT_SECRET = currentScript.getParameter({ name: 'custscript_gmail_client_secret' });
+            GMAIL_CONFIG.REFRESH_TOKEN = currentScript.getParameter({ name: 'custscript_gmail_refresh_token' });
+            GMAIL_CONFIG.INBOX_EMAIL = currentScript.getParameter({ name: 'custscript_inbox_email' });
+
+            if (!GMAIL_CONFIG.CLIENT_ID || !GMAIL_CONFIG.CLIENT_SECRET || !GMAIL_CONFIG.REFRESH_TOKEN) {
+                throw new Error('Missing Gmail API credentials in script parameters. Please configure custscript_gmail_client_id, custscript_gmail_client_secret, and custscript_gmail_refresh_token.');
+            }
+
+            log.audit('Email Processor', 'Starting email processing for: ' + GMAIL_CONFIG.INBOX_EMAIL);
             
             // 1. Get fresh Access Token using Refresh Token
             if (!refreshAccessToken()) {
