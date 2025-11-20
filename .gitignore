@@ -33,3 +33,4 @@ yarn-error.log*
 # Logs
 *.log
 auth_output.txt
+pat_secrets.env
