@@ -1270,8 +1270,40 @@ const QuickCreateForm: React.FC<QuickCreateFormProps> = ({ onCreate }) => {
     focus: 'Resource Planning, Billing',
     website: '',
     demoDate: 'TBD',
-    notes: ''
+    notes: '',
+    salesRep: 'Will Clark',
+    leadSource: '',
+    subsidiary: 'Internal ID 2',
+    phone: '',
+    email: '',
+    invoiceEmail: '',
+    paymentNotificationEmail: ''
   });
+
+  // Function to generate demo contact info
+  const generateDemoContactInfo = (companyName: string, website: string) => {
+    const domain = website.replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
+    const firstName = 'John';
+    const lastName = 'Smith';
+
+    setForm(prev => ({
+      ...prev,
+      phone: '(555) 123-4567',
+      email: `contact@${domain}`,
+      invoiceEmail: `ap@${domain}`,
+      paymentNotificationEmail: `payments@${domain}`,
+      leadSource: 'Web'
+    }));
+  };
+
+  // Auto-populate when website changes
+  const handleWebsiteChange = (newWebsite: string) => {
+    setForm(prev => ({ ...prev, website: newWebsite }));
+
+    if (newWebsite.trim() && form.name.trim()) {
+      generateDemoContactInfo(form.name, newWebsite);
+    }
+  };
 
   const isValid = form.name.trim() && form.industry.trim();
 
@@ -1327,9 +1359,36 @@ const QuickCreateForm: React.FC<QuickCreateFormProps> = ({ onCreate }) => {
           <label className="text-xs uppercase text-gray-500">Website</label>
           <input
             value={form.website}
-            onChange={(e) => setForm({ ...form, website: e.target.value })}
+            onChange={(e) => handleWebsiteChange(e.target.value)}
             className="input"
             placeholder="https://example.com"
+          />
+        </div>
+        <div>
+          <label className="text-xs uppercase text-gray-500">Sales Rep</label>
+          <input
+            value={form.salesRep}
+            onChange={(e) => setForm({ ...form, salesRep: e.target.value })}
+            className="input"
+            placeholder="e.g., Will Clark"
+          />
+        </div>
+        <div>
+          <label className="text-xs uppercase text-gray-500">Lead Source</label>
+          <input
+            value={form.leadSource}
+            onChange={(e) => setForm({ ...form, leadSource: e.target.value })}
+            className="input"
+            placeholder="e.g., Web"
+          />
+        </div>
+        <div>
+          <label className="text-xs uppercase text-gray-500">Subsidiary</label>
+          <input
+            value={form.subsidiary}
+            onChange={(e) => setForm({ ...form, subsidiary: e.target.value })}
+            className="input"
+            placeholder="e.g., Parent Company"
           />
         </div>
         <div>
@@ -1353,6 +1412,51 @@ const QuickCreateForm: React.FC<QuickCreateFormProps> = ({ onCreate }) => {
             <option value="Proposal">Proposal</option>
           </select>
         </div>
+      </div>
+
+      <div className="mt-4">
+        <h4 className="text-sm font-semibold mb-3 text-gray-700 dark:text-gray-300">Contact Information</h4>
+        <div className="grid gap-4 md:grid-cols-2">
+          <div>
+            <label className="text-xs uppercase text-gray-500">Phone</label>
+            <input
+              value={form.phone}
+              onChange={(e) => setForm({ ...form, phone: e.target.value })}
+              className="input"
+              placeholder="(555) 123-4567"
+            />
+          </div>
+          <div>
+            <label className="text-xs uppercase text-gray-500">Email</label>
+            <input
+              value={form.email}
+              onChange={(e) => setForm({ ...form, email: e.target.value })}
+              className="input"
+              placeholder="contact@company.com"
+            />
+          </div>
+          <div>
+            <label className="text-xs uppercase text-gray-500">Invoice Email</label>
+            <input
+              value={form.invoiceEmail}
+              onChange={(e) => setForm({ ...form, invoiceEmail: e.target.value })}
+              className="input"
+              placeholder="ap@company.com"
+            />
+          </div>
+          <div>
+            <label className="text-xs uppercase text-gray-500">Payment Notification Email</label>
+            <input
+              value={form.paymentNotificationEmail}
+              onChange={(e) => setForm({ ...form, paymentNotificationEmail: e.target.value })}
+              className="input"
+              placeholder="payments@company.com"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-4">
         <div className="md:col-span-2">
           <label className="text-xs uppercase text-gray-500">Discovery Notes</label>
           <textarea
@@ -1373,7 +1477,14 @@ const QuickCreateForm: React.FC<QuickCreateFormProps> = ({ onCreate }) => {
           focus: 'Resource Planning, Billing',
           website: '',
           demoDate: 'TBD',
-          notes: ''
+          notes: '',
+          salesRep: 'Will Clark',
+          leadSource: '',
+          subsidiary: 'Internal ID 2',
+          phone: '',
+          email: '',
+          invoiceEmail: '',
+          paymentNotificationEmail: ''
         })}>
           Reset
         </button>
@@ -1392,7 +1503,14 @@ const QuickCreateForm: React.FC<QuickCreateFormProps> = ({ onCreate }) => {
             budget: form.budget || '$150K+',
             nsId: Math.floor(Math.random() * 4000) + 2000,
             website: form.website,
-            notes: form.notes.trim() || undefined
+            notes: form.notes.trim() || undefined,
+            salesRep: form.salesRep || undefined,
+            leadSource: form.leadSource || undefined,
+            subsidiary: form.subsidiary || undefined,
+            phone: form.phone || undefined,
+            email: form.email || undefined,
+            invoiceEmail: form.invoiceEmail || undefined,
+            paymentNotificationEmail: form.paymentNotificationEmail || undefined
           })}
         >
           Create Prospect

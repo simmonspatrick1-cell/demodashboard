@@ -14,6 +14,13 @@ export interface Prospect {
   aiGenerated?: boolean;
   prompt?: string;
   description?: string;
+  salesRep?: string;
+  leadSource?: string;
+  subsidiary?: string;
+  phone?: string;
+  email?: string;
+  invoiceEmail?: string;
+  paymentNotificationEmail?: string;
 }
 
 export interface PrepWorkflowStep {
