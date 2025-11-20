@@ -40,3 +40,4 @@ pat_secrets_env
 # Environment Variables
 .env
 .env.example
+vercel-direct-env.json

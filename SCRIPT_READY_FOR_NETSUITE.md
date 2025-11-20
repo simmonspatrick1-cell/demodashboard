@@ -79,9 +79,9 @@ Customization → Scripting → Script Execution Log
 ### Gmail API Credentials (Lines 88-96)
 ```javascript
 var GMAIL_CONFIG = {
-    CLIENT_ID: '267744217222-bj9qm1jhr6gj6l2c5ikb1rqd9mk1nef7.apps.googleusercontent.com',
-    CLIENT_SECRET: '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',
-    REFRESH_TOKEN: '1//047iIrco0pGhyCgYIARAAGAQSNwF-L9IrnDrBVUI7ciJpULFcbntdjLIXFOKvaOpJzhvo3ywjR_UMEVM9J1nyWe22VH59BcL9WeY',
+    CLIENT_ID: 'YOUR_CLIENT_ID',
+    CLIENT_SECRET: 'YOUR_CLIENT_SECRET',
+    REFRESH_TOKEN: 'YOUR_REFRESH_TOKEN',
     INBOX_EMAIL: 'simmonspatrick1@gmail.com',
     QUERY: 'subject:"NetSuite Export" has:nouserlabels'
 };
