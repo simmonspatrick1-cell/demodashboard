@@ -105,6 +105,51 @@ export default function DemoDashboard() {
     localStorage.setItem('demodashboard_claude_key', trimmedKey);
   };
 
+  // Debounced search query
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Keyboard navigation: ESC to close modals
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        if (showAddProspectModal && !isGeneratingAI) {
+          setShowAddProspectModal(false);
+          setFormErrors({});
+        }
+        if (showSettingsModal) {
+          setShowSettingsModal(false);
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showAddProspectModal, showSettingsModal, isGeneratingAI]);
+
+  // Auto-focus first input when modal opens
+  useEffect(() => {
+    if (showAddProspectModal && nameInputRef.current) {
+      setTimeout(() => {
+        nameInputRef.current?.focus();
+      }, 100);
+    }
+  }, [showAddProspectModal]);
+
+  // Click outside to close modal
+  const handleModalClickOutside = useCallback((e, modalRef, setModal) => {
+    if (modalRef.current && !modalRef.current.contains(e.target)) {
+      if (!isGeneratingAI) {
+        setModal(false);
+        setFormErrors({});
+      }
+    }
+  }, [isGeneratingAI]);
+
   // AI Generation Handler
   const generateFromAI = async (type, content, isRetry = false) => {
     setIsGeneratingAI(true);
@@ -251,12 +296,13 @@ export default function DemoDashboard() {
 
   // ============ CUSTOMER FILTERING & SEARCH ============
   const filteredCustomers = useMemo(() => {
+    const query = debouncedSearchQuery.toLowerCase();
     return prospects.filter(cust =>
-      cust.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      cust.industry.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      cust.entityid.toLowerCase().includes(searchQuery.toLowerCase())
+      cust.name.toLowerCase().includes(query) ||
+      (cust.industry && cust.industry.toLowerCase().includes(query)) ||
+      cust.entityid.toLowerCase().includes(query)
     );
-  }, [searchQuery, prospects]);
+  }, [debouncedSearchQuery, prospects]);
 
   const filteredPrompts = useMemo(() => {
     if (!promptSearch) return promptCategories;
