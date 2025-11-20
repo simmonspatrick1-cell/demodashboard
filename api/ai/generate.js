@@ -42,6 +42,7 @@ export default async function handler(req, res) {
           Based on this content, generate a JSON object with the following structure:
           {
             "name": "Company Name",
+            "entityId": "Short alphanumeric ID (e.g. COMP-001)",
             "industry": "Industry (e.g., SaaS, Manufacturing)",
             "size": "Estimated Employee Count (e.g., 50-100)",
             "revenue": "Estimated Revenue (e.g., $10M-20M)",

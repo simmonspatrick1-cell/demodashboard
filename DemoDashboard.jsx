@@ -149,6 +149,7 @@ export default function DemoDashboard() {
         };
         
         if (data.name) updates.name = data.name;
+        if (data.entityId) updates.entityid = data.entityId;
         if (data.industry) updates.industry = data.industry;
         if (data.size) updates.size = data.size;
         if (data.revenue) updates.budget = data.revenue;
