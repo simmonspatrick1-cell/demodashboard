@@ -43,22 +43,45 @@ export default function DemoDashboard() {
   const modalRef = useRef(null);
   const settingsModalRef = useRef(null);
   const statusRegionRef = useRef(null);
+  const STATUS_OPTIONS = [
+    'LEAD-Unqualified',
+    'LEAD-Qualified',
+    'PROSPECT-In Discussion',
+    'PROSPECT-Proposal',
+    'PROSPECT-Scoping Completed',
+    'CUSTOMER-Closed Won'
+  ];
+
+  const LEAD_SOURCE_OPTIONS = ['Ad', 'Other', 'Partner Referral', 'Trade Show', 'Web'];
+
   const [prospects, setProspects] = useState([
-    { id: 1, name: 'AdvisorHR', entityid: 'AdvisorHR-Demo', industry: 'PEO Services', size: '500-1000', status: 'Hot', demoDate: 'Oct 30', focus: ['Resource Planning', 'Multi-Entity', 'Billing'], budget: '$200K-500K', nsId: 3161, website: 'advisorhr.com' },
-    { id: 2, name: 'GSB Group', entityid: 'GSB-Demo', industry: 'Consulting', size: '50-100', status: 'Active', demoDate: 'Nov 5', focus: ['Project Accounting', 'PSA'], budget: '$100K-200K', nsId: 1834, website: 'gsbgroup.com' },
-    { id: 3, name: 'Innovatia Technical', entityid: 'Innovatia-Demo', industry: 'Tech Consulting', size: '200-300', status: 'Active', demoDate: 'Nov 8', focus: ['Resource Utilization', 'Forecasting'], budget: '$150K-300K', nsId: 1938, website: 'innovatia.net' },
-    { id: 4, name: 'Marabou Midstream', entityid: 'Marabou-Demo', industry: 'Energy/Midstream', size: '100-150', status: 'Active', demoDate: 'Nov 12', focus: ['Project Accounting', 'Multi-Entity', 'Consolidation'], budget: '$250K+', nsId: 2662, website: 'maraboumidstream.com' },
-    { id: 5, name: 'Lovse Surveys', entityid: 'Lovse-Demo', industry: 'Professional Services', size: '75-100', status: 'Qualified', demoDate: 'Nov 15', focus: ['Time & Expense', 'Billing'], budget: '$100K-150K', nsId: 1938, website: 'lovsesurveys.com' },
-    { id: 6, name: 'nFront Consulting', entityid: 'nFront-Demo', industry: 'Energy Consulting', size: '150-200', status: 'Proposal', demoDate: 'Pending', focus: ['Resource Planning', 'Project Accounting', 'Multi-Entity'], budget: '$5.2M', nsId: 4285, website: 'nfrontconsulting.com' },
-    { id: 7, name: 'Formative Group', entityid: 'Formative-Demo', industry: 'Salesforce Consulting', size: '80-120', status: 'Active', demoDate: 'Nov 20', focus: ['Scaling Operations', 'Acquisitions', 'Resource Mgmt'], budget: '$200K-400K', nsId: 1938, website: 'formativegroup.com' },
+    { id: 1, name: 'AdvisorHR', entityid: 'AdvisorHR-Demo', industry: 'PEO Services', size: '500-1000', status: 'LEAD-Qualified', demoDate: 'Oct 30', focus: ['Resource Planning', 'Multi-Entity', 'Billing'], budget: '$200K-500K', nsId: 3161, website: 'advisorhr.com' },
+    { id: 2, name: 'GSB Group', entityid: 'GSB-Demo', industry: 'Consulting', size: '50-100', status: 'PROSPECT-In Discussion', demoDate: 'Nov 5', focus: ['Project Accounting', 'PSA'], budget: '$100K-200K', nsId: 1834, website: 'gsbgroup.com' },
+    { id: 3, name: 'Innovatia Technical', entityid: 'Innovatia-Demo', industry: 'Tech Consulting', size: '200-300', status: 'PROSPECT-Proposal', demoDate: 'Nov 8', focus: ['Resource Utilization', 'Forecasting'], budget: '$150K-300K', nsId: 1938, website: 'innovatia.net' },
+    { id: 4, name: 'Marabou Midstream', entityid: 'Marabou-Demo', industry: 'Energy/Midstream', size: '100-150', status: 'PROSPECT-Scoping Completed', demoDate: 'Nov 12', focus: ['Project Accounting', 'Multi-Entity', 'Consolidation'], budget: '$250K+', nsId: 2662, website: 'maraboumidstream.com' },
+    { id: 5, name: 'Lovse Surveys', entityid: 'Lovse-Demo', industry: 'Professional Services', size: '75-100', status: 'LEAD-Unqualified', demoDate: 'Nov 15', focus: ['Time & Expense', 'Billing'], budget: '$100K-150K', nsId: 1938, website: 'lovsesurveys.com' },
+    { id: 6, name: 'nFront Consulting', entityid: 'nFront-Demo', industry: 'Energy Consulting', size: '150-200', status: 'PROSPECT-Proposal', demoDate: 'Pending', focus: ['Resource Planning', 'Project Accounting', 'Multi-Entity'], budget: '$5.2M', nsId: 4285, website: 'nfrontconsulting.com' },
+    { id: 7, name: 'Formative Group', entityid: 'Formative-Demo', industry: 'Salesforce Consulting', size: '80-120', status: 'CUSTOMER-Closed Won', demoDate: 'Nov 20', focus: ['Scaling Operations', 'Acquisitions', 'Resource Mgmt'], budget: '$200K-400K', nsId: 1938, website: 'formativegroup.com' },
   ]);
+  const getStatusBadgeClass = (status) => {
+    if (status.startsWith('LEAD-')) {
+      return 'border-l-yellow-300 bg-yellow-50 text-yellow-700';
+    }
+    if (status.startsWith('PROSPECT-')) {
+      return 'border-l-orange-300 bg-orange-50 text-orange-700';
+    }
+    if (status.startsWith('CUSTOMER-')) {
+      return 'border-l-green-300 bg-green-50 text-green-700';
+    }
+    return 'border-l-gray-300 bg-gray-50 text-gray-600';
+  };
   const [newProspect, setNewProspect] = useState({
     name: '',
     entityid: '',
     type: 'Company',
     industry: '',
     size: '',
-    status: 'Qualified',
+    status: 'CUSTOMER-Closed Won',
     demoDate: '',
     focus: [],
     budget: '',
@@ -220,9 +243,9 @@ export default function DemoDashboard() {
         if (data.entityId) updates.entityid = data.entityId;
         if (data.type) updates.type = data.type;
         if (data.status) updates.status = data.status;
-        if (data.salesRep) updates.salesRep = data.salesRep;
+        updates.salesRep = data.salesRep || 'Will Clark';
         if (data.leadSource) updates.leadSource = data.leadSource;
-        if (data.subsidiary) updates.subsidiary = data.subsidiary;
+        updates.subsidiary = data.subsidiary || '2';
         if (data.industry) updates.industry = data.industry;
         if (data.size) updates.size = data.size;
         if (data.budget) updates.budget = data.budget;
@@ -429,7 +452,7 @@ export default function DemoDashboard() {
       type: 'Company',
       industry: '',
       size: '',
-      status: 'Qualified',
+      status: 'CUSTOMER-Closed Won',
       demoDate: '',
       focus: [],
       budget: '',
@@ -895,39 +918,37 @@ export default function DemoDashboard() {
         </div>
         
         <div className="flex-1 overflow-y-auto divide-y divide-gray-50">
-          {filteredCustomers.map((customer) => (
-            <button
-              key={customer.id}
-              onClick={() => setSelectedCustomer(customer.id)}
-              className={`w-full text-left px-4 py-3.5 hover:bg-gray-50 transition-all group border-l-4 ${
-                selectedCustomer === customer.id 
-                  ? 'bg-blue-50/50 border-l-blue-600' 
-                  : 'border-l-transparent'
-              }`}
-            >
-              <div className="flex items-start justify-between mb-1">
-                <span className={`font-semibold text-sm ${selectedCustomer === customer.id ? 'text-blue-700' : 'text-gray-900'}`}>
-                  {customer.name}
-                </span>
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${
-                  customer.status === 'Hot' ? 'bg-red-100 text-red-700' :
-                  customer.status === 'Active' ? 'bg-green-100 text-green-700' :
-                  customer.status === 'Proposal' ? 'bg-yellow-100 text-yellow-700' :
-                  'bg-gray-100 text-gray-600'
-                }`}>
-                  {customer.status}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-gray-500">{customer.industry}</span>
-                {!customer.nsId && (
-                  <span className="text-[10px] font-bold text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded border border-orange-100">
-                    LOCAL
+          {filteredCustomers.map((customer) => {
+            const statusBadgeClass = getStatusBadgeClass(customer.status);
+            return (
+              <button
+                key={customer.id}
+                onClick={() => setSelectedCustomer(customer.id)}
+                className={`w-full text-left px-4 py-3.5 hover:bg-gray-50 transition-all group border-l-4 ${
+                  selectedCustomer === customer.id 
+                    ? 'bg-blue-50/50 border-l-blue-600' 
+                    : 'border-l-transparent'
+                }`}
+              >
+                <div className="flex items-start justify-between mb-1">
+                  <span className={`font-semibold text-sm ${selectedCustomer === customer.id ? 'text-blue-700' : 'text-gray-900'}`}>
+                    {customer.name}
                   </span>
-                )}
-              </div>
-            </button>
-          ))}
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide border ${statusBadgeClass}`}>
+                    {customer.status}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-gray-500">{customer.industry}</span>
+                  {!customer.nsId && (
+                    <span className="text-[10px] font-bold text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded border border-orange-100">
+                      LOCAL
+                    </span>
+                  )}
+                </div>
+              </button>
+            );
+          })}
         </div>
         
         <div className="p-3 border-t border-gray-100 bg-gray-50">
@@ -1916,17 +1937,17 @@ export default function DemoDashboard() {
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Status
                     </label>
-                    <select
-                      value={newProspect.status}
-                      onChange={(e) => setNewProspect(prev => ({ ...prev, status: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="Qualified">Qualified</option>
-                      <option value="Active">Active</option>
-                      <option value="Hot">Hot</option>
-                      <option value="Proposal">Proposal</option>
-                      <option value="Customer-Closed Won">Customer-Closed Won</option>
-                    </select>
+                  <select
+                    value={newProspect.status}
+                    onChange={(e) => setNewProspect(prev => ({ ...prev, status: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  >
+                    {STATUS_OPTIONS.map(status => (
+                      <option key={status} value={status}>
+                        {status}
+                      </option>
+                    ))}
+                  </select>
                   </div>
                 </div>
 
@@ -1947,13 +1968,17 @@ export default function DemoDashboard() {
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Lead Source
                     </label>
-                    <input
-                      type="text"
-                      value={newProspect.leadSource}
+                    <select
+                      value={newProspect.leadSource || 'Web'}
                       onChange={(e) => setNewProspect(prev => ({ ...prev, leadSource: e.target.value }))}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                      placeholder="e.g., Web"
-                    />
+                    >
+                      {LEAD_SOURCE_OPTIONS.map(option => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 </div>
 
