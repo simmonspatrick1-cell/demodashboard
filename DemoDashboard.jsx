@@ -369,7 +369,7 @@ export default function DemoDashboard() {
       ...cat,
       prompts: cat.prompts.filter(p => p.toLowerCase().includes(promptSearch.toLowerCase()))
     })).filter(cat => cat.prompts.length > 0);
-  }, [promptSearch]);
+  }, [promptSearch, promptCategories]);
 
   // ============ HELPER FUNCTIONS ============
   const formatPrompt = (prompt, customer) => {
