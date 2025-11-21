@@ -1,14 +1,13 @@
 {
   "version": 2,
+  "name": "netsuite-dashboard-frontend",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
-  "devCommand": "npm run dev",
-  "installCommand": "npm install",
   "framework": "vite",
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "/api/$1"
+      "destination": "https://demodashboard-production.up.railway.app/api/$1"
     }
   ],
   "headers": [
@@ -25,9 +24,12 @@
         },
         {
           "key": "Access-Control-Allow-Headers",
-          "value": "Content-Type, Authorization"
+          "value": "Content-Type, Authorization, X-Requested-With"
         }
       ]
     }
-  ]
+  ],
+  "env": {
+    "VITE_API_URL": "https://demodashboard-production.up.railway.app"
+  }
 }
