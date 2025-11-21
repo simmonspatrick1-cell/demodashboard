@@ -1,0 +1,8 @@
+{
+  "framework": null,
+  "buildCommand": "npm install && npm run build",
+  "outputDirectory": "dist",
+  "env": {
+    "VITE_API_URL": "https://demodashboard-production.up.railway.app"
+  }
+}
