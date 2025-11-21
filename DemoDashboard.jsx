@@ -417,8 +417,6 @@ export default function DemoDashboard() {
 
   // Handler for importing prompts from external source
   const handlePromptsImported = (importedPrompts) => {
-    console.log('📥 Importing prompts:', importedPrompts);
-
     // Convert imported prompts to dashboard format
     const newCategories = Object.values(importedPrompts).map(cat => ({
       name: cat.label,
@@ -434,19 +432,12 @@ export default function DemoDashboard() {
       }).filter(prompt => prompt && prompt.trim().length > 0) // Remove empty prompts
     }));
 
-    console.log('🔄 Converted categories:', newCategories);
-
     // Filter out any categories with no prompts
     const validCategories = newCategories.filter(cat => cat.prompts.length > 0);
-
-    console.log('✅ Valid categories:', validCategories.length);
-    console.log('📋 Existing categories:', promptCategories.length);
 
     // Merge with existing prompts (imported prompts come first)
     const mergedCategories = [...validCategories, ...promptCategories];
     setPromptCategories(mergedCategories);
-
-    console.log('🎉 Final categories count:', mergedCategories.length);
 
     setActionStatus(`✓ Imported ${validCategories.length} categories with prompts!`);
     setTimeout(() => setActionStatus(null), 5000);
