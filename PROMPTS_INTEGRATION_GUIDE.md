@@ -2,11 +2,11 @@
 
 ## Overview
 
-Your NetSuite Dashboard now supports importing demo preparation prompts from external documents (HTML/PDF converted to HTML).
+Your NetSuite Dashboard now supports importing Professional Services demo preparation prompts from an HTML document.
 
 ## Files Added
 
-1. **`public/prompts-source.html`** - Your NetSuite Demo Preparation Prompts document
+1. **`public/prompts-ps.html`** - Professional Services NetSuite Demo Preparation Prompts
 2. **`src/promptParser.js`** - Utility to parse and extract prompts from HTML
 3. **`src/PromptImporter.jsx`** - React component for importing prompts
 
@@ -38,7 +38,7 @@ import PromptImporter from './src/PromptImporter';
 import { loadPromptsFromURL, convertToDashboardFormat } from './src/promptParser.js';
 
 // Load prompts
-const parsed = await loadPromptsFromURL('/prompts-source.html');
+const parsed = await loadPromptsFromURL('/prompts-ps.html');
 const dashboard = convertToDashboardFormat(parsed);
 
 // View the formatted prompts
@@ -163,7 +163,7 @@ console.log(JSON.stringify(prompts, null, 2));
 When your prompts document changes:
 
 1. Re-export to HTML
-2. Replace `public/prompts-source.html`
+2. Replace `public/prompts-ps.html`
 3. Use PromptImporter to reload
 4. Or re-run extraction script
 

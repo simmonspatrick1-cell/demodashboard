@@ -2,27 +2,11 @@
 
 ## Overview
 
-Your NetSuite Dashboard now includes **two comprehensive prompt libraries** that you can import and use for demo preparation. Each library is optimized for different use cases.
+Your NetSuite Dashboard includes a **comprehensive Professional Services prompt library** that you can import and use for demo preparation, optimized for PSA-focused demos, project-based businesses, and services companies.
 
-## 🎯 Available Prompt Sources
+## 🎯 Prompt Source
 
-### 1. **Comprehensive Guide** (`prompts-source.html`)
-**Best for**: General demo preparation across all NetSuite modules
-
-**Categories Included**:
-- Customer Setup
-- Project & PSA
-- Billing & Revenue
-- Industry Scenarios (Environmental, PEO, Energy, etc.)
-
-**Use when**:
-- Preparing demos for mixed audiences
-- Need industry-specific scenarios
-- Want comprehensive coverage
-
----
-
-### 2. **Professional Services** (`prompts-ps.html`)
+### **Professional Services** (`prompts-ps.html`)
 **Best for**: PSA-focused demos, project-based businesses, services companies
 
 **Categories Included**:
@@ -72,19 +56,14 @@ Your NetSuite Dashboard now includes **two comprehensive prompt libraries** that
 
 ## 🚀 How to Use
 
-### Step 1: Choose Your Source
+### Step 1: Import
 
-In the Prompts tab, use the dropdown to select:
-- **Comprehensive Guide** - Broader coverage
-- **Professional Services** - PSA/Services focus
+1. Navigate to the **Prompts** tab
+2. Click **"Load Prompts from Document"**
+3. Review the import stats (12 categories, 50+ prompts)
+4. Click **"Apply to Dashboard"**
 
-### Step 2: Import
-
-1. Click "Load Prompts from Document"
-2. Review the import stats
-3. Click "Apply to Dashboard"
-
-### Step 3: Use
+### Step 2: Use
 
 - Search and filter imported prompts
 - Copy prompts (auto-fills with customer data)
@@ -142,19 +121,10 @@ sales order, fulfillment, invoice, payment"
 
 ### Importing Strategy
 
-**Option 1: Merge Both Libraries**
-- Import Comprehensive Guide first
-- Then import Professional Services
-- Get best of both worlds
-
-**Option 2: Selective Import**
-- Choose based on demo audience
-- Keep library focused and relevant
-
-**Option 3: Periodic Updates**
-- Export current prompts as backup (JSON)
-- Import fresh prompts when documents update
-- Restore custom prompts if needed
+**Periodic Updates**
+- Export current prompts as backup (JSON) before importing
+- Import fresh prompts when the document updates
+- Prompts are automatically saved to localStorage
 
 ### Organizing After Import
 
@@ -188,11 +158,11 @@ Use the search bar to find prompts by:
 
 ## 🔄 Updating Prompts
 
-### When Documents Change
+### When the Document Changes
 
 1. **Receive updated HTML file**
-2. **Replace** `public/prompts-source.html` or `public/prompts-ps.html`
-3. **Commit and push**
+2. **Replace** `public/prompts-ps.html`
+3. **Commit and push** to deploy
 4. **Re-import** in dashboard
 5. **Apply** to update library
 
@@ -209,43 +179,35 @@ All prompts are:
 ### Scenario 1: New Demo for PSA Company
 
 ```
-1. Select: "Professional Services"
-2. Import prompts
-3. Search: "end-to-end service"
-4. Copy prompt for complete scenario
-5. Paste into Claude
-6. Review generated data plan
+1. Navigate to Prompts tab
+2. Click "Load Prompts from Document"
+3. Click "Apply to Dashboard"
+4. Search: "end-to-end service"
+5. Copy prompt for complete scenario
+6. Paste into Claude
+7. Review generated data plan
 ```
 
-### Scenario 2: Industry-Specific Demo
+### Scenario 2: Quick Project Setup
 
 ```
-1. Select: "Comprehensive Guide"
-2. Import prompts
-3. Search: "environmental" or "PEO" or "energy"
-4. Copy industry scenario prompt
-5. Customize with customer details
-6. Generate demo data
+1. Open Prompts tab
+2. Expand "Projects & Professional Services"
+3. Copy "Project Setup" prompt
+4. Customize with customer details
+5. Generate demo data via Claude
 ```
 
-### Scenario 3: Custom Hybrid
+### Scenario 3: Complete Sales Cycle
 
 ```
-1. Import "Comprehensive Guide"
-2. Import "Professional Services" (merges)
-3. Search across both
-4. Build custom workflow
+1. Search: "quote" or "invoice" or "sales order"
+2. Copy relevant prompts
+3. Build end-to-end sales workflow
+4. Generate complete demo scenario
 ```
 
 ## 🎯 Prompt Categories Reference
-
-### Comprehensive Guide Categories
-1. Customer Setup
-2. Project & PSA
-3. Billing & Revenue
-4. Industry Scenarios
-
-**Total**: ~20-30 prompts
 
 ### Professional Services Categories
 1. Customer Management (Basic & Detailed)
@@ -267,8 +229,7 @@ All prompts are:
 ### File Locations
 ```
 public/
-├── prompts-source.html      # Comprehensive Guide
-└── prompts-ps.html          # Professional Services
+└── prompts-ps.html          # Professional Services prompts
 
 src/
 ├── promptParser.js          # HTML parsing utility
