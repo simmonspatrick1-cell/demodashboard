@@ -659,6 +659,33 @@ app.post('/api/cache/clear', (req, res) => {
   res.json({ message: 'Cache cleared' });
 });
 
+/**
+ * Monitoring endpoints
+ */
+app.post('/api/monitoring/error', (req, res) => {
+  const error = req.body;
+  log('error', 'Frontend error received', {
+    type: error.type,
+    message: error.message,
+    url: error.url,
+    timestamp: error.timestamp
+  });
+  res.status(200).json({ received: true });
+});
+
+app.get('/api/monitoring/metrics', (_req, res) => {
+  res.json({
+    server: {
+      uptime: process.uptime(),
+      memory: process.memoryUsage(),
+      env: process.env.NODE_ENV || 'development'
+    },
+    cache: {
+      size: cache.size
+    }
+  });
+});
+
 // ============ ERROR HANDLING ============
 app.use((err, req, res, next) => {
   console.error('Unhandled error:', err);
