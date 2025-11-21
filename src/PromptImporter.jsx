@@ -10,14 +10,21 @@ export default function PromptImporter({ onPromptsImported }) {
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState(null);
   const [importedData, setImportedData] = useState(null);
+  const [selectedSource, setSelectedSource] = useState('comprehensive');
+
+  const promptSources = [
+    { id: 'comprehensive', label: 'Comprehensive Guide', url: '/prompts-source.html' },
+    { id: 'ps', label: 'Professional Services', url: '/prompts-ps.html' }
+  ];
 
   const handleImportFromFile = async () => {
     setLoading(true);
     setStatus(null);
 
     try {
-      // Load from the prompts-source.html file in public folder
-      const parsedPrompts = await loadPromptsFromURL('/prompts-source.html');
+      const sourceUrl = promptSources.find(s => s.id === selectedSource)?.url || '/prompts-source.html';
+      // Load from the selected prompts file in public folder
+      const parsedPrompts = await loadPromptsFromURL(sourceUrl);
 
       if (parsedPrompts.error) {
         setStatus({
@@ -95,6 +102,28 @@ export default function PromptImporter({ onPromptsImported }) {
           This will load prompts from the included reference document and make them
           available in your prompt library.
         </p>
+
+        {/* Source Selector */}
+        <div className="mb-4">
+          <label htmlFor="prompt-source" className="block text-sm font-medium text-gray-700 mb-2">
+            Select Prompt Source
+          </label>
+          <select
+            id="prompt-source"
+            value={selectedSource}
+            onChange={(e) => setSelectedSource(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          >
+            {promptSources.map(source => (
+              <option key={source.id} value={source.id}>
+                {source.label}
+              </option>
+            ))}
+          </select>
+          <p className="mt-1 text-xs text-gray-500">
+            Choose which set of prompts to import
+          </p>
+        </div>
 
         <div className="flex flex-wrap gap-3">
           <button
