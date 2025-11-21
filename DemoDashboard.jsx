@@ -6,6 +6,7 @@ import { exportViaEmail, createExportData, validateNetSuiteFields } from './emai
 import { ITEM_CONFIG, ESTIMATE_PRESETS, AVAILABLE_ITEMS } from './src/itemConfig';
 import ReferenceDataManager from './src/ReferenceDataManager';
 import { ClassSelector, DepartmentSelector, LocationSelector } from './src/ReferenceDataSelector';
+import PromptImporter from './src/PromptImporter';
 // import { NETSUITE_CLASSES, NETSUITE_DEPARTMENTS, NETSUITE_EMPLOYEES, NETSUITE_LOCATIONS } from './src/netsuiteData';
 
 export default function DemoDashboard() {
@@ -37,7 +38,41 @@ export default function DemoDashboard() {
   const [selectedDepartment, setSelectedDepartment] = useState(null);
   const [selectedLocation, setSelectedLocation] = useState(null);
   const [formErrors, setFormErrors] = useState({});
-  
+  const [promptCategories, setPromptCategories] = useState([
+    {
+      name: 'Customer Setup',
+      prompts: [
+        'Create a new customer for [Company Name] in the [Vertical] industry with [company size] employees, annual revenue of [amount], and primary contact [contact info].',
+        'Set up a multi-subsidiary customer structure where the parent company is [Parent Co] and subsidiaries include [List]. Configure consolidated reporting.',
+        'Create a customer with custom fields populated: Industry Type=[X], Annual Revenue=[X], No. of Employees=[X], and AI Generated Summary=[summary].',
+      ]
+    },
+    {
+      name: 'Project & PSA',
+      prompts: [
+        'Create a project for [Customer Name] titled "[Project Name]" with: Project Code=[PRJ####], Customer=[Customer], Project Manager=[Person], Estimated Budget=[Amount], Start=[Date], End=[Date], and add task estimates for: [list tasks].',
+        'Set up resource allocation forecast for project PRJ#### with these roles: [Environmental Engineer-500hrs@$150/hr], [Field Technician-300hrs@$75/hr], [QA Officer-200hrs@$120/hr].',
+        'Create time entries for [Employee Name] on [Project]: [Date] - [Hours] hours for [Task], [Date] - [Hours] hours for [Task]. Mark as approved and billable.',
+      ]
+    },
+    {
+      name: 'Billing & Revenue',
+      prompts: [
+        'Create an estimate for [Customer Name] from project [PRJ####] including: [Item 1-Qty-Rate], [Item 2-Qty-Rate]. Set as pending, customer=[Customer], due date=[Date].',
+        'Generate an invoice from estimate [EST####] with these modifications: remove [Item], add [New Item-Qty-Rate], adjust billing date to [Date].',
+        'Create a purchase order from vendor bill [VB####] for [Vendor Name] totaling $[Amount] for [Description]. Link to project [PRJ####] for cost allocation.',
+      ]
+    },
+    {
+      name: 'Industry Scenarios',
+      prompts: [
+        'Environmental Consulting: Create a complete demo scenario for [Client] including: 5 stream restoration projects, 12 project team members, 2400 billable hours YTD, resource utilization dashboard showing 85% utilization, multi-entity consolidation across 3 regions.',
+        'PEO Services: Set up AdvisorHR demo with: 3 subsidiary companies (staffing, payroll, HR operations), 250+ employees across entities, daily time tracking, multi-entity revenue recognition, compliance tracking.',
+        'Midstream Energy: Build Marabou pipeline scenario with: pipeline segment projects across 4 states, equipment tracking, environmental compliance charges, resource crews with seasonal allocation, multi-entity cost allocation.',
+      ]
+    }
+  ]);
+
   // Refs for auto-focus
   const nameInputRef = useRef(null);
   const modalRef = useRef(null);
@@ -112,6 +147,23 @@ export default function DemoDashboard() {
   useEffect(() => {
     localStorage.setItem('demodashboard_prospects', JSON.stringify(prospects));
   }, [prospects]);
+
+  // Load Prompt Categories from local storage
+  useEffect(() => {
+    const savedPrompts = localStorage.getItem('demodashboard_prompts');
+    if (savedPrompts) {
+      try {
+        setPromptCategories(JSON.parse(savedPrompts));
+      } catch (e) {
+        console.error('Failed to parse saved prompts', e);
+      }
+    }
+  }, []);
+
+  // Save Prompt Categories to local storage
+  useEffect(() => {
+    localStorage.setItem('demodashboard_prompts', JSON.stringify(promptCategories));
+  }, [promptCategories]);
 
   // Load API Key from local storage
   useEffect(() => {
@@ -301,41 +353,6 @@ export default function DemoDashboard() {
     { id: 7, name: 'Formative Group', entityid: 'Formative-Demo', industry: 'Salesforce Consulting', size: '80-120', status: 'Active', demoDate: 'Nov 20', focus: ['Scaling Operations', 'Acquisitions', 'Resource Mgmt'], budget: '$200K-400K', nsId: 1938 },
   ];
 
-  const promptCategories = [
-    {
-      name: 'Customer Setup',
-      prompts: [
-        'Create a new customer for [Company Name] in the [Vertical] industry with [company size] employees, annual revenue of [amount], and primary contact [contact info].',
-        'Set up a multi-subsidiary customer structure where the parent company is [Parent Co] and subsidiaries include [List]. Configure consolidated reporting.',
-        'Create a customer with custom fields populated: Industry Type=[X], Annual Revenue=[X], No. of Employees=[X], and AI Generated Summary=[summary].',
-      ]
-    },
-    {
-      name: 'Project & PSA',
-      prompts: [
-        'Create a project for [Customer Name] titled "[Project Name]" with: Project Code=[PRJ####], Customer=[Customer], Project Manager=[Person], Estimated Budget=[Amount], Start=[Date], End=[Date], and add task estimates for: [list tasks].',
-        'Set up resource allocation forecast for project PRJ#### with these roles: [Environmental Engineer-500hrs@$150/hr], [Field Technician-300hrs@$75/hr], [QA Officer-200hrs@$120/hr].',
-        'Create time entries for [Employee Name] on [Project]: [Date] - [Hours] hours for [Task], [Date] - [Hours] hours for [Task]. Mark as approved and billable.',
-      ]
-    },
-    {
-      name: 'Billing & Revenue',
-      prompts: [
-        'Create an estimate for [Customer Name] from project [PRJ####] including: [Item 1-Qty-Rate], [Item 2-Qty-Rate]. Set as pending, customer=[Customer], due date=[Date].',
-        'Generate an invoice from estimate [EST####] with these modifications: remove [Item], add [New Item-Qty-Rate], adjust billing date to [Date].',
-        'Create a purchase order from vendor bill [VB####] for [Vendor Name] totaling $[Amount] for [Description]. Link to project [PRJ####] for cost allocation.',
-      ]
-    },
-    {
-      name: 'Industry Scenarios',
-      prompts: [
-        'Environmental Consulting: Create a complete demo scenario for [Client] including: 5 stream restoration projects, 12 project team members, 2400 billable hours YTD, resource utilization dashboard showing 85% utilization, multi-entity consolidation across 3 regions.',
-        'PEO Services: Set up AdvisorHR demo with: 3 subsidiary companies (staffing, payroll, HR operations), 250+ employees across entities, daily time tracking, multi-entity revenue recognition, compliance tracking.',
-        'Midstream Energy: Build Marabou pipeline scenario with: pipeline segment projects across 4 states, equipment tracking, environmental compliance charges, resource crews with seasonal allocation, multi-entity cost allocation.',
-      ]
-    }
-  ];
-
   // ============ CUSTOMER FILTERING & SEARCH ============
   const filteredCustomers = useMemo(() => {
     const query = debouncedSearchQuery.toLowerCase();
@@ -398,9 +415,23 @@ export default function DemoDashboard() {
     );
   };
 
+  // Handler for importing prompts from external source
+  const handlePromptsImported = (importedPrompts) => {
+    // Convert imported prompts to dashboard format
+    const newCategories = Object.values(importedPrompts).map(cat => ({
+      name: cat.label,
+      prompts: cat.prompts.map(p => p.prompt)
+    }));
+
+    // Merge with existing prompts (imported prompts come first)
+    setPromptCategories([...newCategories, ...promptCategories]);
+    setActionStatus('✓ Prompts imported successfully!');
+    setTimeout(() => setActionStatus(null), 3000);
+  };
+
   const handleAddProspect = () => {
     const errors = {};
-    
+
     // Validate required fields
     if (!newProspect.name || !newProspect.name.trim()) {
       errors.name = 'Company Name is required';
@@ -1516,6 +1547,9 @@ export default function DemoDashboard() {
           </div>
         </div>
       </div>
+
+      {/* Prompt Importer */}
+      <PromptImporter onPromptsImported={handlePromptsImported} />
 
       {/* Search Bar with Context Indicator */}
       <div className="space-y-2">
