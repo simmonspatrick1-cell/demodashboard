@@ -21,13 +21,16 @@ export function parsePromptsFromHTML(htmlContent) {
   let currentCategory = null;
   let currentPrompt = null;
 
-  // Find all headings and paragraphs
-  const elements = doc.querySelectorAll('h1, h2, h3, p, ul, ol');
+  // Find all headings, paragraphs, and table cells
+  const elements = doc.querySelectorAll('h1, h2, h3, p, ul, ol, td');
 
   elements.forEach(element => {
     const text = element.textContent.trim();
 
     if (!text) return;
+
+    // Skip empty or very short content
+    if (text.length < 3) return;
 
     // H1 or H2 = Main category
     if (element.tagName === 'H1' || element.tagName === 'H2') {
@@ -43,13 +46,15 @@ export function parsePromptsFromHTML(htmlContent) {
       currentPrompt = null;
     }
 
-    // H3 = Prompt title
+    // H3 = Subcategory or Prompt title
     else if (element.tagName === 'H3') {
+      // Save previous prompt if exists
       if (currentPrompt && currentCategory) {
         currentCategory.prompts.push(currentPrompt);
         prompts.allPrompts.push(currentPrompt);
       }
 
+      // Start new subcategory
       currentPrompt = {
         title: text,
         content: '',
@@ -58,8 +63,31 @@ export function parsePromptsFromHTML(htmlContent) {
       };
     }
 
-    // P or Lists = Prompt content
+    // TD (table cell) = Individual prompt in a structured format
+    else if (element.tagName === 'TD' && currentCategory) {
+      // Extract prompt text from table cell (strip quotes if present)
+      const promptText = text.replace(/^[""]|[""]$/g, '').trim();
+
+      // Only add if it looks like a valid prompt (starts with quote or contains key words)
+      if (promptText.length > 20 && (promptText.includes('Create') || promptText.includes('Set up') || promptText.includes('Generate') || promptText.includes('Add'))) {
+        // Create a standalone prompt
+        const tablePrompt = {
+          title: currentPrompt?.title || currentCategory.name,
+          content: promptText,
+          category: currentCategory.name,
+          tags: []
+        };
+
+        currentCategory.prompts.push(tablePrompt);
+        prompts.allPrompts.push(tablePrompt);
+      }
+    }
+
+    // P or Lists = Prompt content (for non-table format)
     else if ((element.tagName === 'P' || element.tagName === 'UL' || element.tagName === 'OL') && currentPrompt) {
+      // Skip if this is inside a table (already handled)
+      if (element.closest('table')) return;
+
       if (currentPrompt.content) {
         currentPrompt.content += '\n\n' + text;
       } else {
@@ -69,6 +97,9 @@ export function parsePromptsFromHTML(htmlContent) {
 
     // If no current prompt, add to category description
     else if ((element.tagName === 'P') && currentCategory && !currentPrompt) {
+      // Skip if inside table
+      if (element.closest('table')) return;
+
       if (currentCategory.description) {
         currentCategory.description += '\n' + text;
       } else {
