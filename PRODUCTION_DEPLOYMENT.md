@@ -1,5 +1,25 @@
 # 🚀 **NetSuite Dashboard - Production Deployment Guide**
 
+## 🌐 **Current Production Deployment**
+
+### **Live URLs**
+- **Frontend (Vercel)**: https://demodashboard-mu.vercel.app
+- **Backend (Railway)**: https://demodashboard-production.up.railway.app
+- **Status**: ✅ Deployed and Running
+
+### **Deployment Architecture**
+- **Frontend**: Deployed on Vercel (auto-deploys from `main` branch)
+- **Backend**: Deployed on Railway (auto-deploys from `main` branch)
+- **API Proxy**: Vercel rewrites `/api/*` → Railway backend
+- **Build**: Vite (production optimized)
+
+### **Quick Start**
+1. Visit: https://demodashboard-mu.vercel.app
+2. Configure NetSuite credentials in Railway environment variables
+3. Add Claude API key in the dashboard settings
+
+---
+
 ## 📋 **Executive Summary**
 
 This guide provides step-by-step instructions for deploying the NetSuite Dashboard to production. The system has been thoroughly tested and optimized for enterprise-scale deployment with robust error handling, monitoring, and security features.
