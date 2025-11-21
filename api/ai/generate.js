@@ -43,18 +43,28 @@ export default async function handler(req, res) {
           {
             "name": "Company Name",
             "entityId": "Short alphanumeric ID (e.g. COMP-001)",
+            "type": "Company or Individual",
+            "status": "Qualified, Active, Hot, Proposal, or Customer-Closed Won",
+            "salesRep": "A plausible sales rep name",
+            "leadSource": "Source (e.g., Web, Referral, Event)",
+            "subsidiary": "Subsidiary or parent company (optional)",
             "industry": "Industry (e.g., SaaS, Manufacturing)",
             "size": "Estimated Employee Count (e.g., 50-100)",
-            "revenue": "Estimated Revenue (e.g., $10M-20M)",
+            "budget": "Estimated revenue or budget range (e.g., $10M-20M)",
+            "revenue": "Estimated Revenue (optional, can mirror budget)",
             "website": "${content}",
             "description": "Brief 1-2 sentence description",
             "focus_areas": ["Area 1", "Area 2", "Area 3"],
+            "phone": "Sales or general phone number",
+            "email": "Company email",
+            "invoiceEmail": "Preferred invoice email (use ap@netsuite.com if unsure)",
+            "paymentEmail": "Payment notification email (use ap@netsuite.com if unsure)",
             "suggested_projects": [
               { "name": "Project Name", "description": "Why this project fits" }
             ]
           }
           
-          Only return the valid JSON object, no other text.
+          Only return the valid JSON object, no other text. If you don't have enough data, make a realistic guess; default invoiceEmail/paymentEmail to ap@netsuite.com when uncertain.
         `;
       } catch (error) {
         return res.status(500).json({ error: `Failed to fetch URL: ${error.message}` });

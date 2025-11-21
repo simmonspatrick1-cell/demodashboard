@@ -218,9 +218,19 @@ export default function DemoDashboard() {
         
         if (data.name) updates.name = data.name;
         if (data.entityId) updates.entityid = data.entityId;
+        if (data.type) updates.type = data.type;
+        if (data.status) updates.status = data.status;
+        if (data.salesRep) updates.salesRep = data.salesRep;
+        if (data.leadSource) updates.leadSource = data.leadSource;
+        if (data.subsidiary) updates.subsidiary = data.subsidiary;
         if (data.industry) updates.industry = data.industry;
         if (data.size) updates.size = data.size;
-        if (data.revenue) updates.budget = data.revenue;
+        if (data.budget) updates.budget = data.budget;
+        else if (data.revenue) updates.budget = data.revenue;
+        if (data.phone) updates.phone = data.phone;
+        if (data.email) updates.email = data.email;
+        updates.invoiceEmail = data.invoiceEmail || 'ap@netsuite.com';
+        updates.paymentEmail = data.paymentEmail || 'ap@netsuite.com';
         if (data.focus_areas && Array.isArray(data.focus_areas)) {
           updates.focus = data.focus_areas;
         }
