@@ -1,9 +1,6 @@
 {
-  "version": 2,
-  "name": "netsuite-dashboard-frontend",
   "buildCommand": "npx vite build",
   "outputDirectory": "dist",
-  "framework": "vite",
   "rewrites": [
     {
       "source": "/api/(.*)",

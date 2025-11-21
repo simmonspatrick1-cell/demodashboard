@@ -784,16 +784,29 @@ function(record, search, log, https, email, encode, runtime) {
             });
 
             // REQUIRED: Entity ID (Project Code/ID)
+            // Check multiple possible field names for flexibility
+            var projectCode = projectData.entityid || projectData.projectEntityid ||
+                             projectData.code || projectData.projectCode ||
+                             projectData.name || projectData.projectName ||
+                             'PROJ-' + Date.now();
+
             projectRecord.setValue({
                 fieldId: 'entityid',
-                value: projectData.code || projectData.projectCode || projectData.name || projectData.projectName || 'PROJ-' + Date.now()
+                value: projectCode
             });
+            log.debug('Project', 'Set entityid: ' + projectCode);
 
             // REQUIRED: Company Name (Project Name)
+            // Check multiple possible field names for flexibility
+            var projectName = projectData.name || projectData.projectName ||
+                             projectData.companyname || projectData.projectCompanyName ||
+                             projectData.code || projectData.projectCode;
+
             projectRecord.setValue({
                 fieldId: 'companyname',
-                value: projectData.name || projectData.projectName || projectData.code || projectData.projectCode
+                value: projectName
             });
+            log.debug('Project', 'Set companyname: ' + projectName);
 
             // REQUIRED: Customer (Parent Customer)
             projectRecord.setValue({

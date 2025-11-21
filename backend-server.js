@@ -9,11 +9,54 @@ import express from 'express';
 import cors from 'cors';
 import Anthropic from "@anthropic-ai/sdk";
 import 'dotenv/config';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Validate required environment variables
 if (!process.env.ANTHROPIC_API_KEY) {
   console.error('ERROR: ANTHROPIC_API_KEY environment variable is required');
+  console.error('Please check your .env file or environment configuration');
   process.exit(1);
+}
+
+// Basic logging setup
+const LOG_LEVEL = process.env.LOG_LEVEL || 'info';
+const LOG_FILE = process.env.LOG_FILE || path.join(__dirname, 'logs', 'app.log');
+
+const logLevels = {
+  error: 0,
+  warn: 1,
+  info: 2,
+  debug: 3
+};
+
+function log(level, message, data = null) {
+  if (logLevels[level] <= logLevels[LOG_LEVEL]) {
+    const timestamp = new Date().toISOString();
+    const logMessage = `[${timestamp}] ${level.toUpperCase()}: ${message}`;
+
+    console.log(logMessage);
+    if (data) {
+      console.log(JSON.stringify(data, null, 2));
+    }
+
+    // Write to file if in production
+    if (process.env.NODE_ENV === 'production') {
+      try {
+        const logDir = path.dirname(LOG_FILE);
+        if (!fs.existsSync(logDir)) {
+          fs.mkdirSync(logDir, { recursive: true });
+        }
+        fs.appendFileSync(LOG_FILE, logMessage + '\n' + (data ? JSON.stringify(data, null, 2) + '\n' : ''));
+      } catch (error) {
+        console.error('Failed to write to log file:', error.message);
+      }
+    }
+  }
 }
 
 const app = express();

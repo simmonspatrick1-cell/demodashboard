@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { Search, Settings, User, Users, Zap, ChevronRight, Copy, Check, BookOpen, ChevronDown, Target, Building2, Mail, Phone, MoreVertical, Play, Plus, FileText, Clock, TrendingUp, AlertCircle, Loader, RefreshCw, Database, Globe, X } from 'lucide-react';
 // Import the NetSuite service
 // import NetSuiteService from './netsuite-service';
-import { exportViaEmail, createExportData } from './email-export-utils';
+import { exportViaEmail, createExportData, validateNetSuiteFields } from './email-export-utils';
 import { ITEM_CONFIG, ESTIMATE_PRESETS, AVAILABLE_ITEMS } from './src/itemConfig';
 import ReferenceDataManager from './src/ReferenceDataManager';
 import { ClassSelector, DepartmentSelector, LocationSelector } from './src/ReferenceDataSelector';
@@ -619,7 +619,7 @@ export default function DemoDashboard() {
         custentity_esc_no_of_employees: nsResponse.custentity_esc_no_of_employees || selectedCustData.size
       } : selectedCustData;
 
-      // Prepare export data with hashtags
+      // Prepare export data with hashtags (only NetSuite-compatible fields)
       const exportData = createExportData(customerData, null, {
         memo: demoNotes[selectedCustData.id] || '',
         estimate: {
@@ -629,10 +629,35 @@ export default function DemoDashboard() {
         }
       });
 
+      // Validate fields before export
+      const validation = validateNetSuiteFields(exportData);
+
+      // Show validation feedback
+      if (validation.warnings.length > 0) {
+        const warningText = validation.warnings.map(w => w.replace('⚠️ ', '')).join('; ');
+        setActionStatus(`⚠️ Export filtered invalid fields: ${warningText}`);
+        setTimeout(() => {
+          // Continue with export after showing warning
+          performEmailExport(exportData);
+        }, 2000);
+      } else {
+        performEmailExport(exportData);
+      }
+
+    } catch (error) {
+      console.error('Email export error:', error);
+      setActionStatus('⚠ Email export failed');
+      setTimeout(() => setActionStatus(null), 3000);
+    }
+  };
+
+  const performEmailExport = (exportData) => {
+    try {
       // Export via email
       exportViaEmail(exportData, {
         recipientEmail: 'simmonspatrick1@gmail.com',
-        includeInstructions: true
+        includeInstructions: true,
+        includeValidation: true
       });
 
       setActionStatus('✓ Opening email client...');
