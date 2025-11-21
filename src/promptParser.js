@@ -68,8 +68,11 @@ export function parsePromptsFromHTML(htmlContent) {
       // Extract prompt text from table cell (strip quotes if present)
       const promptText = text.replace(/^[""]|[""]$/g, '').trim();
 
-      // Only add if it looks like a valid prompt (starts with quote or contains key words)
-      if (promptText.length > 20 && (promptText.includes('Create') || promptText.includes('Set up') || promptText.includes('Generate') || promptText.includes('Add'))) {
+      // Count words in the prompt
+      const wordCount = promptText.split(/\s+/).filter(word => word.length > 0).length;
+
+      // Only add if it's a valid prompt: has 5+ words, sufficient length, and contains key action words
+      if (wordCount >= 5 && promptText.length > 20 && (promptText.includes('Create') || promptText.includes('Set up') || promptText.includes('Generate') || promptText.includes('Add'))) {
         // Create a standalone prompt
         const tablePrompt = {
           title: currentPrompt?.title || currentCategory.name,
@@ -116,6 +119,19 @@ export function parsePromptsFromHTML(htmlContent) {
   if (currentCategory && currentCategory.prompts.length > 0) {
     prompts.categories.push(currentCategory);
   }
+
+  // Clean up: Filter out prompts with less than 5 words
+  prompts.categories = prompts.categories.map(category => ({
+    ...category,
+    prompts: category.prompts.filter(prompt => {
+      const content = prompt.content || '';
+      const wordCount = content.split(/\s+/).filter(word => word.length > 0).length;
+      return wordCount >= 5;
+    })
+  })).filter(category => category.prompts.length > 0); // Remove empty categories
+
+  // Update allPrompts to match filtered categories
+  prompts.allPrompts = prompts.categories.flatMap(cat => cat.prompts);
 
   return prompts;
 }
