@@ -2,12 +2,35 @@ import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { Search, Settings, User, Users, Zap, ChevronRight, Copy, Check, BookOpen, ChevronDown, Target, Building2, Mail, Phone, MoreVertical, Play, Plus, FileText, Clock, TrendingUp, AlertCircle, Loader, RefreshCw, Database, Globe, X } from 'lucide-react';
 // Import the NetSuite service
 // import NetSuiteService from './netsuite-service';
-import { exportViaEmail, createExportData, validateNetSuiteFields } from './email-export-utils';
+import { exportViaEmail, createExportData, validateNetSuiteFields, computeIdempotencyKey } from './email-export-utils';
 import { ITEM_CONFIG, ESTIMATE_PRESETS, AVAILABLE_ITEMS } from './src/itemConfig';
 import ReferenceDataManager from './src/ReferenceDataManager';
 import { ClassSelector, DepartmentSelector, LocationSelector } from './src/ReferenceDataSelector';
 import PromptImporter from './src/PromptImporter';
 // import { NETSUITE_CLASSES, NETSUITE_DEPARTMENTS, NETSUITE_EMPLOYEES, NETSUITE_LOCATIONS } from './src/netsuiteData';
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+const getNewProspectTemplate = () => ({
+  name: '',
+  entityid: '',
+  type: 'Company',
+  industry: '',
+  size: '',
+  status: 'CUSTOMER-Closed Won',
+  demoDate: '',
+  focus: [],
+  budget: '',
+  nsId: null,
+  website: '',
+  salesRep: 'Will Clark',
+  leadSource: 'Web',
+  subsidiary: '2',
+  phone: '',
+  email: '',
+  invoiceEmail: 'ap@netsuite.com',
+  paymentEmail: 'ap@netsuite.com'
+});
 
 export default function DemoDashboard() {
   // ============ STATE MANAGEMENT ============
@@ -16,6 +39,7 @@ export default function DemoDashboard() {
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [promptSearch, setPromptSearch] = useState('');
+  const [debouncedPromptSearch, setDebouncedPromptSearch] = useState('');
   const [copiedIndex, setCopiedIndex] = useState(null);
   const [expandedCategory, setExpandedCategory] = useState(null);
   const [favorites, setFavorites] = useState([]);
@@ -110,26 +134,7 @@ export default function DemoDashboard() {
     }
     return 'border-l-gray-300 bg-gray-50 text-gray-600';
   };
-  const [newProspect, setNewProspect] = useState({
-    name: '',
-    entityid: '',
-    type: 'Company',
-    industry: '',
-    size: '',
-    status: 'CUSTOMER-Closed Won',
-    demoDate: '',
-    focus: [],
-    budget: '',
-    nsId: null,
-    website: '',
-    salesRep: '',
-    leadSource: '',
-    subsidiary: '',
-    phone: '',
-    email: '',
-    invoiceEmail: '',
-    paymentEmail: ''
-  });
+  const [newProspect, setNewProspect] = useState(getNewProspectTemplate);
 
   // Load Prospects from local storage
   useEffect(() => {
@@ -190,6 +195,13 @@ export default function DemoDashboard() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedPromptSearch(promptSearch);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [promptSearch]);
+
   // Keyboard navigation: ESC to close modals
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -233,6 +245,34 @@ export default function DemoDashboard() {
       setFormErrors({});
     }
   }, [isGeneratingAI]);
+
+  const validateField = useCallback((field, value, enforceRequired = false) => {
+    const trimmedValue = value ? value.trim() : '';
+    if (field === 'name') {
+      if (enforceRequired && !trimmedValue) {
+        return 'Company Name is required';
+      }
+      return null;
+    }
+
+    if (field === 'entityid') {
+      if (enforceRequired && !trimmedValue) {
+        return 'Entity ID is required';
+      }
+      if (trimmedValue && !/^[A-Za-z0-9_-]+$/.test(trimmedValue)) {
+        return 'Entity ID can only contain letters, numbers, dashes, and underscores';
+      }
+      return null;
+    }
+
+    if (['email', 'invoiceEmail', 'paymentEmail'].includes(field)) {
+      if (trimmedValue && !EMAIL_REGEX.test(trimmedValue)) {
+        return 'Please enter a valid email address';
+      }
+    }
+
+    return null;
+  }, []);
 
   // AI Generation Handler
   const generateFromAI = async (type, content, isRetry = false) => {
@@ -364,12 +404,12 @@ export default function DemoDashboard() {
   }, [debouncedSearchQuery, prospects]);
 
   const filteredPrompts = useMemo(() => {
-    if (!promptSearch) return promptCategories;
+    if (!debouncedPromptSearch) return promptCategories;
     return promptCategories.map(cat => ({
       ...cat,
-      prompts: cat.prompts.filter(p => p.toLowerCase().includes(promptSearch.toLowerCase()))
+      prompts: cat.prompts.filter(p => p.toLowerCase().includes(debouncedPromptSearch.toLowerCase()))
     })).filter(cat => cat.prompts.length > 0);
-  }, [promptSearch, promptCategories]);
+  }, [debouncedPromptSearch, promptCategories]);
 
   // ============ HELPER FUNCTIONS ============
   const formatPrompt = (prompt, customer) => {
@@ -445,33 +485,16 @@ export default function DemoDashboard() {
 
   const handleAddProspect = () => {
     const errors = {};
+    ['name', 'entityid', 'email', 'invoiceEmail', 'paymentEmail'].forEach(field => {
+      const enforceRequired = field === 'name' || field === 'entityid';
+      const error = validateField(field, newProspect[field], enforceRequired);
+      if (error) {
+        errors[field] = error;
+      }
+    });
 
-    // Validate required fields
-    if (!newProspect.name || !newProspect.name.trim()) {
-      errors.name = 'Company Name is required';
-    }
-    if (!newProspect.entityid || !newProspect.entityid.trim()) {
-      errors.entityid = 'Entity ID is required';
-    }
-    
-    // Validate email format if provided
-    if (newProspect.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newProspect.email)) {
-      errors.email = 'Please enter a valid email address';
-    }
-    if (newProspect.invoiceEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newProspect.invoiceEmail)) {
-      errors.invoiceEmail = 'Please enter a valid email address';
-    }
-    if (newProspect.paymentEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newProspect.paymentEmail)) {
-      errors.paymentEmail = 'Please enter a valid email address';
-    }
-    
-    // Validate Entity ID format (alphanumeric with dashes/underscores)
-    if (newProspect.entityid && !/^[A-Za-z0-9_-]+$/.test(newProspect.entityid)) {
-      errors.entityid = 'Entity ID can only contain letters, numbers, dashes, and underscores';
-    }
-    
     setFormErrors(errors);
-    
+
     if (Object.keys(errors).length > 0) {
       setActionStatus('⚠️ Please fix the errors below');
       setTimeout(() => setActionStatus(null), 3000);
@@ -480,6 +503,8 @@ export default function DemoDashboard() {
 
     const prospectToAdd = {
       ...newProspect,
+      name: newProspect.name.trim(),
+      entityid: newProspect.entityid.trim(),
       id: prospects.length + 1,
       nsId: null // Will be assigned when created in NetSuite
     };
@@ -491,31 +516,18 @@ export default function DemoDashboard() {
     setTimeout(() => setActionStatus(null), 3000);
 
     // Reset form
-    setNewProspect({
-      name: '',
-      entityid: '',
-      type: 'Company',
-      industry: '',
-      size: '',
-      status: 'CUSTOMER-Closed Won',
-      demoDate: '',
-      focus: [],
-      budget: '',
-      nsId: null,
-      website: '',
-      salesRep: '',
-      leadSource: '',
-      subsidiary: '',
-      phone: '',
-      email: '',
-      invoiceEmail: '',
-      paymentEmail: ''
-    });
+    setNewProspect(getNewProspectTemplate());
     
     // Reset focus
     if (nameInputRef.current) {
       nameInputRef.current.blur();
     }
+  };
+
+  const handleFormSubmit = (event) => {
+    event.preventDefault();
+    if (isGeneratingAI) return;
+    handleAddProspect();
   };
 
   const toggleFocusArea = (area) => {
@@ -836,10 +848,25 @@ export default function DemoDashboard() {
             purchasePrice: item.purchasePrice || 0
           }))
         };
-
+        // Compute a deterministic idempotency key for this estimate to prevent duplicates in NetSuite
+        const idKey = computeIdempotencyKey({
+          customerId: estimateData.customerId,
+          projectId: estimateData.projectId || null,
+          dueDate: estimateData.dueDate || null,
+          items: estimateData.items.map(it => ({
+            name: it.name,
+            displayName: it.displayName,
+            qty: it.quantity,
+            rate: it.rate
+          }))
+        });
+        // Attach as externalId (preferred) and include top-level idempotencyKey for SuiteScript fallback
+        estimateData.externalId = idKey;
+        
         const exportData = createExportData(selectedCustData, null, {
           estimate: estimateData,
-          memo: demoNotes[selectedCustData.id] || ''
+          memo: demoNotes[selectedCustData.id] || '',
+          idempotencyKey: idKey
         });
 
         exportViaEmail(exportData, {
@@ -1525,6 +1552,223 @@ export default function DemoDashboard() {
     </div>
   );
 
+  // ============ COMPONENT: PROJECT CONFIGURATION ============
+  const ProjectConfigPanel = () => {
+    const [projectName, setProjectName] = useState(
+      selectedCustData ? `${selectedCustData.name} - Demo Project` : ''
+    );
+    const [projectCode, setProjectCode] = useState(
+      selectedCustData ? `PRJ-${selectedCustData?.entityid}-${Date.now()}` : `PRJ-${Date.now()}`
+    );
+    const [projectManager, setProjectManager] = useState('');
+    const [projectStatus, setProjectStatus] = useState('OPEN');
+    const [billingSchedule, setBillingSchedule] = useState('Time and Materials');
+    const [tasks, setTasks] = useState([
+      { name: 'Discovery & Design', estimatedHours: 40 },
+      { name: 'Implementation', estimatedHours: 120 },
+      { name: 'Training & UAT', estimatedHours: 32 }
+    ]);
+
+    const disabled = !selectedCustData;
+
+    const addTask = () =>
+      setTasks((prev) => [...prev, { name: `Task ${prev.length + 1}`, estimatedHours: 8 }]);
+
+    const updateTask = (idx, updates) =>
+      setTasks((prev) => prev.map((t, i) => (i === idx ? { ...t, ...updates } : t)));
+
+    const removeTask = (idx) => setTasks((prev) => prev.filter((_, i) => i !== idx));
+
+    const handleExportProject = () => {
+      if (disabled) return;
+
+      const projectData = {
+        name: projectName || `${selectedCustData.name} - Project`,
+        entityid: projectCode || `PRJ-${selectedCustData.entityid}-${Date.now()}`,
+        customerId: selectedCustData.nsId,
+        startDate: new Date().toISOString().split('T')[0],
+        endDate: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        status: projectStatus,
+        description: `Project Manager: ${projectManager || 'Unassigned'} • Billing Schedule: ${
+          billingSchedule || 'N/A'
+        }`
+      };
+
+      const exportData = createExportData(selectedCustData, projectData, {
+        // Export tasks; SuiteScript already parses and creates project tasks
+        tasks: tasks.map((t) => ({
+          name: t.name,
+          estimatedHours: t.estimatedHours
+        })),
+        // Include for downstream flows or SuiteScript logging
+        billingSchedule
+      });
+
+      exportViaEmail(exportData, {
+        recipientEmail: 'simmonspatrick1@gmail.com',
+        includeInstructions: true,
+        includeValidation: true
+      });
+
+      setActionStatus('✓ Project export opened in email');
+      setTimeout(() => setActionStatus(null), 2500);
+    };
+
+    return (
+      <div className="space-y-6">
+        <div className="bg-white rounded-lg border border-gray-200 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold text-gray-900">Project Configuration</h2>
+            {!selectedCustData && (
+              <span className="text-xs px-2 py-1 rounded bg-orange-50 text-orange-700 border border-orange-200">
+                Select a customer in Context to enable exports
+              </span>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Project Name</label>
+              <input
+                type="text"
+                value={projectName}
+                onChange={(e) => setProjectName(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                placeholder="e.g., Acme Implementation"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Project ID (Entity ID)
+              </label>
+              <input
+                type="text"
+                value={projectCode}
+                onChange={(e) => setProjectCode(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                placeholder="e.g., PRJ-ACME-001"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Project Manager</label>
+              <input
+                type="text"
+                value={projectManager}
+                onChange={(e) => setProjectManager(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                placeholder="e.g., Jane Smith"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Project Status</label>
+              <select
+                value={projectStatus}
+                onChange={(e) => setProjectStatus(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="OPEN">OPEN</option>
+                <option value="IN_PROGRESS">IN_PROGRESS</option>
+                <option value="ON_HOLD">ON_HOLD</option>
+                <option value="CLOSED">CLOSED</option>
+              </select>
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Billing Schedule
+              </label>
+              <select
+                value={billingSchedule}
+                onChange={(e) => setBillingSchedule(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              >
+                <option>Time and Materials</option>
+                <option>Fixed Bid</option>
+                <option>Milestone</option>
+                <option>Retainer</option>
+              </select>
+              <p className="text-xs text-gray-500 mt-1">
+                Included in export JSON and memo. Estimate creation can honor this setting.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg border border-gray-200 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-gray-900">Tasks</h3>
+            <button
+              onClick={addTask}
+              className="px-3 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            >
+              Add Task
+            </button>
+          </div>
+
+          <div className="space-y-3">
+            {tasks.map((t, idx) => (
+              <div
+                key={idx}
+                className="grid grid-cols-1 md:grid-cols-6 gap-3 items-center border border-gray-200 rounded-lg p-3"
+              >
+                <div className="md:col-span-4">
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Task Name</label>
+                  <input
+                    type="text"
+                    value={t.name}
+                    onChange={(e) => updateTask(idx, { name: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder={`Task ${idx + 1}`}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    Est. Hours
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.5"
+                    value={t.estimatedHours || 0}
+                    onChange={(e) =>
+                      updateTask(idx, { estimatedHours: parseFloat(e.target.value) || 0 })
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder="8"
+                  />
+                </div>
+                <div className="flex items-end">
+                  <button
+                    onClick={() => removeTask(idx)}
+                    className="px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
+            ))}
+            {tasks.length === 0 && (
+              <div className="text-sm text-gray-500">
+                No tasks yet. Click "Add Task" to include project tasks in the export.
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="flex gap-3">
+          <button
+            onClick={handleExportProject}
+            disabled={disabled}
+            className={`px-5 py-3 rounded-lg text-white font-semibold ${
+              disabled ? 'bg-gray-300 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
+            }`}
+          >
+            Export Project + Tasks to NetSuite
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   // ============ COMPONENT: PROMPT LIBRARY ============
   const PromptLibrary = () => (
     <div className="space-y-4">
@@ -1684,6 +1928,7 @@ export default function DemoDashboard() {
                 { id: 'context', label: 'Context', icon: User },
                 { id: 'prompts', label: 'Prompts', icon: BookOpen },
                 { id: 'items', label: 'Items', icon: Settings },
+                { id: 'projects', label: 'Projects', icon: FileText },
                 { id: 'reference', label: 'Reference', icon: Database }
               ].map((tab) => {
                 const Icon = tab.icon;
@@ -1826,6 +2071,7 @@ export default function DemoDashboard() {
                 { id: 'context', label: 'Context', icon: User },
                 { id: 'prompts', label: 'Prompts', icon: BookOpen },
                 { id: 'items', label: 'Items', icon: Settings },
+                { id: 'projects', label: 'Projects', icon: FileText },
                 { id: 'reference', label: 'Reference', icon: Database }
               ].map((tab) => {
                 const Icon = tab.icon;
@@ -1855,6 +2101,7 @@ export default function DemoDashboard() {
         {activeTab === 'context' ? <CustomerContextPanel /> :
          activeTab === 'prompts' ? <PromptLibrary /> :
          activeTab === 'items' ? <ItemConfigPanel /> :
+         activeTab === 'projects' ? <ProjectConfigPanel /> :
          activeTab === 'reference' ? <ReferenceDataManager /> : null}
       </div>
 
@@ -1889,7 +2136,12 @@ export default function DemoDashboard() {
               </button>
             </div>
 
-            <div className="p-6 space-y-4">
+            <form
+              className="p-6 space-y-4"
+              onSubmit={handleFormSubmit}
+              aria-busy={isGeneratingAI}
+              aria-label="Add new prospect"
+            >
               {/* Form Error Summary */}
               {Object.keys(formErrors).length > 0 && (
                 <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg" role="alert">
@@ -1921,6 +2173,7 @@ export default function DemoDashboard() {
                     placeholder="https://company.com"
                   />
                   <button
+                    type="button"
                     onClick={() => generateFromAI('analyze_url', newProspect.website)}
                     disabled={!newProspect.website || isGeneratingAI}
                     className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 whitespace-nowrap"
@@ -1949,8 +2202,18 @@ export default function DemoDashboard() {
                       type="text"
                       value={newProspect.name}
                       onChange={(e) => {
-                        setNewProspect(prev => ({ ...prev, name: e.target.value }));
-                        if (formErrors.name) setFormErrors(prev => ({ ...prev, name: null }));
+                        const value = e.target.value;
+                        setNewProspect(prev => ({ ...prev, name: value }));
+                        setFormErrors(prev => {
+                          const updated = { ...prev };
+                          const error = validateField('name', value);
+                          if (error) {
+                            updated.name = error;
+                          } else {
+                            delete updated.name;
+                          }
+                          return updated;
+                        });
                       }}
                       className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
                         formErrors.name ? 'border-red-300 bg-red-50' : 'border-gray-300'
@@ -1974,8 +2237,18 @@ export default function DemoDashboard() {
                       type="text"
                       value={newProspect.entityid}
                       onChange={(e) => {
-                        setNewProspect(prev => ({ ...prev, entityid: e.target.value }));
-                        if (formErrors.entityid) setFormErrors(prev => ({ ...prev, entityid: null }));
+                        const value = e.target.value;
+                        setNewProspect(prev => ({ ...prev, entityid: value }));
+                        setFormErrors(prev => {
+                          const updated = { ...prev };
+                          const error = validateField('entityid', value);
+                          if (error) {
+                            updated.entityid = error;
+                          } else {
+                            delete updated.entityid;
+                          }
+                          return updated;
+                        });
                       }}
                       className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
                         formErrors.entityid ? 'border-red-300 bg-red-50' : 'border-gray-300'
@@ -2097,8 +2370,18 @@ export default function DemoDashboard() {
                       type="email"
                       value={newProspect.email}
                       onChange={(e) => {
-                        setNewProspect(prev => ({ ...prev, email: e.target.value }));
-                        if (formErrors.email) setFormErrors(prev => ({ ...prev, email: null }));
+                        const value = e.target.value;
+                        setNewProspect(prev => ({ ...prev, email: value }));
+                        setFormErrors(prev => {
+                          const updated = { ...prev };
+                          const error = validateField('email', value);
+                          if (error) {
+                            updated.email = error;
+                          } else {
+                            delete updated.email;
+                          }
+                          return updated;
+                        });
                       }}
                       className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
                         formErrors.email ? 'border-red-300 bg-red-50' : 'border-gray-300'
@@ -2125,8 +2408,18 @@ export default function DemoDashboard() {
                       type="email"
                       value={newProspect.invoiceEmail}
                       onChange={(e) => {
-                        setNewProspect(prev => ({ ...prev, invoiceEmail: e.target.value }));
-                        if (formErrors.invoiceEmail) setFormErrors(prev => ({ ...prev, invoiceEmail: null }));
+                        const value = e.target.value;
+                        setNewProspect(prev => ({ ...prev, invoiceEmail: value }));
+                        setFormErrors(prev => {
+                          const updated = { ...prev };
+                          const error = validateField('invoiceEmail', value);
+                          if (error) {
+                            updated.invoiceEmail = error;
+                          } else {
+                            delete updated.invoiceEmail;
+                          }
+                          return updated;
+                        });
                       }}
                       className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
                         formErrors.invoiceEmail ? 'border-red-300 bg-red-50' : 'border-gray-300'
@@ -2150,8 +2443,18 @@ export default function DemoDashboard() {
                       type="email"
                       value={newProspect.paymentEmail}
                       onChange={(e) => {
-                        setNewProspect(prev => ({ ...prev, paymentEmail: e.target.value }));
-                        if (formErrors.paymentEmail) setFormErrors(prev => ({ ...prev, paymentEmail: null }));
+                        const value = e.target.value;
+                        setNewProspect(prev => ({ ...prev, paymentEmail: value }));
+                        setFormErrors(prev => {
+                          const updated = { ...prev };
+                          const error = validateField('paymentEmail', value);
+                          if (error) {
+                            updated.paymentEmail = error;
+                          } else {
+                            delete updated.paymentEmail;
+                          }
+                          return updated;
+                        });
                       }}
                       className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
                         formErrors.paymentEmail ? 'border-red-300 bg-red-50' : 'border-gray-300'
@@ -2168,32 +2471,32 @@ export default function DemoDashboard() {
                   </div>
                 </div>
               </div>
-            </div>
-
-            <div className="p-6 border-t border-gray-200 flex gap-3">
-              <button
-                onClick={() => {
-                  if (!isGeneratingAI) {
-                    setShowAddProspectModal(false);
-                    setFormErrors({});
-                  }
-                }}
-                disabled={isGeneratingAI}
-                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                aria-label="Cancel and close modal"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleAddProspect}
-                disabled={isGeneratingAI}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                aria-label="Add new prospect to list"
-              >
-                {isGeneratingAI && <Loader size={16} className="animate-spin" />}
-                Add Prospect
-              </button>
-            </div>
+              <div className="p-6 border-t border-gray-200 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!isGeneratingAI) {
+                      setShowAddProspectModal(false);
+                      setFormErrors({});
+                    }
+                  }}
+                  disabled={isGeneratingAI}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                  aria-label="Cancel and close modal"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isGeneratingAI}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  aria-label="Add new prospect to list"
+                >
+                  {isGeneratingAI && <Loader size={16} className="animate-spin" />}
+                  Add Prospect
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

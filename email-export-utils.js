@@ -121,6 +121,36 @@ function flattenData(data) {
 }
 
 /**
+ * Generate a lightweight export ID for traceability
+ */
+function generateExportId() {
+  return 'NSDD-' + Math.random().toString(36).slice(2, 10) + '-' + Date.now().toString(36);
+}
+
+/**
+ * Deterministic idempotency key for exports based on content
+ * Stable stringify + djb2 hash -> hex
+ */
+export function computeIdempotencyKey(obj) {
+  function stableStringify(o) {
+    if (o === null || typeof o !== 'object') return JSON.stringify(o);
+    if (Array.isArray(o)) return '[' + o.map(stableStringify).join(',') + ']';
+    const keys = Object.keys(o).sort();
+    return '{' + keys.map(k => JSON.stringify(k) + ':' + stableStringify(o[k])).join(',') + '}';
+  }
+  const str = stableStringify(obj);
+  // djb2
+  let hash = 5381;
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) + hash) + str.charCodeAt(i);
+    hash = hash & 0xffffffff;
+  }
+  // to unsigned hex
+  const hex = (hash >>> 0).toString(16).padStart(8, '0');
+  return 'NSDD-' + hex;
+}
+
+/**
  * Formats customer, project, and estimate data with hashtags (NetSuite-compatible only)
  * @param {Object} data - The data to format
  * @param {Object} options - Formatting options
@@ -145,6 +175,12 @@ export function formatDataWithHashtags(data, options = {}) {
   }
 
   // Add metadata
+  if (data.exportVersion) {
+    lines.push(`#exportVersion: ${data.exportVersion}`);
+  }
+  if (data.exportId) {
+    lines.push(`#exportId: ${data.exportId}`);
+  }
   if (data.type) {
     lines.push(`#recordType: ${data.type}`);
   }
@@ -382,6 +418,8 @@ export function exportViaEmail(data, options = {}) {
  */
 export function createExportData(customerData, projectData = null, additionalData = {}) {
   const exportData = {
+    exportVersion: '1.0',
+    exportId: generateExportId(),
     type: projectData ? 'project' : 'customer',
     timestamp: new Date().toISOString(),
     customer: customerData ? {
@@ -420,5 +458,6 @@ export default {
   createMailtoUrl,
   exportViaEmail,
   createExportData,
-  validateNetSuiteFields
+  validateNetSuiteFields,
+  computeIdempotencyKey
 };

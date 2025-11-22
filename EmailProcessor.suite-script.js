@@ -81,6 +81,14 @@
 define(['N/record', 'N/search', 'N/log', 'N/https', 'N/email', 'N/encode', 'N/runtime'], 
 function(record, search, log, https, email, encode, runtime) {
     
+    // Simple in-memory caches to reduce repeated searches within a single execution
+    var CACHE = {
+        itemByName: {},
+        classByName: {},
+        deptByName: {},
+        locByName: {}
+    };
+
     /**
      * Gmail API Configuration
      * Set these as script parameters or in a configuration file
@@ -619,7 +627,18 @@ function(record, search, log, https, email, encode, runtime) {
                     log.debug('First Item', JSON.stringify(estimateData.items[0]));
                 }
                 
-                estimateId = createEstimate(estimateData, customerId, projectId);
+                var externalId = estimateData.externalId || data.idempotencyKey || data.exportId;
+                if (externalId) {
+                    var existingId = findEstimateByExternalId(externalId);
+                    if (existingId) {
+                        log.audit('Estimate Exists', 'Found existing estimate with externalId ' + externalId + ': ' + existingId);
+                        estimateId = existingId;
+                    } else {
+                        estimateId = createEstimate(estimateData, customerId, projectId, externalId);
+                    }
+                } else {
+                    estimateId = createEstimate(estimateData, customerId, projectId);
+                }
                 if (!estimateId) {
                     log.error('Estimate Creation', 'Failed to create estimate from JSON');
                 } else {
@@ -628,7 +647,18 @@ function(record, search, log, https, email, encode, runtime) {
             } else if (data.estimateType && customerId) {
                 log.audit('Creating Estimate from hashtags', 'Customer: ' + customerId + ', Type: ' + data.estimateType);
                 log.debug('Hashtag estimateItems', 'Has estimateItems: ' + !!data.estimateItems + ', Count: ' + (data.estimateItems ? data.estimateItems.length : 0));
-                estimateId = createEstimate(data, customerId, projectId);
+                var externalId2 = data.idempotencyKey || data.exportId;
+                if (externalId2) {
+                    var existingId2 = findEstimateByExternalId(externalId2);
+                    if (existingId2) {
+                        log.audit('Estimate Exists', 'Found existing estimate with externalId ' + externalId2 + ': ' + existingId2);
+                        estimateId = existingId2;
+                    } else {
+                        estimateId = createEstimate(data, customerId, projectId, externalId2);
+                    }
+                } else {
+                    estimateId = createEstimate(data, customerId, projectId);
+                }
                 if (!estimateId) {
                     log.error('Estimate Creation', 'Failed to create estimate');
                 } else {
@@ -935,7 +965,7 @@ function(record, search, log, https, email, encode, runtime) {
      * Create estimate record
      * Only sets required and specified optional fields
      */
-    function createEstimate(data, customerId, projectId) {
+    function createEstimate(data, customerId, projectId, externalId) {
         try {
             log.debug('Create Estimate', 'Starting estimate creation for customer: ' + customerId);
             log.debug('Create Estimate Data', JSON.stringify(data));
@@ -1024,6 +1054,19 @@ function(record, search, log, https, email, encode, runtime) {
                 }
             }
 
+            // OPTIONAL: External ID (idempotency)
+            if (externalId) {
+                try {
+                    estimateRecord.setValue({
+                        fieldId: 'externalid',
+                        value: externalId
+                    });
+                    log.debug('Estimate', 'Set external id: ' + externalId);
+                } catch (e) {
+                    log.error('Estimate ExternalId', 'Could not set external id: ' + e.toString());
+                }
+            }
+
             // OPTIONAL: Class
             if (estimateData.class || estimateData.classId || data.estimateClass) {
                 try {
@@ -1096,38 +1139,47 @@ function(record, search, log, https, email, encode, runtime) {
                         });
                         
                         var itemId = null;
+
+                        // Prefer explicit internal ID if provided in payload
+                        if (item.nsItemId || item.itemId || item.internalId) {
+                            itemId = parseInt(item.nsItemId || item.itemId || item.internalId, 10);
+                            log.debug('Estimate Item ' + i, 'Using provided internalId from payload: ' + itemId);
+                        }
                         
-                        // If user provided a custom display name, check if an item with that name already exists
-                        if (hasCustomName) {
-                            log.debug('Custom Name Detected', 'Checking if item "' + displayName + '" already exists');
-                            itemId = getItemIdByName(displayName);
-                            
-                            // If the custom-named item doesn't exist, copy the source item and rename it
-                            if (!itemId) {
-                                log.audit('Copy & Rename', 'Item "' + displayName + '" not found. Will copy source item "' + item.name + '"');
+                        // Resolve item by name/display strategy only if no explicit internalId provided
+                        if (!itemId) {
+                            // If user provided a custom display name, check if an item with that name already exists
+                            if (hasCustomName) {
+                                log.debug('Custom Name Detected', 'Checking if item "' + displayName + '" already exists');
+                                itemId = getItemIdByName(displayName);
                                 
-                                // First, get the source item ID
-                                var sourceItemId = getItemIdByName(item.name);
-                                
-                                if (sourceItemId) {
-                                    // Copy the source item with the new display name
-                                    itemId = copyAndRenameItem(sourceItemId, displayName, item.description);
+                                // If the custom-named item doesn't exist, copy the source item and rename it
+                                if (!itemId) {
+                                    log.audit('Copy & Rename', 'Item "' + displayName + '" not found. Will copy source item "' + item.name + '"');
+                                    
+                                    // First, get the source item ID
+                                    var sourceItemId = getItemIdByName(item.name);
+                                    
+                                    if (sourceItemId) {
+                                        // Copy the source item with the new display name
+                                        itemId = copyAndRenameItem(sourceItemId, displayName, item.description);
+                                    } else {
+                                        // Source item not found, create a basic service item
+                                        log.debug('Source Item Not Found', 'Creating basic service item: ' + displayName);
+                                        itemId = createServiceItem(displayName, item.description);
+                                    }
                                 } else {
-                                    // Source item not found, create a basic service item
-                                    log.debug('Source Item Not Found', 'Creating basic service item: ' + displayName);
-                                    itemId = createServiceItem(displayName, item.description);
+                                    log.debug('Custom Item Found', 'Using existing item "' + displayName + '" with ID: ' + itemId);
                                 }
                             } else {
-                                log.debug('Custom Item Found', 'Using existing item "' + displayName + '" with ID: ' + itemId);
-                            }
-                        } else {
-                            // No custom name, use standard lookup
-                            itemId = getItemIdByName(item.name);
-                            
-                            // If not found, create it
-                            if (!itemId) {
-                                log.debug('Item Not Found', 'Creating service item: ' + displayName);
-                                itemId = createServiceItem(displayName, item.description);
+                                // No custom name, use standard lookup
+                                itemId = getItemIdByName(item.name);
+                                
+                                // If not found, create it
+                                if (!itemId) {
+                                    log.debug('Item Not Found', 'Creating service item: ' + displayName);
+                                    itemId = createServiceItem(displayName, item.description);
+                                }
                             }
                         }
                         
@@ -1302,14 +1354,23 @@ function(record, search, log, https, email, encode, runtime) {
     function getItemIdByName(itemName) {
         try {
             log.debug('Get Item ID', 'Searching for item: ' + itemName);
-            
-            // Step 1: Check if there's a mapping for this item name
+
+            // Step 1: Check mapping and cache
             var mappedName = ITEM_NAME_MAPPINGS[itemName] || itemName;
             if (mappedName !== itemName) {
                 log.debug('Item Mapping', 'Mapped "' + itemName + '" to "' + mappedName + '"');
             }
-            
-            // Step 2: Search by exact name or itemid
+
+            if (CACHE.itemByName[mappedName]) {
+                log.debug('Item Cache', 'Cache hit for "' + mappedName + '": ' + CACHE.itemByName[mappedName]);
+                return CACHE.itemByName[mappedName];
+            }
+            if (CACHE.itemByName[itemName]) {
+                log.debug('Item Cache', 'Cache hit for "' + itemName + '": ' + CACHE.itemByName[itemName]);
+                return CACHE.itemByName[itemName];
+            }
+
+            // Step 2: Search by exact name, displayname, or itemid
             var itemSearch = search.create({
                 type: search.Type.ITEM,
                 filters: [
@@ -1320,22 +1381,28 @@ function(record, search, log, https, email, encode, runtime) {
                         'OR',
                         ['itemid', 'is', mappedName],
                         'OR',
+                        ['displayname', 'is', mappedName],
+                        'OR',
                         ['name', 'is', itemName],
                         'OR',
-                        ['itemid', 'is', itemName]
+                        ['itemid', 'is', itemName],
+                        'OR',
+                        ['displayname', 'is', itemName]
                     ]
                 ],
-                columns: ['internalid', 'name', 'itemid', 'type']
+                columns: ['internalid', 'name', 'itemid', 'displayname', 'type']
             });
-            
+
             var results = itemSearch.run().getRange({ start: 0, end: 1 });
             if (results && results.length > 0) {
-                var itemId = results[0].getValue('internalid');
-                var foundName = results[0].getValue('name');
-                log.debug('Item Found', 'Item ID: ' + itemId + ' (' + foundName + ') for search: ' + itemName);
-                return itemId;
+                var id = results[0].getValue('internalid');
+                var foundName = results[0].getValue('name') || results[0].getValue('displayname') || results[0].getValue('itemid');
+                CACHE.itemByName[mappedName] = parseInt(id, 10);
+                CACHE.itemByName[itemName] = parseInt(id, 10);
+                log.debug('Item Found', 'Item ID: ' + id + ' (' + foundName + ') for search: ' + itemName);
+                return parseInt(id, 10);
             }
-            
+
             // Step 3: Try partial match (contains)
             log.debug('Item Search', 'Exact match not found, trying partial match');
             var partialSearch = search.create({
@@ -1351,21 +1418,48 @@ function(record, search, log, https, email, encode, runtime) {
                         ['name', 'contains', 'Consulting']
                     ]
                 ],
-                columns: ['internalid', 'name', 'itemid', 'type']
+                columns: ['internalid', 'name', 'itemid', 'displayname', 'type']
             });
-            
+
             var partialResults = partialSearch.run().getRange({ start: 0, end: 1 });
             if (partialResults && partialResults.length > 0) {
-                var itemId = partialResults[0].getValue('internalid');
-                var foundName = partialResults[0].getValue('name');
-                log.debug('Item Found (Partial)', 'Using item ID: ' + itemId + ' (' + foundName + ') for: ' + itemName);
-                return itemId;
+                var pid = partialResults[0].getValue('internalid');
+                var pname = partialResults[0].getValue('name') || partialResults[0].getValue('displayname') || partialResults[0].getValue('itemid');
+                CACHE.itemByName[mappedName] = parseInt(pid, 10);
+                CACHE.itemByName[itemName] = parseInt(pid, 10);
+                log.debug('Item Found (Partial)', 'Using item ID: ' + pid + ' (' + pname + ') for: ' + itemName);
+                return parseInt(pid, 10);
             }
-            
+
             log.debug('Item Not Found', 'No item found for: ' + itemName);
             return null;
         } catch (e) {
             log.error('Get Item Error', e.toString());
+            return null;
+        }
+    }
+    
+    /**
+     * Find existing estimate by externalId (idempotency)
+     */
+    function findEstimateByExternalId(externalId) {
+        try {
+            if (!externalId) return null;
+            var s = search.create({
+                type: search.Type.ESTIMATE,
+                filters: [
+                    ['externalidstring', 'is', externalId]
+                ],
+                columns: ['internalid']
+            });
+            var r = s.run().getRange({ start: 0, end: 1 });
+            if (r && r.length > 0) {
+                var id = r[0].getValue('internalid');
+                return parseInt(id, 10);
+            }
+            return null;
+        } catch (e) {
+            log.error('Find Estimate by ExternalId', e.toString());
             return null;
         }
     }
