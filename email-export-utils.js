@@ -29,7 +29,7 @@ const VALID_NETSUITE_FIELDS = {
   projectStartDate: 'startdate',
   projectEndDate: 'enddate',
   projectBudget: 'projectedtotalvalue',
-  projectStatus: 'status',            // NetSuite project status (not standardized like estimates)
+  projectStatus: 'status',            // NetSuite project status
   projectDescription: 'comments',
 
   // Estimate fields
@@ -42,9 +42,6 @@ const VALID_NETSUITE_FIELDS = {
   estimateLocation: 'location',     // Maps to NetSuite location ID (looked up by name)
   estimateItems: 'items',          // Line items array - processed separately
 
-  // Note: estimateType and estimateTotal are exported for reference but not used by NetSuite
-  // estimateTotal is calculated from line items, estimateType is for categorization only
-
   // Special sections (processed separately)
   tasks: 'tasks',
   checklists: 'checklists'
@@ -52,7 +49,7 @@ const VALID_NETSUITE_FIELDS = {
 
 /**
  * Validates data against NetSuite field mappings and returns validation results
- * @param {Object} data - The data to validate
+ * @param {Object} data - The data to validate (flat object with hashtag-like keys)
  * @returns {Object} - Validation results with valid/invalid fields
  */
 export function validateNetSuiteFields(data) {
@@ -67,7 +64,7 @@ export function validateNetSuiteFields(data) {
     }
   };
 
-  // Flatten data for validation
+  // Flatten data for validation (supports nested objects like { customer: { entityid } } -> customerEntityid)
   const flatData = flattenData(data);
 
   for (const [key, value] of Object.entries(flatData)) {
@@ -151,156 +148,312 @@ export function computeIdempotencyKey(obj) {
 }
 
 /**
+ * Build a sanitized structure that only contains fields supported by NetSuite/SuiteScript.
+ * - Normalizes common aliases to the names SuiteScript expects
+ * - Drops unknown/custom fields
+ * - Adds idempotencyKey computed from a stable subset of content
+ * @param {Object} data
+ * @returns {Object} filtered
+ */
+export function filterToNetSuiteData(data = {}) {
+  const filtered = {};
+
+  // Metadata (kept minimal for traceability; not emitted as hashtags)
+  if (data.exportVersion) filtered.exportVersion = data.exportVersion;
+  filtered.exportId = data.exportId || generateExportId();
+  if (data.type) filtered.type = data.type;
+  if (data.timestamp) filtered.timestamp = data.timestamp;
+
+  // Customer
+  if (data.customer && typeof data.customer === 'object') {
+    const c = data.customer;
+    const fc = {};
+    if (c.name || c.companyname) fc.name = c.name || c.companyname;
+    if (c.entityid || c.entityId) fc.entityid = c.entityid || c.entityId;
+    if (c.email) fc.email = c.email;
+    if (c.phone) fc.phone = c.phone;
+    if (Object.keys(fc).length) filtered.customer = fc;
+  }
+
+  // Project
+  if (data.project && typeof data.project === 'object') {
+    const p = data.project;
+    const fp = {};
+    if (p.name || p.companyname) fp.name = p.name || p.companyname;
+    if (p.entityid || p.code) fp.entityid = p.entityid || p.code;
+    if (p.customerId || p.customer) fp.customerId = p.customerId || p.customer;
+    if (p.startDate || p.startdate) fp.startDate = p.startDate || p.startdate;
+    if (p.endDate || p.enddate) fp.endDate = p.endDate || p.enddate;
+    if (p.budget || p.projectedtotalvalue) fp.budget = p.budget || p.projectedtotalvalue;
+    if (p.status) fp.status = p.status;
+    if (p.description) fp.description = p.description;
+    if (Object.keys(fp).length) filtered.project = fp;
+  }
+
+  // Estimate
+  if (data.estimate && typeof data.estimate === 'object') {
+    const e = data.estimate;
+    const fe = {};
+    // IDs (by name or ID; SuiteScript resolves names to IDs)
+    if (e.customer || data.estimateCustomer) fe.customer = e.customer || data.estimateCustomer;
+    if (e.project || data.estimateProject) fe.project = e.project || data.estimateProject;
+    // Status and dates
+    if (e.status || data.estimateStatus) fe.status = e.status || data.estimateStatus;
+    if (e.dueDate || e.duedate || data.estimateDueDate) fe.dueDate = e.dueDate || e.duedate || data.estimateDueDate;
+    // Optional memo
+    if (e.memo || e.message || data.memo || data.message) fe.memo = e.memo || e.message || data.memo || data.message;
+    // Classification
+    if (e.class || e.classId || data.estimateClass) fe.class = e.class || e.classId || data.estimateClass;
+    if (e.department || e.departmentId || data.estimateDepartment) fe.department = e.department || e.departmentId || data.estimateDepartment;
+    if (e.location || e.locationId || data.estimateLocation) fe.location = e.location || e.locationId || data.estimateLocation;
+    // Billing schedule (optional support in optimized script)
+    if (e.billingSchedule || data.billingSchedule) fe.billingSchedule = e.billingSchedule || data.billingSchedule;
+
+    // Items
+    const items = e.items && Array.isArray(e.items) ? e.items
+      : (Array.isArray(data.estimateItems) ? data.estimateItems : null);
+    if (items) {
+      fe.items = items.map(it => ({
+        name: it.name || it.item || it.displayName || 'Unknown Item',
+        displayName: it.displayName,
+        quantity: it.quantity || 1,
+        rate: it.rate || it.price || 0,
+        description: it.description,
+        nsItemId: it.nsItemId || it.itemId || it.internalId
+      }));
+    }
+
+    if (Object.keys(fe).length) filtered.estimate = fe;
+  } else {
+    // Backward-compat: some flows set estimate-like keys at top-level
+    const fe = {};
+    if (data.estimateCustomer) fe.customer = data.estimateCustomer;
+    if (data.estimateProject) fe.project = data.estimateProject;
+    if (data.estimateStatus) fe.status = data.estimateStatus;
+    if (data.estimateDueDate) fe.dueDate = data.estimateDueDate;
+    if (data.estimateClass) fe.class = data.estimateClass;
+    if (data.estimateDepartment) fe.department = data.estimateDepartment;
+    if (data.estimateLocation) fe.location = data.estimateLocation;
+    if (Array.isArray(data.estimateItems)) {
+      fe.items = data.estimateItems.map(it => ({
+        name: it.name || it.item || it.displayName || 'Unknown Item',
+        displayName: it.displayName,
+        quantity: it.quantity || 1,
+        rate: it.rate || it.price || 0,
+        description: it.description,
+        nsItemId: it.nsItemId || it.itemId || it.internalId
+      }));
+    }
+    if (Object.keys(fe).length) filtered.estimate = fe;
+  }
+
+  // Tasks
+  if (Array.isArray(data.tasks)) {
+    filtered.tasks = data.tasks.map(t => ({
+      name: t.name || t.title || 'Unnamed Task',
+      estimatedHours: t.estimatedHours,
+      assignee: t.assignee,
+      dueDate: t.dueDate
+    }));
+  }
+
+  // Checklists
+  if (Array.isArray(data.checklists)) {
+    filtered.checklists = data.checklists.map(cl => ({
+      name: cl.name || cl.title || 'Unnamed Checklist',
+      items: Array.isArray(cl.items) ? cl.items.map(i => ({
+        name: i.name || i.task || 'Unnamed Item',
+        completed: !!i.completed
+      })) : []
+    }));
+  }
+
+  // Compute idempotency key from a stable subset (do not include timestamp or exportId)
+  const keyBasis = {
+    customer: filtered.customer ? { entityid: filtered.customer.entityid || filtered.customer.name } : null,
+    project: filtered.project ? { entityid: filtered.project.entityid || filtered.project.name } : null,
+    estimate: filtered.estimate ? {
+      customer: filtered.estimate.customer || null,
+      project: filtered.estimate.project || null,
+      status: filtered.estimate.status || null,
+      dueDate: filtered.estimate.dueDate || null,
+      items: Array.isArray(filtered.estimate.items)
+        ? filtered.estimate.items.map(i => ({ name: i.name, qty: i.quantity, rate: i.rate }))
+        : null
+    } : null
+  };
+  filtered.idempotencyKey = computeIdempotencyKey(keyBasis);
+
+  return filtered;
+}
+
+/**
  * Formats customer, project, and estimate data with hashtags (NetSuite-compatible only)
- * @param {Object} data - The data to format
+ * @param {Object} data - The raw data to format
  * @param {Object} options - Formatting options
+ *   - includeValidation: boolean (default true)
+ *   - includeJsonFiltered: boolean (default true)
  * @returns {string} - Formatted string with hashtags
  */
 export function formatDataWithHashtags(data, options = {}) {
-  const { includeValidation = false, includeInvalidFields = false } = options;
+  const {
+    includeValidation = true,
+    includeJsonFiltered = true
+  } = options;
+
+  const filtered = filterToNetSuiteData(data);
   const lines = [];
 
-  // Validate fields first
-  const validation = validateNetSuiteFields(data);
+  // Build a flat object of only the hashtag keys we will emit for validation summary
+  const hv = {};
 
-  // Add validation summary if requested
-  if (includeValidation) {
-    lines.push(`--- FIELD VALIDATION ---`);
-    lines.push(`Valid fields: ${validation.summary.validFields}/${validation.summary.totalFields}`);
-    if (validation.warnings.length > 0) {
-      lines.push(`Warnings:`);
-      validation.warnings.forEach(warning => lines.push(`  ${warning}`));
-    }
-    lines.push(``);
-  }
-
-  // Add metadata
-  if (data.exportVersion) {
-    lines.push(`#exportVersion: ${data.exportVersion}`);
-  }
-  if (data.exportId) {
-    lines.push(`#exportId: ${data.exportId}`);
-  }
-  if (data.type) {
-    lines.push(`#recordType: ${data.type}`);
+  // Idempotency (used by SuiteScript to dedupe Estimates)
+  if (filtered.idempotencyKey) {
+    lines.push(`#idempotencyKey: ${filtered.idempotencyKey}`);
+    // Not part of VALID_NETSUITE_FIELDS on purpose (meta), so we don't add to hv
   }
 
   // Customer fields (only valid NetSuite fields)
-  if (data.customer) {
-    if (data.customer.name || data.customer.companyname) {
-      lines.push(`#customerName: ${data.customer.name || data.customer.companyname}`);
+  if (filtered.customer) {
+    const c = filtered.customer;
+    if (c.name) {
+      lines.push(`#customerName: ${c.name}`);
+      hv.customerName = c.name;
     }
-    if (data.customer.entityid) {
-      lines.push(`#customerEntityId: ${data.customer.entityid}`);
+    if (c.entityid) {
+      lines.push(`#customerEntityId: ${c.entityid}`);
+      hv.customerEntityid = c.entityid; // key aligned to validator
     }
-    if (data.customer.email) {
-      lines.push(`#customerEmail: ${data.customer.email}`);
+    if (c.email) {
+      lines.push(`#customerEmail: ${c.email}`);
+      hv.customerEmail = c.email;
     }
-    if (data.customer.phone) {
-      lines.push(`#customerPhone: ${data.customer.phone}`);
+    if (c.phone) {
+      lines.push(`#customerPhone: ${c.phone}`);
+      hv.customerPhone = c.phone;
     }
-
-    // Note: Custom fields like industry, revenue, size are NOT included
-    // They would need to be added to SuiteScript with proper field IDs
   }
 
   // Project fields
-  if (data.project) {
-    if (data.project.name || data.project.companyname) {
-      lines.push(`#projectName: ${data.project.name || data.project.companyname}`);
+  if (filtered.project) {
+    const p = filtered.project;
+    if (p.name) {
+      lines.push(`#projectName: ${p.name}`);
+      hv.projectName = p.name;
     }
-    if (data.project.entityid || data.project.code) {
-      lines.push(`#projectCode: ${data.project.entityid || data.project.code}`);
+    if (p.entityid) {
+      lines.push(`#projectCode: ${p.entityid}`);
+      hv.projectCode = p.entityid;
     }
-    if (data.project.customerId || data.project.customer) {
-      lines.push(`#projectCustomer: ${data.project.customerId || data.project.customer}`);
+    if (p.customerId) {
+      lines.push(`#projectCustomer: ${p.customerId}`);
+      hv.projectCustomer = p.customerId;
     }
-    if (data.project.startDate || data.project.startdate) {
-      lines.push(`#projectStartDate: ${data.project.startDate || data.project.startdate}`);
+    if (p.startDate) {
+      lines.push(`#projectStartDate: ${p.startDate}`);
+      hv.projectStartDate = p.startDate;
     }
-    if (data.project.endDate || data.project.enddate) {
-      lines.push(`#projectEndDate: ${data.project.endDate || data.project.enddate}`);
+    if (p.endDate) {
+      lines.push(`#projectEndDate: ${p.endDate}`);
+      hv.projectEndDate = p.endDate;
     }
-    if (data.project.budget || data.project.projectedtotalvalue) {
-      lines.push(`#projectBudget: ${data.project.budget || data.project.projectedtotalvalue}`);
+    if (p.budget != null) {
+      lines.push(`#projectBudget: ${p.budget}`);
+      hv.projectBudget = p.budget;
     }
-    if (data.project.status) {
-      lines.push(`#projectStatus: ${data.project.status}`);
+    if (p.status) {
+      lines.push(`#projectStatus: ${p.status}`);
+      hv.projectStatus = p.status;
     }
-    if (data.project.description) {
-      lines.push(`#projectDescription: ${data.project.description}`);
+    if (p.description) {
+      lines.push(`#projectDescription: ${p.description}`);
+      hv.projectDescription = p.description;
     }
   }
 
-  // Estimate fields
-  if (data.estimate) {
-    if (data.estimate.type) {
-      lines.push(`#estimateType: ${data.estimate.type}`);
+  // Estimate fields (no estimateType/estimateTotal)
+  if (filtered.estimate) {
+    const e = filtered.estimate;
+    if (e.customer) {
+      lines.push(`#estimateCustomer: ${e.customer}`);
+      hv.estimateCustomer = e.customer;
     }
-    if (data.estimate.customerId || data.estimate.customer) {
-      lines.push(`#estimateCustomer: ${data.estimate.customerId || data.estimate.customer}`);
+    if (e.project) {
+      lines.push(`#estimateProject: ${e.project}`);
+      hv.estimateProject = e.project;
     }
-    if (data.estimate.projectId || data.estimate.project) {
-      lines.push(`#estimateProject: ${data.estimate.projectId || data.estimate.project}`);
+    if (e.status) {
+      lines.push(`#estimateStatus: ${e.status}`);
+      hv.estimateStatus = e.status;
     }
-    if (data.estimate.total || data.estimate.amount) {
-      lines.push(`#estimateTotal: ${data.estimate.total || data.estimate.amount}`);
+    if (e.dueDate) {
+      lines.push(`#estimateDueDate: ${e.dueDate}`);
+      hv.estimateDueDate = e.dueDate;
     }
-    if (data.estimate.status) {
-      lines.push(`#estimateStatus: ${data.estimate.status}`);
+    if (e.class) {
+      lines.push(`#estimateClass: ${e.class}`);
+      hv.estimateClass = e.class;
     }
-    if (data.estimate.dueDate || data.estimate.duedate) {
-      lines.push(`#estimateDueDate: ${data.estimate.dueDate || data.estimate.duedate}`);
+    if (e.department) {
+      lines.push(`#estimateDepartment: ${e.department}`);
+      hv.estimateDepartment = e.department;
     }
-
-    // Class, Department, Location (optional)
-    if (data.estimate.class || data.estimate.classId) {
-      lines.push(`#estimateClass: ${data.estimate.class || data.estimate.classId}`);
+    if (e.location) {
+      lines.push(`#estimateLocation: ${e.location}`);
+      hv.estimateLocation = e.location;
     }
-    if (data.estimate.department || data.estimate.departmentId) {
-      lines.push(`#estimateDepartment: ${data.estimate.department || data.estimate.departmentId}`);
-    }
-    if (data.estimate.location || data.estimate.locationId) {
-      lines.push(`#estimateLocation: ${data.estimate.location || data.estimate.locationId}`);
-    }
-
-    if (data.estimate.items && Array.isArray(data.estimate.items)) {
-      const itemLines = data.estimate.items.map((item, idx) => {
-        return `  - ${item.name || item.item || 'Unknown Item'}: Qty=${item.quantity || 1}, Rate=${item.rate || item.price || 0}`;
+    if (Array.isArray(e.items) && e.items.length) {
+      const itemLines = e.items.map((item, idx) => {
+        return `  - ${item.name || 'Unknown Item'}: Qty=${item.quantity || 1}, Rate=${item.rate || 0}`;
       }).join('\n');
       lines.push(`#estimateItems:\n${itemLines}`);
+      hv.estimateItems = e.items.length;
     }
   }
 
   // Tasks (supported by SuiteScript)
-  if (data.tasks && Array.isArray(data.tasks)) {
+  if (filtered.tasks && Array.isArray(filtered.tasks)) {
     lines.push(`#tasks:`);
-    data.tasks.forEach((task, idx) => {
-      lines.push(`  Task ${idx + 1}: ${task.name || task.title || 'Unnamed Task'}`);
+    filtered.tasks.forEach((task, idx) => {
+      lines.push(`  Task ${idx + 1}: ${task.name || 'Unnamed Task'}`);
       if (task.estimatedHours) lines.push(`    Estimated Hours: ${task.estimatedHours}`);
       if (task.assignee) lines.push(`    Assignee: ${task.assignee}`);
       if (task.dueDate) lines.push(`    Due Date: ${task.dueDate}`);
     });
+    hv.tasks = filtered.tasks.length;
   }
 
   // Checklists (supported by SuiteScript)
-  if (data.checklists && Array.isArray(data.checklists)) {
+  if (filtered.checklists && Array.isArray(filtered.checklists)) {
     lines.push(`#checklists:`);
-    data.checklists.forEach((checklist, idx) => {
-      lines.push(`  Checklist ${idx + 1}: ${checklist.name || checklist.title || 'Unnamed Checklist'}`);
+    filtered.checklists.forEach((checklist, idx) => {
+      lines.push(`  Checklist ${idx + 1}: ${checklist.name || 'Unnamed Checklist'}`);
       if (checklist.items && Array.isArray(checklist.items)) {
         checklist.items.forEach(item => {
           const status = item.completed ? '✓' : '○';
-          lines.push(`    ${status} ${item.name || item.task || 'Unnamed Item'}`);
+          lines.push(`    ${status} ${item.name || 'Unnamed Item'}`);
         });
       }
     });
+    hv.checklists = filtered.checklists.length;
   }
 
-  // Raw JSON data (for complex scenarios - always include for debugging)
-  if (data.includeJson !== false) {
+  // Validation summary (only over hashtag keys we actually emitted)
+  if (includeValidation) {
+    const v = validateNetSuiteFields(hv);
+    lines.unshift('');
+    lines.unshift(`Valid fields: ${v.summary.validFields}/${v.summary.totalFields}`);
+    if (v.warnings.length > 0) {
+      lines.unshift(`Warnings:`);
+      v.warnings.forEach(w => lines.unshift(`  ${w}`));
+    }
+    lines.unshift(`--- FIELD VALIDATION ---`);
+  }
+
+  // Filtered JSON data (optional, defaults to included)
+  if (includeJsonFiltered) {
     lines.push('\n--- JSON DATA ---');
-    lines.push(JSON.stringify(data, null, 2));
+    lines.push(JSON.stringify(filtered, null, 2));
   }
 
   return lines.join('\n');
@@ -337,17 +490,22 @@ export function createEmailSubject(data) {
  * Prepares email content with formatted data
  * @param {Object} data - The data to export
  * @param {Object} options - Export options
+ *   - recipientEmail
+ *   - includeInstructions: default true
+ *   - includeValidation: default true
+ *   - includeJsonFiltered: default true
  * @returns {Object} - Email content with subject and body
  */
 export function prepareEmailContent(data, options = {}) {
   const {
     recipientEmail = 'simmonspatrick1@gmail.com',
     includeInstructions = true,
-    includeValidation = true
+    includeValidation = true,
+    includeJsonFiltered = true
   } = options;
 
   const subject = createEmailSubject(data);
-  const hashtagContent = formatDataWithHashtags(data, { includeValidation });
+  const hashtagContent = formatDataWithHashtags(data, { includeValidation, includeJsonFiltered });
 
   let body = '';
 
@@ -452,6 +610,7 @@ export function createExportData(customerData, projectData = null, additionalDat
 }
 
 export default {
+  filterToNetSuiteData,
   formatDataWithHashtags,
   createEmailSubject,
   prepareEmailContent,

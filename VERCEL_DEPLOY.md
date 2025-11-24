@@ -9,9 +9,23 @@
    npm i -g vercel
    ```
 
-2. **Login to Vercel**:
+2. **Authenticate with Vercel** (choose one method):
+   
+   **Method A: Using Access Token** (Recommended for CI/CD):
+   ```bash
+   export VERCEL_TOKEN="ZBLJ9sVLIhmDtzO5MdFsrDgo"
+   vercel whoami  # Verify authentication
+   ```
+   
+   **Method B: Interactive Login**:
    ```bash
    vercel login
+   ```
+   
+   **Method C: Use Setup Script**:
+   ```bash
+   source scripts/setup-vercel-token.sh
+   vercel whoami  # Verify authentication
    ```
 
 3. **Navigate to project directory**:

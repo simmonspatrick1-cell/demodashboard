@@ -6,7 +6,7 @@ This guide explains how to use the **Email → SuiteScript Scheduled Script** in
 
 ## How It Works
 
-1. **Web App** exports JSON data with hashtag formatting
+1. **Web App** exports filtered JSON with hashtag formatting (only NetSuite-supported fields)
 2. **Email** is sent to a special inbox (e.g., `simmonspatrick1@gmail.com`)
 3. **SuiteScript Scheduled Script** logs into Gmail via API
 4. **Script parses emails** with hashtags/brackets
@@ -188,47 +188,99 @@ We use a helper script to perform the one-time login flow to get a "Refresh Toke
 
 ## Step 5: Hashtag Format Reference
 
-The script parses these hashtags from the email body:
+Only NetSuite-supported hashtags are emitted. The JSON block is filtered to these fields as well.
+
+### Meta
+```
+#idempotencyKey: NSDD-1a2b3c4d
+```
 
 ### Customer Fields
 ```
 #customerName: Company Name
 #customerEntityId: COMPANY-001
-#customerIndustry: Professional Services
 #customerEmail: contact@company.com
 #customerPhone: (555) 123-4567
-#customerRevenue: $500K
-#customerSize: 100-200 employees
 ```
 
 ### Project Fields
 ```
 #projectName: NTI Implementation
 #projectCode: PRJ-001
+#projectCustomer: 12345          // Customer internal ID or external reference
 #projectStartDate: 2024-01-01
-#projectBudget: $150000
+#projectEndDate: 2024-03-31
+#projectBudget: 150000
 #projectStatus: OPEN
+#projectDescription: Discovery and rollout
 ```
 
 ### Estimate Fields
 ```
-#estimateType: T&M
-#estimateTotal: $50000
+#estimateCustomer: 12345         // Customer internal ID or name that resolves
+#estimateProject: 67890          // Project internal ID or code/name that resolves
+#estimateStatus: A               // A=Open, B=Pending, C=Closed, D=Expired (names are mapped)
+#estimateDueDate: 2024-02-15
+#estimateClass: Services
+#estimateDepartment: Delivery
+#estimateLocation: HQ
 #estimateItems:
   - Professional Services: Qty=100, Rate=150
   - Software Licensing: Qty=12, Rate=500
 ```
 
-### Modules & Tasks
+### Tasks
 ```
-#modules: SuiteProjects,FAM,FSM
-
 #tasks:
   Task 1: Requirement Gathering
     Estimated Hours: 40
     Assignee: John Doe
     Due Date: 2024-01-15
 ```
+
+### Checklists
+```
+#checklists:
+  Checklist 1: Project Kickoff
+    ✓ Invite stakeholders
+    ○ Prepare kickoff deck
+```
+
+### JSON Section
+The email ends with a filtered JSON block for the SuiteScript to consume:
+```
+--- JSON DATA ---
+{
+  "exportVersion": "1.0",
+  "exportId": "NSDD-xxxx",
+  "type": "project",
+  "customer": { "name": "...", "entityid": "...", "email": "...", "phone": "..." },
+  "project": { "name": "...", "entityid": "...", "customerId": "...", "startDate": "...", "endDate": "...", "budget": 0, "status": "OPEN", "description": "..." },
+  "estimate": { "customer": "...", "project": "...", "status": "A", "dueDate": "2024-02-15", "class": "Services", "department": "Delivery", "location": "HQ", "items": [ ... ] },
+  "tasks": [ ... ],
+  "checklists": [ ... ],
+  "idempotencyKey": "NSDD-xxxx"
+}
+```
+
+Note:
+- Non-NetSuite fields (e.g., industry, revenue, size, estimateType, estimateTotal) are not included.
+- By default, the server uses filtered JSON. You can disable the JSON block by passing `includeJsonFiltered: false` to `prepareEmailContent`.
+
+### Extending the allowlist
+To support additional fields:
+- Update `VALID_NETSUITE_FIELDS` and the filtering logic in `email-export-utils.js` (`filterToNetSuiteData`).
+- Ensure the SuiteScript reads those fields and maps them to proper NetSuite field IDs before saving.
+
+### Quick Test Plan
+- Input includes extra fields like `customer.industry`, `customer.revenue`, `estimate.type`, `estimate.total`.
+  - Expected: No such hashtags in output; JSON block excludes them.
+- Include classification and location names (`estimate.class`, `estimate.department`, `estimate.location`).
+  - Expected: Hashtags present; SuiteScript resolves names to IDs if possible.
+- Provide repeated identical export payloads.
+  - Expected: Same `#idempotencyKey`; SuiteScript reuses existing estimate via `externalId`.
+- Provide tasks and checklists arrays.
+  - Expected: Correctly formatted `#tasks` and `#checklists` sections.
 
 ---
 

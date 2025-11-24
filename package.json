@@ -9,7 +9,9 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "server": "nodemon backend-server.js"
+    "server": "nodemon backend-server.js",
+    "gemini": "gemini",
+    "test:email-export": "node scripts/test-email-export.js"
   },
   "keywords": [
     "netsuite",
@@ -40,7 +42,9 @@
     "vite": "^7.2.4"
   },
   "devDependencies": {
-    "nodemon": "^3.0.1"
+    "@google/gemini-cli": "^0.17.1",
+    "nodemon": "^3.0.1",
+    "vercel": "^48.10.11"
   },
   "engines": {
     "node": ">=18.0.0"

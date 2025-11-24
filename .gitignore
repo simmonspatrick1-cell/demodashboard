@@ -41,3 +41,6 @@ pat_secrets_env
 .env
 .env.example
 vercel-direct-env.json
+
+# Token/Secret Scripts
+scripts/setup-vercel-token.sh

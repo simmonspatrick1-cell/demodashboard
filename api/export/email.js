@@ -19,9 +19,11 @@ export default async function handler(req, res) {
     const emailUtils = await import('../../email-export-utils.js');
     const { formatDataWithHashtags, createEmailSubject, prepareEmailContent } = emailUtils;
 
-    const emailContent = prepareEmailContent(data, { 
+    const emailContent = prepareEmailContent(data, {
       recipientEmail,
-      includeInstructions: true 
+      includeInstructions: true,
+      includeValidation: true,
+      includeJsonFiltered: true
     });
 
     console.log(`Email export prepared for ${recipientEmail}`);
@@ -44,4 +46,3 @@ export default async function handler(req, res) {
     });
   }
 }
-

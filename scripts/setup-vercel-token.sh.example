@@ -1,0 +1,36 @@
+#!/bin/bash
+
+# Setup script for Vercel Access Token
+# Copy this file to setup-vercel-token.sh and add your token
+
+# Replace with your actual Vercel access token
+VERCEL_TOKEN="YOUR_VERCEL_TOKEN_HERE"
+
+# Export token for current session
+export VERCEL_TOKEN="$VERCEL_TOKEN"
+
+# Add to shell profile for persistence (optional)
+if [ -f ~/.zshrc ]; then
+    if ! grep -q "VERCEL_TOKEN" ~/.zshrc; then
+        echo "" >> ~/.zshrc
+        echo "# Vercel Access Token" >> ~/.zshrc
+        echo "export VERCEL_TOKEN=\"$VERCEL_TOKEN\"" >> ~/.zshrc
+        echo "Added VERCEL_TOKEN to ~/.zshrc"
+    else
+        echo "VERCEL_TOKEN already exists in ~/.zshrc"
+    fi
+elif [ -f ~/.bash_profile ]; then
+    if ! grep -q "VERCEL_TOKEN" ~/.bash_profile; then
+        echo "" >> ~/.bash_profile
+        echo "# Vercel Access Token" >> ~/.bash_profile
+        echo "export VERCEL_TOKEN=\"$VERCEL_TOKEN\"" >> ~/.bash_profile
+        echo "Added VERCEL_TOKEN to ~/.bash_profile"
+    else
+        echo "VERCEL_TOKEN already exists in ~/.bash_profile"
+    fi
+fi
+
+echo "Vercel token configured!"
+echo "To use it in the current session, run: source scripts/setup-vercel-token.sh"
+echo "Or use it directly: export VERCEL_TOKEN=\"$VERCEL_TOKEN\""
+
