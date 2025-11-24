@@ -5,7 +5,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { type, content, apiKey, projectData, customerData, tasks } = req.body;
+  const { type, content, apiKey, projectData, customerData, tasks, currentProject } = req.body;
   
   // Use environment variable if apiKey is not provided, empty, or looks invalid
   // Only accept frontend key if it starts with 'sk-ant-'
@@ -182,6 +182,84 @@ export default async function handler(req, res) {
 
         Return ONLY the JSON object, no other text.
       `;
+    } else if (type === 'generate_project') {
+      const customerName = customerData?.name || 'Customer';
+      const customerIndustry = customerData?.industry || projectData?.industry || 'Professional Services';
+      const customerSize = customerData?.size || customerData?.custentity_esc_no_of_employees || '50-100';
+      const customerBudget = customerData?.budget || customerData?.annualRevenue || customerData?.custentity_esc_annual_revenue || 100000;
+      const customerFocus = customerData?.focus || [];
+      const existingProjectName = currentProject?.projectName || '';
+      
+      prompt = `
+        You are a NetSuite PSA expert. Generate a complete, context-aware project configuration for a customer.
+        
+        Customer Context:
+        - Name: ${customerName}
+        - Industry: ${customerIndustry}
+        - Company Size: ${customerSize}
+        - Budget: $${customerBudget}
+        - Focus Areas: ${customerFocus.join(', ') || 'General Professional Services'}
+        
+        ${existingProjectName ? `Current Project Name: ${existingProjectName}` : ''}
+        
+        Generate a complete project configuration as a JSON object with this structure:
+        {
+          "projectName": "Relevant project name for ${customerName} in ${customerIndustry}",
+          "projectCode": "PRJ-${customerName.toUpperCase().replace(/[^A-Z0-9]/g, '')}-${new Date().getFullYear()}",
+          "projectManager": "Appropriate project manager name",
+          "projectStatus": "OPEN",
+          "billingType": "Charge-Based|Fixed Bid, Interval|Fixed Bid, Milestone|Time and Materials",
+          "billingSchedule": "Appropriate billing schedule name (or empty if Charge-Based)",
+          "tasks": [
+            {
+              "name": "Task name",
+              "estimatedHours": 40,
+              "plannedWork": 40,
+              "status": "Not Started",
+              "resource": "912|913|914|915|916",
+              "serviceItem": "NetSuite service item name",
+              "billingClass": "1|2|3|4",
+              "unitCost": 150
+            }
+          ]
+        }
+        
+        Resource IDs (use these exact IDs):
+        - 912: Business Analyst
+        - 913: Consultant
+        - 914: Project Manager
+        - 915: Technical Consultant
+        - 916: Trainer
+        
+        Billing Classes:
+        - 1: Professional Services
+        - 2: Consulting
+        - 3: Development
+        - 4: Training
+        
+        Service Items (use realistic NetSuite service items):
+        - PS - Discovery & Design Strategy
+        - PS - Training Services
+        - SVC_PR_Development
+        - SVC_PR_Consulting
+        - SVC_PR_Project Management
+        - PS - Data Migration
+        - PS - Go-Live Support
+        - PS - Post Go-Live Support
+        
+        Guidelines:
+        - Project name should be specific to ${customerIndustry} industry and ${customerName}
+        - Choose billing type appropriate for ${customerIndustry} (Charge-Based is default for most)
+        - Create 4-7 tasks that are realistic for ${customerIndustry}
+        - Tasks should be sequential and logical
+        - Total project hours should align with budget (approximately ${Math.round(customerBudget / 150)} hours)
+        - Use industry-appropriate service items and rates
+        - Match resource types to task complexity
+        - If billing type is "Fixed Bid, Milestone", include a billing schedule name
+        - Make the project relevant to customer focus areas: ${customerFocus.join(', ') || 'General'}
+        
+        Return ONLY the JSON object, no other text.
+      `;
     } else {
       return res.status(400).json({ error: 'Invalid request type' });
     }
@@ -234,7 +312,7 @@ export default async function handler(req, res) {
     const completion = data.content[0].text;
 
     // If looking for JSON, try to extract it if Claude added extra text
-    if (type === 'analyze_url' || type === 'suggest_tasks' || type === 'generate_estimate') {
+    if (type === 'analyze_url' || type === 'suggest_tasks' || type === 'generate_estimate' || type === 'generate_project') {
       try {
         // Try to find JSON array or object
         const jsonMatch = completion.match(/\[[\s\S]*\]|\{[\s\S]*\}/);
