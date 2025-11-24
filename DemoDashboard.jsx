@@ -58,6 +58,7 @@ export default function DemoDashboard() {
   const [selectedDepartment, setSelectedDepartment] = useState(null);
   const [selectedLocation, setSelectedLocation] = useState(null);
   const [formErrors, setFormErrors] = useState({});
+  const [recentItems, setRecentItems] = useState([]); // Track recently viewed/used items
   const [promptCategories, setPromptCategories] = useState([
     {
       name: 'Customer Setup',
@@ -324,7 +325,49 @@ export default function DemoDashboard() {
   }, []);
 
   // AI Generation Handler
+  // AI Response Cache (24 hour TTL)
+  const getCachedAIResponse = (type, content) => {
+    try {
+      const cacheKey = `ai_cache_${type}_${typeof content === 'string' ? content : JSON.stringify(content)}`;
+      const cached = localStorage.getItem(cacheKey);
+      if (cached) {
+        const { data, timestamp } = JSON.parse(cached);
+        const age = Date.now() - timestamp;
+        const ttl = 24 * 60 * 60 * 1000; // 24 hours
+        if (age < ttl) {
+          return data;
+        }
+        localStorage.removeItem(cacheKey);
+      }
+    } catch (e) {
+      // Ignore cache errors
+    }
+    return null;
+  };
+
+  const setCachedAIResponse = (type, content, data) => {
+    try {
+      const cacheKey = `ai_cache_${type}_${typeof content === 'string' ? content : JSON.stringify(content)}`;
+      localStorage.setItem(cacheKey, JSON.stringify({
+        data,
+        timestamp: Date.now()
+      }));
+    } catch (e) {
+      // Ignore cache errors (storage full, etc.)
+    }
+  };
+
   const generateFromAI = async (type, content, isRetry = false) => {
+    // Check cache first (skip for retries)
+    if (!isRetry) {
+      const cached = getCachedAIResponse(type, content);
+      if (cached) {
+        setActionStatus('✓ Using cached result');
+        setTimeout(() => setActionStatus(null), 2000);
+        return cached;
+      }
+    }
+
     setIsGeneratingAI(true);
     setActionStatus(isRetry ? '🔄 Retrying with system key...' : '🤖 Analyzing...');
     
@@ -433,7 +476,16 @@ export default function DemoDashboard() {
         return data;
       } else if (type === 'suggest_tasks' || type === 'generate_estimate') {
         // For new AI types, just return the data - caller will handle it
+        // Cache the response
+        if (!isRetry) {
+          setCachedAIResponse(type, content, data);
+        }
         return data;
+      }
+      
+      // Cache successful responses
+      if (!isRetry && !data.error) {
+        setCachedAIResponse(type, content, data);
       }
       
       return data;
@@ -510,9 +562,10 @@ export default function DemoDashboard() {
       .replace(/\[contact info\]/gi, 'primary@example.com');
   };
 
-  const copyToClipboard = (text, index) => {
+  const copyToClipboard = (text, index, label = 'Copied!') => {
     navigator.clipboard.writeText(text);
     setCopiedIndex(index);
+    setActionStatus(`✓ ${label}`);
     
     // Add to history
     setClipboardHistory(prev => {
@@ -520,7 +573,16 @@ export default function DemoDashboard() {
       return newHistory.slice(0, 20); // Keep last 20 items
     });
     
-    setTimeout(() => setCopiedIndex(null), 2000);
+    // Track recent action
+    setRecentItems(prev => {
+      const newItem = { type: 'copy', text: text.substring(0, 50), timestamp: new Date() };
+      return [newItem, ...prev.filter(item => item.text !== newItem.text)].slice(0, 10);
+    });
+    
+    setTimeout(() => {
+      setCopiedIndex(null);
+      setActionStatus(null);
+    }, 2000);
   };
 
   const toggleFavorite = (prompt) => {
@@ -1721,17 +1783,35 @@ export default function DemoDashboard() {
 
   // ============ COMPONENT: PROJECT CONFIGURATION ============
   const ProjectConfigPanel = () => {
+    // Auto-load saved project data
+    const loadSavedProject = () => {
+      try {
+        const saved = localStorage.getItem('demodashboard_project_draft');
+        if (saved) {
+          const data = JSON.parse(saved);
+          if (data.customerId === selectedCustData?.id) {
+            return data;
+          }
+        }
+      } catch (e) {
+        // Ignore errors
+      }
+      return null;
+    };
+
+    const savedProject = loadSavedProject();
+    
     const [projectName, setProjectName] = useState(
-      selectedCustData ? `${selectedCustData.name} - Demo Project` : ''
+      savedProject?.projectName || (selectedCustData ? `${selectedCustData.name} - Demo Project` : '')
     );
     const [projectCode, setProjectCode] = useState(
-      selectedCustData ? `PRJ-${selectedCustData?.entityid}-${Date.now()}` : `PRJ-${Date.now()}`
+      savedProject?.projectCode || (selectedCustData ? `PRJ-${selectedCustData?.entityid}-${Date.now()}` : `PRJ-${Date.now()}`)
     );
-    const [projectManager, setProjectManager] = useState('');
-    const [projectStatus, setProjectStatus] = useState('OPEN');
-    const [billingType, setBillingType] = useState('Charge-Based');
-    const [billingSchedule, setBillingSchedule] = useState('');
-    const [tasks, setTasks] = useState([
+    const [projectManager, setProjectManager] = useState(savedProject?.projectManager || '');
+    const [projectStatus, setProjectStatus] = useState(savedProject?.projectStatus || 'OPEN');
+    const [billingType, setBillingType] = useState(savedProject?.billingType || 'Charge-Based');
+    const [billingSchedule, setBillingSchedule] = useState(savedProject?.billingSchedule || '');
+    const [tasks, setTasks] = useState(savedProject?.tasks || [
       {
         name: 'Discovery & Design',
         estimatedHours: 40,
@@ -1765,6 +1845,23 @@ export default function DemoDashboard() {
     ]);
 
     const disabled = !selectedCustData;
+
+    // Auto-save project data
+    useEffect(() => {
+      if (selectedCustData) {
+        const projectData = {
+          customerId: selectedCustData.id,
+          projectName,
+          projectCode,
+          projectManager,
+          projectStatus,
+          billingType,
+          billingSchedule,
+          tasks
+        };
+        localStorage.setItem('demodashboard_project_draft', JSON.stringify(projectData));
+      }
+    }, [projectName, projectCode, projectManager, projectStatus, billingType, billingSchedule, tasks, selectedCustData]);
 
     const addTask = () =>
       setTasks((prev) => [
@@ -1884,7 +1981,15 @@ export default function DemoDashboard() {
       <div className="space-y-6">
         <div className="bg-white rounded-lg border border-gray-200 p-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold text-gray-900">Project Configuration</h2>
+            <div className="flex items-center gap-2">
+              <h2 className="text-xl font-bold text-gray-900">Project Configuration</h2>
+              {selectedCustData && (
+                <span className="text-xs px-2 py-1 rounded bg-green-50 text-green-700 border border-green-200 flex items-center gap-1">
+                  <Check size={12} />
+                  Auto-saved
+                </span>
+              )}
+            </div>
             {!selectedCustData && (
               <span className="text-xs px-2 py-1 rounded bg-orange-50 text-orange-700 border border-orange-200">
                 Select a customer in Context to enable exports
@@ -3042,7 +3147,7 @@ export default function DemoDashboard() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="p-6 border-b border-gray-200 flex items-center justify-between">
-              <h2 id="settings-modal-title" className="text-xl font-bold text-gray-900">Claude API Settings</h2>
+              <h2 id="settings-modal-title" className="text-xl font-bold text-gray-900">Settings</h2>
               <button
                 onClick={() => setShowSettingsModal(false)}
                 className="text-gray-400 hover:text-gray-600 p-1 rounded hover:bg-gray-100 transition-colors"
@@ -3096,6 +3201,33 @@ export default function DemoDashboard() {
               <p className="text-xs text-gray-500 mt-3">
                 🔒 Your API key is stored locally in your browser and sent directly to Claude's API. It is never stored on our servers.
               </p>
+              
+              {/* Cache Management */}
+              <div className="mt-6 pt-6 border-t border-gray-200">
+                <h3 className="text-sm font-semibold text-gray-900 mb-3">Cache Management</h3>
+                <button
+                  onClick={() => {
+                    // Clear all AI cache
+                    let cleared = 0;
+                    for (let i = 0; i < localStorage.length; i++) {
+                      const key = localStorage.key(i);
+                      if (key && key.startsWith('ai_cache_')) {
+                        localStorage.removeItem(key);
+                        cleared++;
+                      }
+                    }
+                    setActionStatus(`✓ Cleared ${cleared} cached AI responses`);
+                    setTimeout(() => setActionStatus(null), 3000);
+                  }}
+                  className="w-full px-4 py-2 bg-amber-100 text-amber-800 rounded-lg hover:bg-amber-200 transition-colors text-sm font-medium"
+                >
+                  <RefreshCw size={14} className="inline mr-2" />
+                  Clear AI Cache ({Object.keys(localStorage).filter(k => k.startsWith('ai_cache_')).length} items)
+                </button>
+                <p className="text-xs text-gray-500 mt-2">
+                  AI responses are cached for 24 hours to reduce API costs. Clear cache to force fresh responses.
+                </p>
+              </div>
             </div>
             <div className="p-6 border-t border-gray-200 flex gap-3">
               <button
