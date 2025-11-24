@@ -1628,7 +1628,7 @@ export default function DemoDashboard() {
     );
     const [projectManager, setProjectManager] = useState('');
     const [projectStatus, setProjectStatus] = useState('OPEN');
-    const [billingSchedule, setBillingSchedule] = useState('Time and Materials');
+    const [billingSchedule, setBillingSchedule] = useState('Charge-Based');
     const [tasks, setTasks] = useState([
       {
         name: 'Discovery & Design',
@@ -1785,19 +1785,46 @@ export default function DemoDashboard() {
             </div>
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Billing Schedule
+                Billing Type
+                <span className="text-xs text-gray-500 ml-2 font-normal">
+                  Select a method to bill project costs to the customer
+                </span>
               </label>
               <select
                 value={billingSchedule}
                 onChange={(e) => setBillingSchedule(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               >
-                <option>Time and Materials</option>
-                <option>Fixed Bid</option>
-                <option>Milestone</option>
-                <option>Retainer</option>
+                <option value="Charge-Based">Charge-Based</option>
+                <option value="Fixed Bid, Interval">Fixed Bid, Interval</option>
+                <option value="Fixed Bid Milestone">Fixed Bid Milestone</option>
+                <option value="Time and Materials">Time and Materials</option>
               </select>
-              <p className="text-xs text-gray-500 mt-1">
+              <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-xs text-gray-700 font-medium mb-1">
+                  {billingSchedule === 'Charge-Based' && (
+                    <>
+                      <strong>Charge-Based:</strong> Billable amounts are represented by charges. Charges are generated based on charge rules based on fixed dates, milestones, project progress, or time entries. This option requires that you have enabled the Charge-Based Billing feature.
+                    </>
+                  )}
+                  {billingSchedule === 'Fixed Bid, Interval' && (
+                    <>
+                      <strong>Fixed Bid, Interval:</strong> Bill customers at predefined intervals for a portion of the fixed amount based on project percent complete.
+                    </>
+                  )}
+                  {billingSchedule === 'Fixed Bid Milestone' && (
+                    <>
+                      <strong>Fixed Bid Milestone:</strong> Bill customers as milestones are completed for the percentage of the total project amount specified for the milestone.
+                    </>
+                  )}
+                  {billingSchedule === 'Time and Materials' && (
+                    <>
+                      <strong>Time and Materials:</strong> Bill customers for time and expenses entered against the project.
+                    </>
+                  )}
+                </p>
+              </div>
+              <p className="text-xs text-gray-500 mt-2">
                 Included in export JSON and memo. Estimate creation can honor this setting.
               </p>
             </div>
