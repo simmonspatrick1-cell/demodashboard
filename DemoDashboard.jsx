@@ -2178,9 +2178,25 @@ export default function DemoDashboard() {
               unitCost: Math.max(0, parseFloat(task.unitCost || 150))
             }));
 
+          console.log('AI returned tasks:', result.tasks.length);
+          console.log('Valid tasks after filtering:', suggestedTasks.length);
+          console.log('Tasks array:', suggestedTasks);
+
           if (suggestedTasks.length > 0) {
-            setTasks(suggestedTasks);
-            setActionStatus(`✓ Generated complete project with ${suggestedTasks.length} tasks!`);
+            // Clear existing tasks first to ensure clean state update
+            setTasks([]);
+            // Use setTimeout to ensure React batches the state update properly
+            setTimeout(() => {
+              setTasks([...suggestedTasks]);
+              // Use the original count from AI response for the message
+              const taskCount = result.tasks.length;
+              const validCount = suggestedTasks.length;
+              if (taskCount !== validCount) {
+                setActionStatus(`✓ Generated complete project with ${validCount} tasks! (${taskCount - validCount} filtered out)`);
+              } else {
+                setActionStatus(`✓ Generated complete project with ${validCount} tasks!`);
+              }
+            }, 10);
           } else {
             throw new Error('No valid tasks in AI response');
           }
