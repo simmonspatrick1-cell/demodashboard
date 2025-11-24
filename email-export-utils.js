@@ -252,6 +252,12 @@ export function filterToNetSuiteData(data = {}) {
     filtered.tasks = data.tasks.map(t => ({
       name: t.name || t.title || 'Unnamed Task',
       estimatedHours: t.estimatedHours,
+      plannedWork: t.plannedWork,
+      status: t.status,
+      resource: t.resource, // Generic resource ID (912-916)
+      serviceItem: t.serviceItem,
+      billingClass: t.billingClass,
+      unitCost: t.unitCost,
       assignee: t.assignee,
       dueDate: t.dueDate
     }));
@@ -417,6 +423,21 @@ export function formatDataWithHashtags(data, options = {}) {
     filtered.tasks.forEach((task, idx) => {
       lines.push(`  Task ${idx + 1}: ${task.name || 'Unnamed Task'}`);
       if (task.estimatedHours) lines.push(`    Estimated Hours: ${task.estimatedHours}`);
+      if (task.plannedWork) lines.push(`    Planned Work: ${task.plannedWork} hrs`);
+      if (task.status) lines.push(`    Status: ${task.status}`);
+      if (task.resource) {
+        const resourceNames = {
+          '912': 'Business Analyst',
+          '913': 'Consultant',
+          '914': 'Project Manager',
+          '915': 'Technical Consultant',
+          '916': 'Trainer'
+        };
+        lines.push(`    Resource: ${resourceNames[task.resource] || task.resource} (ID: ${task.resource})`);
+      }
+      if (task.serviceItem) lines.push(`    Service Item: ${task.serviceItem}`);
+      if (task.billingClass) lines.push(`    Billing Class: ${task.billingClass}`);
+      if (task.unitCost) lines.push(`    Unit Cost: $${task.unitCost}`);
       if (task.assignee) lines.push(`    Assignee: ${task.assignee}`);
       if (task.dueDate) lines.push(`    Due Date: ${task.dueDate}`);
     });

@@ -1975,15 +1975,17 @@ export default function DemoDashboard() {
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white"
                     >
                       <option value="">-- Select Resource --</option>
-                      <option value="1">John Smith</option>
-                      <option value="2">Sarah Johnson</option>
-                      <option value="3">Michael Chen</option>
-                      <option value="4">Emily Davis</option>
-                      <option value="5">Robert Wilson</option>
-                      <option value="6">Jennifer Lee</option>
-                      <option value="7">David Martinez</option>
-                      <option value="8">Lisa Anderson</option>
+                      <option value="912">Business Analyst</option>
+                      <option value="913">Consultant</option>
+                      <option value="914">Project Manager</option>
+                      <option value="915">Technical Consultant</option>
+                      <option value="916">Trainer</option>
                     </select>
+                    {t.resource && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        Resource ID: {t.resource} ({t.resource === '912' ? 'Business Analyst' : t.resource === '913' ? 'Consultant' : t.resource === '914' ? 'Project Manager' : t.resource === '915' ? 'Technical Consultant' : t.resource === '916' ? 'Trainer' : ''})
+                      </p>
+                    )}
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">Service Item</label>
