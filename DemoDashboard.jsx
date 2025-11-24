@@ -59,6 +59,11 @@ export default function DemoDashboard() {
   const [selectedLocation, setSelectedLocation] = useState(null);
   const [formErrors, setFormErrors] = useState({});
   const [recentItems, setRecentItems] = useState([]); // Track recently viewed/used items
+  const [exportHistory, setExportHistory] = useState([]); // Track export history
+  const [showShortcutsModal, setShowShortcutsModal] = useState(false); // Keyboard shortcuts help
+  const [quickFilter, setQuickFilter] = useState(null); // Quick filter state: 'lead', 'prospect', 'customer', null
+  const [selectedItems, setSelectedItems] = useState(new Set()); // Bulk selection
+  const [showBulkActions, setShowBulkActions] = useState(false); // Show bulk actions bar
   const [promptCategories, setPromptCategories] = useState([
     {
       name: 'Customer Setup',
@@ -206,7 +211,7 @@ export default function DemoDashboard() {
   useEffect(() => {
     const handleKeyDown = (e) => {
       // Don't trigger shortcuts when typing in inputs, textareas, or modals are open
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || showAddProspectModal || showSettingsModal) {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || showAddProspectModal || showSettingsModal || showShortcutsModal) {
         if (e.key === 'Escape') {
           if (showAddProspectModal && !isGeneratingAI) {
             setShowAddProspectModal(false);
@@ -254,6 +259,13 @@ export default function DemoDashboard() {
         return;
       }
 
+      // ?: Show keyboard shortcuts
+      if (e.key === '?' && !e.metaKey && !e.ctrlKey) {
+        e.preventDefault();
+        setShowShortcutsModal(true);
+        return;
+      }
+
       // ESC: Close modals
       if (e.key === 'Escape') {
         if (showAddProspectModal && !isGeneratingAI) {
@@ -262,6 +274,9 @@ export default function DemoDashboard() {
         }
         if (showSettingsModal) {
           setShowSettingsModal(false);
+        }
+        if (showShortcutsModal) {
+          setShowShortcutsModal(false);
         }
       }
     };
@@ -521,13 +536,42 @@ export default function DemoDashboard() {
 
   // ============ CUSTOMER FILTERING & SEARCH ============
   const filteredCustomers = useMemo(() => {
+    let filtered = prospects;
+    
+    // Apply quick filter
+    if (quickFilter) {
+      filtered = filtered.filter(cust => {
+        if (quickFilter === 'lead') return cust.status.startsWith('LEAD-');
+        if (quickFilter === 'prospect') return cust.status.startsWith('PROSPECT-');
+        if (quickFilter === 'customer') return cust.status.startsWith('CUSTOMER-');
+        return true;
+      });
+    }
+    
+    // Apply search query
     const query = debouncedSearchQuery.toLowerCase();
-    return prospects.filter(cust =>
-      cust.name.toLowerCase().includes(query) ||
-      (cust.industry && cust.industry.toLowerCase().includes(query)) ||
-      cust.entityid.toLowerCase().includes(query)
+    if (query) {
+      filtered = filtered.filter(cust =>
+        cust.name.toLowerCase().includes(query) ||
+        (cust.industry && cust.industry.toLowerCase().includes(query)) ||
+        cust.entityid.toLowerCase().includes(query)
+      );
+    }
+    
+    return filtered;
+  }, [debouncedSearchQuery, prospects, quickFilter]);
+
+  // Helper function to highlight search terms
+  const highlightText = (text, searchTerm) => {
+    if (!searchTerm || !text) return text;
+    const regex = new RegExp(`(${searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+    const parts = text.split(regex);
+    return parts.map((part, i) => 
+      regex.test(part) ? (
+        <mark key={i} className="bg-yellow-200 text-gray-900 px-0.5 rounded">{part}</mark>
+      ) : part
     );
-  }, [debouncedSearchQuery, prospects]);
+  };
 
   const filteredPrompts = useMemo(() => {
     if (!debouncedPromptSearch) return promptCategories;
@@ -846,6 +890,25 @@ export default function DemoDashboard() {
     }
   };
 
+  // Load export history from local storage
+  useEffect(() => {
+    const saved = localStorage.getItem('demodashboard_export_history');
+    if (saved) {
+      try {
+        setExportHistory(JSON.parse(saved));
+      } catch (e) {
+        console.error('Failed to parse export history', e);
+      }
+    }
+  }, []);
+
+  // Save export history to local storage
+  useEffect(() => {
+    if (exportHistory.length > 0) {
+      localStorage.setItem('demodashboard_export_history', JSON.stringify(exportHistory));
+    }
+  }, [exportHistory]);
+
   const performEmailExport = (exportData) => {
     try {
       // Export via email
@@ -854,6 +917,21 @@ export default function DemoDashboard() {
         includeInstructions: true,
         includeValidation: true
       });
+
+      // Track export history
+      const exportRecord = {
+        id: Date.now(),
+        timestamp: new Date().toISOString(),
+        customer: selectedCustData?.name || 'Unknown',
+        customerId: selectedCustData?.id || null,
+        type: 'email',
+        data: {
+          projectName: exportData.projectName || 'N/A',
+          estimateType: exportData.estimate?.type || 'N/A',
+          itemCount: exportData.items?.length || 0
+        }
+      };
+      setExportHistory(prev => [exportRecord, ...prev.slice(0, 49)]); // Keep last 50
 
       setActionStatus('✓ Opening email client...');
       setTimeout(() => setActionStatus(null), 3000);
@@ -1145,9 +1223,52 @@ export default function DemoDashboard() {
             <h3 className="font-semibold text-gray-900 flex items-center gap-2">
               <Users size={18} className="text-blue-600" /> Prospects
             </h3>
-            <span className="text-xs font-medium px-2 py-1 bg-blue-100 text-blue-700 rounded-full">
-              {filteredCustomers.length}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium px-2 py-1 bg-blue-100 text-blue-700 rounded-full">
+                {filteredCustomers.length}
+              </span>
+              <button
+                onClick={() => setShowShortcutsModal(true)}
+                className="p-1.5 hover:bg-gray-200 rounded-lg transition-colors"
+                title="Keyboard Shortcuts (?)"
+              >
+                <BookOpen size={14} className="text-gray-500" />
+              </button>
+            </div>
+          </div>
+          
+          {/* Quick Filters */}
+          <div className="flex gap-1.5 mb-2">
+            <button
+              onClick={() => setQuickFilter(quickFilter === 'lead' ? null : 'lead')}
+              className={`text-xs px-2 py-1 rounded-md transition-all ${
+                quickFilter === 'lead'
+                  ? 'bg-yellow-100 text-yellow-700 border border-yellow-300'
+                  : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+              }`}
+            >
+              Leads
+            </button>
+            <button
+              onClick={() => setQuickFilter(quickFilter === 'prospect' ? null : 'prospect')}
+              className={`text-xs px-2 py-1 rounded-md transition-all ${
+                quickFilter === 'prospect'
+                  ? 'bg-orange-100 text-orange-700 border border-orange-300'
+                  : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+              }`}
+            >
+              Prospects
+            </button>
+            <button
+              onClick={() => setQuickFilter(quickFilter === 'customer' ? null : 'customer')}
+              className={`text-xs px-2 py-1 rounded-md transition-all ${
+                quickFilter === 'customer'
+                  ? 'bg-green-100 text-green-700 border border-green-300'
+                  : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+              }`}
+            >
+              Customers
+            </button>
           </div>
           
           <div className="relative">
@@ -1161,6 +1282,58 @@ export default function DemoDashboard() {
               className="w-full pl-9 pr-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
             />
           </div>
+          
+          {/* Bulk Selection Toggle */}
+          <div className="mt-2 flex items-center justify-between">
+            <button
+              onClick={() => {
+                if (selectedItems.size > 0) {
+                  setSelectedItems(new Set());
+                  setShowBulkActions(false);
+                } else {
+                  setShowBulkActions(true);
+                }
+              }}
+              className="text-xs px-2 py-1 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
+            >
+              {showBulkActions ? 'Cancel Selection' : 'Select Multiple'}
+            </button>
+          </div>
+          
+          {/* Bulk Actions Bar */}
+          {selectedItems.size > 0 && (
+            <div className="mt-2 flex items-center justify-between p-2 bg-blue-50 border border-blue-200 rounded-lg">
+              <span className="text-xs font-medium text-blue-700">
+                {selectedItems.size} selected
+              </span>
+              <div className="flex gap-1">
+                <button
+                  onClick={() => {
+                    // Bulk export selected items
+                    const selectedCustomers = prospects.filter(c => selectedItems.has(c.id));
+                    setActionStatus(`✓ Preparing export for ${selectedCustomers.length} customers...`);
+                    setTimeout(() => {
+                      setSelectedItems(new Set());
+                      setShowBulkActions(false);
+                      setActionStatus(null);
+                    }, 2000);
+                  }}
+                  className="text-xs px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
+                >
+                  Export Selected
+                </button>
+                <button
+                  onClick={() => {
+                    setSelectedItems(new Set());
+                    setShowBulkActions(false);
+                  }}
+                  className="text-xs px-2 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+                >
+                  Clear
+                </button>
+              </div>
+            </div>
+          )}
         </div>
         
         <div className="flex-1 overflow-y-auto divide-y divide-gray-50">
@@ -1178,9 +1351,29 @@ export default function DemoDashboard() {
                 }`}
               >
                 <div className="flex items-start justify-between mb-1">
-                  <span className={`font-semibold text-sm ${selectedCustomer === customer.id ? 'text-blue-700' : 'text-gray-900'}`}>
-                    {customer.name}
-                  </span>
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                    {showBulkActions && (
+                      <input
+                        type="checkbox"
+                        checked={selectedItems.has(customer.id)}
+                        onChange={(e) => {
+                          e.stopPropagation();
+                          const newSelected = new Set(selectedItems);
+                          if (e.target.checked) {
+                            newSelected.add(customer.id);
+                          } else {
+                            newSelected.delete(customer.id);
+                          }
+                          setSelectedItems(newSelected);
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        className="mt-0.5"
+                      />
+                    )}
+                    <span className={`font-semibold text-sm truncate ${selectedCustomer === customer.id ? 'text-blue-700' : 'text-gray-900'}`}>
+                      {debouncedSearchQuery ? highlightText(customer.name, debouncedSearchQuery) : customer.name}
+                    </span>
+                  </div>
                   <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide border ${statusBadgeClass}`}>
                     {customer.status}
                   </span>
@@ -3202,6 +3395,43 @@ export default function DemoDashboard() {
                 🔒 Your API key is stored locally in your browser and sent directly to Claude's API. It is never stored on our servers.
               </p>
               
+              {/* Export History */}
+              <div className="mt-6 pt-6 border-t border-gray-200">
+                <h3 className="text-sm font-semibold text-gray-900 mb-3">Export History</h3>
+                {exportHistory.length === 0 ? (
+                  <p className="text-xs text-gray-500">No exports yet</p>
+                ) : (
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {exportHistory.slice(0, 10).map((exportItem) => (
+                      <div key={exportItem.id} className="p-2 bg-gray-50 rounded-lg border border-gray-100 text-xs">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="font-medium text-gray-900">{exportItem.customer}</span>
+                          <span className="text-gray-500">
+                            {new Date(exportItem.timestamp).toLocaleDateString()} {new Date(exportItem.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                          </span>
+                        </div>
+                        <div className="text-gray-600">
+                          {exportItem.data.projectName} • {exportItem.data.itemCount} items
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {exportHistory.length > 0 && (
+                  <button
+                    onClick={() => {
+                      setExportHistory([]);
+                      localStorage.removeItem('demodashboard_export_history');
+                      setActionStatus('✓ Export history cleared');
+                      setTimeout(() => setActionStatus(null), 2000);
+                    }}
+                    className="mt-2 text-xs text-gray-500 hover:text-red-600"
+                  >
+                    Clear History
+                  </button>
+                )}
+              </div>
+
               {/* Cache Management */}
               <div className="mt-6 pt-6 border-t border-gray-200">
                 <h3 className="text-sm font-semibold text-gray-900 mb-3">Cache Management</h3>
@@ -3252,6 +3482,96 @@ export default function DemoDashboard() {
                 className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {claudeApiKey ? 'Save Custom Key' : 'Use System Key'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Keyboard Shortcuts Modal */}
+      {showShortcutsModal && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-opacity duration-200"
+          onClick={() => setShowShortcutsModal(false)}
+          aria-modal="true"
+          aria-labelledby="shortcuts-modal-title"
+          role="dialog"
+        >
+          <div 
+            className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-xl transform transition-all duration-200 scale-100"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-6 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white z-10">
+              <h2 id="shortcuts-modal-title" className="text-xl font-bold text-gray-900">Keyboard Shortcuts</h2>
+              <button
+                onClick={() => setShowShortcutsModal(false)}
+                className="text-gray-400 hover:text-gray-600 p-1 rounded hover:bg-gray-100 transition-colors"
+                aria-label="Close shortcuts modal"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="p-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900 mb-3 uppercase tracking-wide">Navigation</h3>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
+                      <span className="text-sm text-gray-700">Switch to Context Tab</span>
+                      <kbd className="px-2 py-1 bg-white border border-gray-300 rounded text-xs font-mono">⌘1</kbd>
+                    </div>
+                    <div className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
+                      <span className="text-sm text-gray-700">Switch to Prompts Tab</span>
+                      <kbd className="px-2 py-1 bg-white border border-gray-300 rounded text-xs font-mono">⌘2</kbd>
+                    </div>
+                    <div className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
+                      <span className="text-sm text-gray-700">Switch to Items Tab</span>
+                      <kbd className="px-2 py-1 bg-white border border-gray-300 rounded text-xs font-mono">⌘3</kbd>
+                    </div>
+                    <div className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
+                      <span className="text-sm text-gray-700">Switch to Projects Tab</span>
+                      <kbd className="px-2 py-1 bg-white border border-gray-300 rounded text-xs font-mono">⌘4</kbd>
+                    </div>
+                    <div className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
+                      <span className="text-sm text-gray-700">Switch to Reference Tab</span>
+                      <kbd className="px-2 py-1 bg-white border border-gray-300 rounded text-xs font-mono">⌘5</kbd>
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900 mb-3 uppercase tracking-wide">Actions</h3>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
+                      <span className="text-sm text-gray-700">Focus Search</span>
+                      <kbd className="px-2 py-1 bg-white border border-gray-300 rounded text-xs font-mono">⌘K</kbd>
+                    </div>
+                    <div className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
+                      <span className="text-sm text-gray-700">New Prospect</span>
+                      <kbd className="px-2 py-1 bg-white border border-gray-300 rounded text-xs font-mono">⌘N</kbd>
+                    </div>
+                    <div className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
+                      <span className="text-sm text-gray-700">Show Shortcuts</span>
+                      <kbd className="px-2 py-1 bg-white border border-gray-300 rounded text-xs font-mono">?</kbd>
+                    </div>
+                    <div className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
+                      <span className="text-sm text-gray-700">Close Modal</span>
+                      <kbd className="px-2 py-1 bg-white border border-gray-300 rounded text-xs font-mono">ESC</kbd>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="mt-6 pt-6 border-t border-gray-200">
+                <p className="text-xs text-gray-500">
+                  💡 Tip: Shortcuts work when you're not typing in input fields. Press <kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-300 rounded text-xs font-mono">?</kbd> anytime to see this help.
+                </p>
+              </div>
+            </div>
+            <div className="p-6 border-t border-gray-200">
+              <button
+                onClick={() => setShowShortcutsModal(false)}
+                className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+              >
+                Got it!
               </button>
             </div>
           </div>
