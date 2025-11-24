@@ -686,6 +686,40 @@ app.get('/api/monitoring/metrics', (_req, res) => {
   });
 });
 
+// ============ ROOT ROUTE ============
+app.get('/', (req, res) => {
+  res.json({
+    service: 'NetSuite Demo Dashboard API',
+    status: 'running',
+    version: '1.0.0',
+    endpoints: {
+      health: '/api/health',
+      customers: '/api/netsuite/customers',
+      sync: 'POST /api/netsuite/sync',
+      projects: 'POST /api/netsuite/projects',
+      createProject: 'POST /api/netsuite/create-project',
+      createTimeEntries: 'POST /api/netsuite/create-time-entries',
+      scenarios: 'POST /api/netsuite/scenarios',
+      scenarioTemplates: '/api/netsuite/scenarios/templates',
+      exportEmail: 'POST /api/export/email',
+      monitoring: '/api/monitoring/metrics',
+      cache: 'POST /api/cache/clear'
+    },
+    documentation: 'See README.md for API documentation',
+    frontend: process.env.FRONTEND_URL || 'https://demodashboard-j0ryywiv5-pat-simmons-projects.vercel.app'
+  });
+});
+
+// ============ 404 HANDLER ============
+app.use((req, res) => {
+  res.status(404).json({
+    error: 'Not Found',
+    message: `Cannot ${req.method} ${req.path}`,
+    availableEndpoints: '/api/health, /api/netsuite/customers, etc.',
+    seeRoot: 'Visit / for all available endpoints'
+  });
+});
+
 // ============ ERROR HANDLING ============
 app.use((err, req, res, next) => {
   console.error('Unhandled error:', err);
