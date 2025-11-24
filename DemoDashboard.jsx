@@ -1628,7 +1628,8 @@ export default function DemoDashboard() {
     );
     const [projectManager, setProjectManager] = useState('');
     const [projectStatus, setProjectStatus] = useState('OPEN');
-    const [billingSchedule, setBillingSchedule] = useState('Charge-Based');
+    const [billingType, setBillingType] = useState('Charge-Based');
+    const [billingSchedule, setBillingSchedule] = useState('');
     const [tasks, setTasks] = useState([
       {
         name: 'Discovery & Design',
@@ -1694,9 +1695,7 @@ export default function DemoDashboard() {
         startDate: new Date().toISOString().split('T')[0],
         endDate: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
         status: projectStatus,
-        description: `Project Manager: ${projectManager || 'Unassigned'} • Billing Schedule: ${
-          billingSchedule || 'N/A'
-        }`
+        description: `Project Manager: ${projectManager || 'Unassigned'} • Billing Type: ${billingType || 'N/A'} • Billing Schedule: ${billingSchedule || 'N/A'}`
       };
 
       const exportData = createExportData(selectedCustData, projectData, {
@@ -1712,6 +1711,7 @@ export default function DemoDashboard() {
           unitCost: t.unitCost
         })),
         // Include for downstream flows or SuiteScript logging
+        billingType,
         billingSchedule
       });
 
@@ -1791,8 +1791,8 @@ export default function DemoDashboard() {
                 </span>
               </label>
               <select
-                value={billingSchedule}
-                onChange={(e) => setBillingSchedule(e.target.value)}
+                value={billingType}
+                onChange={(e) => setBillingType(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               >
                 <option value="Charge-Based">Charge-Based</option>
@@ -1802,22 +1802,22 @@ export default function DemoDashboard() {
               </select>
               <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                 <p className="text-xs text-gray-700 font-medium mb-1">
-                  {billingSchedule === 'Charge-Based' && (
+                  {billingType === 'Charge-Based' && (
                     <>
                       <strong>Charge-Based:</strong> Billable amounts are represented by charges. Charges are generated based on charge rules based on fixed dates, milestones, project progress, or time entries. This option requires that you have enabled the Charge-Based Billing feature.
                     </>
                   )}
-                  {billingSchedule === 'Fixed Bid, Interval' && (
+                  {billingType === 'Fixed Bid, Interval' && (
                     <>
                       <strong>Fixed Bid, Interval:</strong> Bill customers at predefined intervals for a portion of the fixed amount based on project percent complete.
                     </>
                   )}
-                  {billingSchedule === 'Fixed Bid Milestone' && (
+                  {billingType === 'Fixed Bid Milestone' && (
                     <>
                       <strong>Fixed Bid Milestone:</strong> Bill customers as milestones are completed for the percentage of the total project amount specified for the milestone.
                     </>
                   )}
-                  {billingSchedule === 'Time and Materials' && (
+                  {billingType === 'Time and Materials' && (
                     <>
                       <strong>Time and Materials:</strong> Bill customers for time and expenses entered against the project.
                     </>
@@ -1826,6 +1826,39 @@ export default function DemoDashboard() {
               </div>
               <p className="text-xs text-gray-500 mt-2">
                 Included in export JSON and memo. Estimate creation can honor this setting.
+              </p>
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Billing Schedule
+                <span className="text-xs text-gray-500 ml-2 font-normal">
+                  Determines when and how to bill a customer over the duration of the project
+                </span>
+              </label>
+              <input
+                type="text"
+                value={billingSchedule}
+                onChange={(e) => setBillingSchedule(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                placeholder={billingType === 'Fixed Bid Milestone' ? 'Private schedule (project-specific)' : 'Select or create a public schedule'}
+              />
+              <div className="mt-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                <p className="text-xs text-gray-700">
+                  {billingType === 'Fixed Bid Milestone' ? (
+                    <>
+                      <strong>Private Schedule:</strong> A Fixed Bid, Milestone billing schedule is private and used only for the project it is created for.
+                    </>
+                  ) : (
+                    <>
+                      <strong>Public Schedule:</strong> Billing schedules for {billingType === 'Charge-Based' ? 'Charge-Based' : billingType} projects are public schedules and can be shared across projects.
+                    </>
+                  )}
+                </p>
+              </div>
+              <p className="text-xs text-gray-500 mt-2">
+                {billingType === 'Fixed Bid Milestone' 
+                  ? 'This schedule will be created specifically for this project and cannot be shared.'
+                  : 'This schedule can be reused across multiple projects.'}
               </p>
             </div>
           </div>
