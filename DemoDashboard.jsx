@@ -1630,15 +1630,54 @@ export default function DemoDashboard() {
     const [projectStatus, setProjectStatus] = useState('OPEN');
     const [billingSchedule, setBillingSchedule] = useState('Time and Materials');
     const [tasks, setTasks] = useState([
-      { name: 'Discovery & Design', estimatedHours: 40 },
-      { name: 'Implementation', estimatedHours: 120 },
-      { name: 'Training & UAT', estimatedHours: 32 }
+      {
+        name: 'Discovery & Design',
+        estimatedHours: 40,
+        plannedWork: 40,
+        status: 'Not Started',
+        resource: '',
+        serviceItem: 'PS - Discovery & Design Strategy',
+        billingClass: '1',
+        unitCost: 150
+      },
+      {
+        name: 'Implementation',
+        estimatedHours: 120,
+        plannedWork: 120,
+        status: 'Not Started',
+        resource: '',
+        serviceItem: 'SVC_PR_Development',
+        billingClass: '1',
+        unitCost: 175
+      },
+      {
+        name: 'Training & UAT',
+        estimatedHours: 32,
+        plannedWork: 32,
+        status: 'Not Started',
+        resource: '',
+        serviceItem: 'PS - Training Services',
+        billingClass: '4',
+        unitCost: 150
+      }
     ]);
 
     const disabled = !selectedCustData;
 
     const addTask = () =>
-      setTasks((prev) => [...prev, { name: `Task ${prev.length + 1}`, estimatedHours: 8 }]);
+      setTasks((prev) => [
+        ...prev,
+        {
+          name: `Task ${prev.length + 1}`,
+          estimatedHours: 8,
+          plannedWork: 8,
+          status: 'Not Started',
+          resource: '',
+          serviceItem: 'PS - Post Go-Live Support',
+          billingClass: '1',
+          unitCost: 150
+        }
+      ]);
 
     const updateTask = (idx, updates) =>
       setTasks((prev) => prev.map((t, i) => (i === idx ? { ...t, ...updates } : t)));
@@ -1664,7 +1703,13 @@ export default function DemoDashboard() {
         // Export tasks; SuiteScript already parses and creates project tasks
         tasks: tasks.map((t) => ({
           name: t.name,
-          estimatedHours: t.estimatedHours
+          estimatedHours: t.estimatedHours,
+          plannedWork: t.plannedWork,
+          status: t.status,
+          resource: t.resource,
+          serviceItem: t.serviceItem,
+          billingClass: t.billingClass,
+          unitCost: t.unitCost
         })),
         // Include for downstream flows or SuiteScript logging
         billingSchedule
@@ -1770,44 +1815,164 @@ export default function DemoDashboard() {
             </button>
           </div>
 
-          <div className="space-y-3">
+          <div className="space-y-4">
             {tasks.map((t, idx) => (
               <div
                 key={idx}
-                className="grid grid-cols-1 md:grid-cols-6 gap-3 items-center border border-gray-200 rounded-lg p-3"
+                className="border border-gray-200 rounded-lg p-4 bg-gray-50"
               >
-                <div className="md:col-span-4">
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Task Name</label>
-                  <input
-                    type="text"
-                    value={t.name}
-                    onChange={(e) => updateTask(idx, { name: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    placeholder={`Task ${idx + 1}`}
-                  />
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Task Name</label>
+                    <input
+                      type="text"
+                      value={t.name}
+                      onChange={(e) => updateTask(idx, { name: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white"
+                      placeholder={`Task ${idx + 1}`}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Status</label>
+                    <select
+                      value={t.status || 'Not Started'}
+                      onChange={(e) => updateTask(idx, { status: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white"
+                    >
+                      <option value="Not Started">Not Started</option>
+                      <option value="In Progress">In Progress</option>
+                      <option value="Completed">Completed</option>
+                      <option value="On Hold">On Hold</option>
+                    </select>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">
-                    Est. Hours
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.5"
-                    value={t.estimatedHours || 0}
-                    onChange={(e) =>
-                      updateTask(idx, { estimatedHours: parseFloat(e.target.value) || 0 })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    placeholder="8"
-                  />
+
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Planned Work (hrs)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.5"
+                      value={t.plannedWork || 0}
+                      onChange={(e) =>
+                        updateTask(idx, { plannedWork: parseFloat(e.target.value) || 0 })
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white"
+                      placeholder="8"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Est. Hours
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.5"
+                      value={t.estimatedHours || 0}
+                      onChange={(e) =>
+                        updateTask(idx, { estimatedHours: parseFloat(e.target.value) || 0 })
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white"
+                      placeholder="8"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Unit Cost ($)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={t.unitCost || 0}
+                      onChange={(e) =>
+                        updateTask(idx, { unitCost: parseFloat(e.target.value) || 0 })
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white"
+                      placeholder="150"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Total Cost
+                    </label>
+                    <div className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-100 text-gray-700 font-semibold">
+                      ${((t.plannedWork || 0) * (t.unitCost || 0)).toLocaleString()}
+                    </div>
+                  </div>
                 </div>
-                <div className="flex items-end">
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Resource Assigned</label>
+                    <select
+                      value={t.resource || ''}
+                      onChange={(e) => updateTask(idx, { resource: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white"
+                    >
+                      <option value="">-- Select Resource --</option>
+                      <option value="1">John Smith</option>
+                      <option value="2">Sarah Johnson</option>
+                      <option value="3">Michael Chen</option>
+                      <option value="4">Emily Davis</option>
+                      <option value="5">Robert Wilson</option>
+                      <option value="6">Jennifer Lee</option>
+                      <option value="7">David Martinez</option>
+                      <option value="8">Lisa Anderson</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Service Item</label>
+                    <select
+                      value={t.serviceItem || ''}
+                      onChange={(e) => updateTask(idx, { serviceItem: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white"
+                    >
+                      <option value="">-- Select Service Item --</option>
+                      <option value="PS - Post Go-Live Support">PS - Post Go-Live Support</option>
+                      <option value="PS - Go-Live Support">PS - Go-Live Support</option>
+                      <option value="PS - Training Services">PS - Training Services</option>
+                      <option value="PS - Data Migration">PS - Data Migration</option>
+                      <option value="PS - Discovery & Design Strategy">PS - Discovery & Design Strategy</option>
+                      <option value="SVC_PR_Consulting">SVC_PR_Consulting</option>
+                      <option value="SVC_PR_Project Management">SVC_PR_Project Management</option>
+                      <option value="SVC_PR_Development">SVC_PR_Development</option>
+                      <option value="SVC_PR_Testing">SVC_PR_Testing</option>
+                      <option value="SVC_PR_Training">SVC_PR_Training</option>
+                      <option value="SVC_PR_Integration">SVC_PR_Integration</option>
+                      <option value="SVC_PR_Business Analysis">SVC_PR_Business Analysis</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Billing Class</label>
+                    <select
+                      value={t.billingClass || ''}
+                      onChange={(e) => updateTask(idx, { billingClass: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white"
+                    >
+                      <option value="">-- Select Class --</option>
+                      <option value="1">Professional Services</option>
+                      <option value="2">Software Sales</option>
+                      <option value="3">Consulting</option>
+                      <option value="4">Training</option>
+                      <option value="5">Support Services</option>
+                      <option value="6">Implementation</option>
+                      <option value="7">Managed Services</option>
+                      <option value="8">Cloud Services</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="mt-3 flex justify-end">
                   <button
                     onClick={() => removeTask(idx)}
-                    className="px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+                    className="px-3 py-2 text-sm bg-red-50 text-red-700 border border-red-200 rounded-lg hover:bg-red-100"
                   >
-                    Remove
+                    Remove Task
                   </button>
                 </div>
               </div>
@@ -1818,6 +1983,36 @@ export default function DemoDashboard() {
               </div>
             )}
           </div>
+
+          {tasks.length > 0 && (
+            <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <h4 className="text-sm font-semibold text-gray-900 mb-2">Project Summary</h4>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                <div>
+                  <div className="text-gray-600">Total Tasks</div>
+                  <div className="text-lg font-bold text-gray-900">{tasks.length}</div>
+                </div>
+                <div>
+                  <div className="text-gray-600">Total Planned Hours</div>
+                  <div className="text-lg font-bold text-gray-900">
+                    {tasks.reduce((sum, t) => sum + (t.plannedWork || 0), 0).toFixed(1)}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-gray-600">Total Budget</div>
+                  <div className="text-lg font-bold text-blue-700">
+                    ${tasks.reduce((sum, t) => sum + ((t.plannedWork || 0) * (t.unitCost || 0)), 0).toLocaleString()}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-gray-600">Avg. Hourly Rate</div>
+                  <div className="text-lg font-bold text-gray-900">
+                    ${tasks.length > 0 ? Math.round(tasks.reduce((sum, t) => sum + (t.unitCost || 0), 0) / tasks.length) : 0}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="flex gap-3">
