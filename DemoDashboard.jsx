@@ -336,11 +336,23 @@ export default function DemoDashboard() {
       }
       
       // If retrying, explicitly send NO key to force system key usage
-      const payload = { 
+      let payload = { 
         type, 
         content: url, 
         apiKey: isRetry ? '' : claudeApiKey 
       };
+      
+      // Add additional data for new AI types
+      if (type === 'suggest_tasks' || type === 'generate_estimate') {
+        payload = {
+          type,
+          content: '',
+          apiKey: isRetry ? '' : claudeApiKey,
+          projectData: content.projectData || {},
+          customerData: content.customerData || {},
+          tasks: content.tasks || []
+        };
+      }
 
       const response = await fetch('/api/ai/generate', {
         method: 'POST',
@@ -418,13 +430,23 @@ export default function DemoDashboard() {
         // Also put it in the clipboard
         navigator.clipboard.writeText(summary);
         setActionStatus('✓ Summary copied to clipboard!');
+        return data;
+      } else if (type === 'suggest_tasks' || type === 'generate_estimate') {
+        // For new AI types, just return the data - caller will handle it
+        return data;
       }
+      
+      return data;
     } catch (error) {
       console.error('AI Error:', error);
       setActionStatus(`⚠ AI Error: ${error.message}`);
+      throw error; // Re-throw so caller can handle it
     } finally {
       setIsGeneratingAI(false);
-      setTimeout(() => setActionStatus(null), 3000);
+      // Only auto-clear status for non-new types
+      if (type !== 'suggest_tasks' && type !== 'generate_estimate') {
+        setTimeout(() => setActionStatus(null), 3000);
+      }
     }
   };
 
@@ -864,15 +886,15 @@ export default function DemoDashboard() {
       id: 'create-estimate',
       label: 'Create Estimate',
       icon: FileText,
-      action: () => {
+      action: async () => {
         if (!selectedCustData) {
           setActionStatus('⚠ Please select a customer first');
           setTimeout(() => setActionStatus(null), 2000);
           return;
         }
 
-        // Create estimate via email export using configured items
-        // Use items from the Items Configuration tab (customItems state)
+        // Check if user wants AI-generated estimate (if project tasks exist)
+        // For now, use configured items - AI generation can be added as separate action
         const lineItems = customItems;
         
         // Calculate total from line items
@@ -1388,7 +1410,86 @@ export default function DemoDashboard() {
 
       {/* Line Items Configuration */}
       <div className="bg-white rounded-lg border border-gray-200 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Estimate Line Items</h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-gray-900">Estimate Line Items</h3>
+          <button
+            onClick={async () => {
+              if (!selectedCustData) {
+                setActionStatus('⚠ Please select a customer first');
+                setTimeout(() => setActionStatus(null), 2000);
+                return;
+              }
+
+              setIsGeneratingAI(true);
+              setActionStatus('🤖 Generating estimate from project tasks...');
+
+              try {
+                // Get tasks from project config if available, otherwise use empty array
+                // Note: This requires tasks to be in a shared state or passed differently
+                // For now, we'll generate based on customer data and industry
+                const result = await generateFromAI('generate_estimate', {
+                  projectData: {
+                    name: 'Demo Project',
+                    budget: customFieldsData.custentity_esc_annual_revenue || 100000
+                  },
+                  customerData: {
+                    name: selectedCustData.name,
+                    industry: customFieldsData.custentity_esc_industry || selectedCustData.industry || 'Professional Services',
+                    annualRevenue: customFieldsData.custentity_esc_annual_revenue || 100000
+                  },
+                  tasks: [] // Could be enhanced to get from project config
+                });
+
+                if (result.error) {
+                  throw new Error(result.error);
+                }
+
+                if (result.items && Array.isArray(result.items)) {
+                  // Convert AI response to customItems format
+                  const newItems = {};
+                  result.items.forEach((item, idx) => {
+                    const key = `item_${idx + 1}`;
+                    newItems[key] = {
+                      name: item.name || 'PS - Post Go-Live Support',
+                      displayName: item.name,
+                      description: item.description || '',
+                      quantity: item.quantity || 1,
+                      salesPrice: item.rate || 0,
+                      rate: item.rate || 0,
+                      purchasePrice: 0
+                    };
+                  });
+
+                  setCustomItems(newItems);
+                  setActionStatus(`✓ Generated ${result.items.length} estimate line items! ${result.recommendations ? `(${result.recommendations})` : ''}`);
+                } else {
+                  throw new Error('Invalid estimate format');
+                }
+              } catch (error) {
+                console.error('Estimate generation error:', error);
+                setActionStatus(`⚠ Error: ${error.message}`);
+              } finally {
+                setIsGeneratingAI(false);
+                setTimeout(() => setActionStatus(null), 5000);
+              }
+            }}
+            disabled={!selectedCustData || isGeneratingAI}
+            className="px-4 py-2 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            title="AI-powered estimate generation based on customer and industry"
+          >
+            {isGeneratingAI ? (
+              <>
+                <Loader size={14} className="animate-spin" />
+                Generating...
+              </>
+            ) : (
+              <>
+                <Zap size={14} />
+                AI Generate Estimate
+              </>
+            )}
+          </button>
+        </div>
         
         <div className="space-y-4">
           {Object.entries(customItems).map(([key, item]) => (
@@ -1685,6 +1786,60 @@ export default function DemoDashboard() {
 
     const removeTask = (idx) => setTasks((prev) => prev.filter((_, i) => i !== idx));
 
+    const generateTaskSuggestions = async () => {
+      if (!selectedCustData) {
+        setActionStatus('⚠ Please select a customer first');
+        return;
+      }
+
+      setIsGeneratingAI(true);
+      setActionStatus('🤖 Generating task suggestions...');
+
+      try {
+        const result = await generateFromAI('suggest_tasks', {
+          projectData: {
+            name: projectName || `${selectedCustData.name} - Demo Project`,
+            billingType: billingType,
+            industry: customFieldsData.custentity_esc_industry || selectedCustData.industry || 'Professional Services',
+            budget: customFieldsData.custentity_esc_annual_revenue || 100000
+          },
+          customerData: {
+            name: selectedCustData.name,
+            industry: customFieldsData.custentity_esc_industry || selectedCustData.industry || 'Professional Services',
+            annualRevenue: customFieldsData.custentity_esc_annual_revenue || 100000
+          }
+        });
+
+        if (result.error) {
+          throw new Error(result.error);
+        }
+
+        if (Array.isArray(result) && result.length > 0) {
+          // Map AI response to task format
+          const suggestedTasks = result.map(task => ({
+            name: task.name || 'Unnamed Task',
+            estimatedHours: task.estimatedHours || task.plannedWork || 8,
+            plannedWork: task.plannedWork || task.estimatedHours || 8,
+            status: task.status || 'Not Started',
+            resource: task.resource || '',
+            serviceItem: task.serviceItem || 'PS - Post Go-Live Support',
+            billingClass: task.billingClass || '1',
+            unitCost: task.unitCost || 150
+          }));
+
+          setTasks(suggestedTasks);
+          setActionStatus(`✓ Generated ${suggestedTasks.length} task suggestions!`);
+        } else {
+          throw new Error('Invalid task suggestions format');
+        }
+      } catch (error) {
+        console.error('Task generation error:', error);
+        setActionStatus(`⚠ Error: ${error.message}`);
+      } finally {
+        setIsGeneratingAI(false);
+      }
+    };
+
     const handleExportProject = () => {
       if (disabled) return;
 
@@ -1867,12 +2022,32 @@ export default function DemoDashboard() {
         <div className="bg-white rounded-lg border border-gray-200 p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-gray-900">Tasks</h3>
-            <button
-              onClick={addTask}
-              className="px-3 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-            >
-              Add Task
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={generateTaskSuggestions}
+                disabled={disabled || isGeneratingAI}
+                className="px-3 py-2 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                title="AI-powered task suggestions based on industry and project type"
+              >
+                {isGeneratingAI ? (
+                  <>
+                    <Loader size={14} className="animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <Zap size={14} />
+                    AI Suggest Tasks
+                  </>
+                )}
+              </button>
+              <button
+                onClick={addTask}
+                className="px-3 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                Add Task
+              </button>
+            </div>
           </div>
 
           <div className="space-y-4">

@@ -5,7 +5,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { type, content, apiKey } = req.body;
+  const { type, content, apiKey, projectData, customerData, tasks } = req.body;
   
   // Use environment variable if apiKey is not provided, empty, or looks invalid
   // Only accept frontend key if it starts with 'sk-ant-'
@@ -81,6 +81,107 @@ export default async function handler(req, res) {
         ## Recommended Strategy
         ...
       `;
+    } else if (type === 'suggest_tasks') {
+      const industry = customerData?.industry || projectData?.industry || 'Professional Services';
+      const projectName = projectData?.name || projectData?.projectName || 'New Project';
+      const projectType = projectData?.billingType || 'Charge-Based';
+      const budget = projectData?.budget || customerData?.annualRevenue || 100000;
+      
+      prompt = `
+        You are a NetSuite PSA expert. Generate a detailed task breakdown for a project.
+
+        Project Details:
+        - Name: ${projectName}
+        - Type: ${projectType}
+        - Industry: ${industry}
+        - Budget: $${budget}
+
+        Generate a JSON array of tasks with the following structure:
+        [
+          {
+            "name": "Task name (e.g., Discovery & Design)",
+            "estimatedHours": 40,
+            "plannedWork": 40,
+            "status": "Not Started",
+            "resource": "912|913|914|915|916",
+            "serviceItem": "Service item name from NetSuite",
+            "billingClass": "1|2|3|4",
+            "unitCost": 150
+          }
+        ]
+
+        Resource IDs (use these exact IDs):
+        - 912: Business Analyst
+        - 913: Consultant
+        - 914: Project Manager
+        - 915: Technical Consultant
+        - 916: Trainer
+
+        Billing Classes:
+        - 1: Professional Services
+        - 2: Consulting
+        - 3: Development
+        - 4: Training
+
+        Service Items (use realistic NetSuite service items):
+        - PS - Discovery & Design Strategy
+        - PS - Training Services
+        - SVC_PR_Development
+        - SVC_PR_Consulting
+        - SVC_PR_Project Management
+        - PS - Data Migration
+        - PS - Go-Live Support
+        - PS - Post Go-Live Support
+
+        Guidelines:
+        - Create 3-6 tasks appropriate for ${industry} industry
+        - Match resource types to task complexity
+        - Use industry-standard hourly rates ($${Math.round(budget / 200)}-$${Math.round(budget / 100)} range)
+        - Ensure total hours align with project budget
+        - Make tasks realistic and sequential
+
+        Return ONLY the JSON array, no other text.
+      `;
+    } else if (type === 'generate_estimate') {
+      const customerName = customerData?.name || 'Customer';
+      const projectName = projectData?.name || 'Project';
+      const customerBudget = customerData?.annualRevenue || 100000;
+      const taskList = tasks || [];
+      
+      prompt = `
+        You are a NetSuite sales engineer. Generate an estimate/quote from project tasks.
+
+        Customer: ${customerName}
+        Project: ${projectName}
+        Customer Budget: $${customerBudget}
+        
+        Tasks:
+        ${JSON.stringify(taskList, null, 2)}
+
+        Generate a JSON object with estimate line items:
+        {
+          "items": [
+            {
+              "name": "Service item name",
+              "quantity": 1,
+              "rate": 150,
+              "description": "Brief description"
+            }
+          ],
+          "total": 0,
+          "recommendations": "Brief notes on pricing strategy"
+        }
+
+        Guidelines:
+        - Convert tasks to estimate line items
+        - Use task unitCost * estimatedHours for item rates
+        - Group similar tasks into single line items when appropriate
+        - Ensure total is within customer budget constraints
+        - Apply industry-standard markups (15-25%)
+        - Use realistic NetSuite service item names
+
+        Return ONLY the JSON object, no other text.
+      `;
     } else {
       return res.status(400).json({ error: 'Invalid request type' });
     }
@@ -133,11 +234,13 @@ export default async function handler(req, res) {
     const completion = data.content[0].text;
 
     // If looking for JSON, try to extract it if Claude added extra text
-    if (type === 'analyze_url') {
+    if (type === 'analyze_url' || type === 'suggest_tasks' || type === 'generate_estimate') {
       try {
-        const jsonMatch = completion.match(/\{[\s\S]*\}/);
+        // Try to find JSON array or object
+        const jsonMatch = completion.match(/\[[\s\S]*\]|\{[\s\S]*\}/);
         if (jsonMatch) {
-          res.status(200).json(JSON.parse(jsonMatch[0]));
+          const parsed = JSON.parse(jsonMatch[0]);
+          res.status(200).json(parsed);
         } else {
           res.status(200).json({ error: 'Could not parse JSON from Claude response', raw: completion });
         }
