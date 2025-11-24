@@ -15,7 +15,8 @@ WORKDIR /app
 COPY --chown=nodejs:nodejs package*.json ./
 
 # Install dependencies
-RUN npm ci --only=production && npm cache clean --force
+# Use npm install instead of npm ci to allow dependency resolution for esbuild conflicts
+RUN npm install --omit=dev && npm cache clean --force
 
 # Copy application code
 COPY --chown=nodejs:nodejs . .
