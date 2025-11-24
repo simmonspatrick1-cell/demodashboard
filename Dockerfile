@@ -20,9 +20,6 @@ RUN npm ci --only=production && npm cache clean --force
 # Copy application code
 COPY --chown=nodejs:nodejs . .
 
-# Copy environment file (if it exists)
-COPY --chown=nodejs:nodejs .env* ./
-
 # Create necessary directories with proper permissions
 RUN mkdir -p /app/logs && chown -R nodejs:nodejs /app
 
@@ -33,10 +30,10 @@ USER nodejs
 EXPOSE 3001
 
 # Environment variables with defaults
+# Note: ANTHROPIC_API_KEY must be set via Railway environment variables
 ENV PORT=3001
 ENV NODE_ENV=production
 ENV NETSUITE_ACCOUNT_ID=demo
-ENV ANTHROPIC_API_KEY=""
 
 # Add health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
