@@ -2083,6 +2083,23 @@ export default function DemoDashboard() {
         return;
       }
 
+      // Save current state for undo
+      const previousState = {
+        projectName,
+        projectCode,
+        projectManager,
+        projectStatus,
+        billingType,
+        billingSchedule,
+        tasks: JSON.parse(JSON.stringify(tasks))
+      };
+
+      // Warn if project has data
+      const hasExistingData = projectName || tasks.length > 0;
+      if (hasExistingData && !window.confirm('This will overwrite your current project configuration. Continue?')) {
+        return;
+      }
+
       setIsGeneratingAI(true);
       setActionStatus('🤖 Generating complete project configuration...');
 
@@ -2121,36 +2138,66 @@ export default function DemoDashboard() {
           throw new Error(result.error);
         }
 
-        // Populate all project fields from AI response
-        if (result.projectName) setProjectName(result.projectName);
-        if (result.projectCode) setProjectCode(result.projectCode);
-        if (result.projectManager) setProjectManager(result.projectManager);
-        if (result.projectStatus) setProjectStatus(result.projectStatus);
-        if (result.billingType) setBillingType(result.billingType);
-        if (result.billingSchedule !== undefined) setBillingSchedule(result.billingSchedule || '');
+        // Validate AI response structure
+        if (!result || typeof result !== 'object') {
+          throw new Error('Invalid response format from AI');
+        }
+
+        // Populate all project fields from AI response with validation
+        if (result.projectName && typeof result.projectName === 'string') {
+          setProjectName(result.projectName.trim());
+        }
+        if (result.projectCode && typeof result.projectCode === 'string') {
+          setProjectCode(result.projectCode.trim());
+        }
+        if (result.projectManager && typeof result.projectManager === 'string') {
+          setProjectManager(result.projectManager.trim());
+        }
+        if (result.projectStatus && typeof result.projectStatus === 'string') {
+          setProjectStatus(result.projectStatus);
+        }
+        if (result.billingType && typeof result.billingType === 'string') {
+          setBillingType(result.billingType);
+        }
+        if (result.billingSchedule !== undefined) {
+          setBillingSchedule(result.billingSchedule ? String(result.billingSchedule).trim() : '');
+        }
         
         if (Array.isArray(result.tasks) && result.tasks.length > 0) {
-          // Map AI response to task format
-          const suggestedTasks = result.tasks.map(task => ({
-            name: task.name || 'Unnamed Task',
-            estimatedHours: task.estimatedHours || task.plannedWork || 8,
-            plannedWork: task.plannedWork || task.estimatedHours || 8,
-            status: task.status || 'Not Started',
-            resource: task.resource || '',
-            serviceItem: task.serviceItem || 'PS - Post Go-Live Support',
-            billingClass: task.billingClass || '1',
-            unitCost: task.unitCost || 150
-          }));
+          // Map AI response to task format with validation
+          const suggestedTasks = result.tasks
+            .filter(task => task && typeof task === 'object')
+            .map(task => ({
+              name: (task.name || 'Unnamed Task').trim(),
+              estimatedHours: Math.max(1, parseInt(task.estimatedHours || task.plannedWork || 8, 10)),
+              plannedWork: Math.max(1, parseInt(task.plannedWork || task.estimatedHours || 8, 10)),
+              status: task.status || 'Not Started',
+              resource: String(task.resource || '').trim(),
+              serviceItem: (task.serviceItem || 'PS - Post Go-Live Support').trim(),
+              billingClass: String(task.billingClass || '1'),
+              unitCost: Math.max(0, parseFloat(task.unitCost || 150))
+            }));
 
-          setTasks(suggestedTasks);
-          setActionStatus(`✓ Generated complete project with ${suggestedTasks.length} tasks!`);
+          if (suggestedTasks.length > 0) {
+            setTasks(suggestedTasks);
+            setActionStatus(`✓ Generated complete project with ${suggestedTasks.length} tasks!`);
+          } else {
+            throw new Error('No valid tasks in AI response');
+          }
         } else {
           // If no tasks, at least update the project fields
-          setActionStatus(`✓ Generated project configuration!`);
+          setActionStatus(`✓ Generated project configuration! (No tasks included)`);
         }
+
+        // Store undo state
+        window.__projectUndoState = previousState;
       } catch (error) {
         console.error('Project generation error:', error);
         setActionStatus(`⚠ Error: ${error.message}`);
+        // Optionally restore previous state on error
+        // setProjectName(previousState.projectName);
+        // setProjectCode(previousState.projectCode);
+        // ... etc
       } finally {
         setIsGeneratingAI(false);
       }
@@ -2274,20 +2321,41 @@ export default function DemoDashboard() {
           {selectedCustData && (
             <div className="mb-4 p-4 bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-lg">
               <div className="flex items-center justify-between">
-                <div>
+                <div className="flex-1">
                   <h3 className="text-sm font-semibold text-gray-900 mb-1 flex items-center gap-2">
                     <Zap size={16} className="text-purple-600" />
                     AI-Powered Project Generation
                   </h3>
-                  <p className="text-xs text-gray-600">
-                    Generate a complete, context-aware project configuration based on {selectedCustData.name}'s industry, budget, and focus areas. Saves 10-15 minutes per demo prep.
+                  <p className="text-xs text-gray-600 mb-2">
+                    Generate a complete, context-aware project configuration based on <strong>{selectedCustData.name}</strong>'s industry ({selectedCustData.industry || 'Professional Services'}), budget ({selectedCustData.budget || '$100K-200K'}), and focus areas. Saves 10-15 minutes per demo prep.
                   </p>
+                  {window.__projectUndoState && (
+                    <button
+                      onClick={() => {
+                        const undo = window.__projectUndoState;
+                        setProjectName(undo.projectName);
+                        setProjectCode(undo.projectCode);
+                        setProjectManager(undo.projectManager);
+                        setProjectStatus(undo.projectStatus);
+                        setBillingType(undo.billingType);
+                        setBillingSchedule(undo.billingSchedule);
+                        setTasks(undo.tasks);
+                        delete window.__projectUndoState;
+                        setActionStatus('✓ Restored previous project configuration');
+                        setTimeout(() => setActionStatus(null), 2000);
+                      }}
+                      className="text-xs text-purple-600 hover:text-purple-700 underline"
+                    >
+                      ↶ Undo last generation
+                    </button>
+                  )}
                 </div>
                 <button
                   onClick={generateCompleteProject}
                   disabled={isGeneratingAI}
-                  className="px-4 py-2 text-sm bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 font-medium shadow-sm"
+                  className="ml-4 px-4 py-2 text-sm bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 font-medium shadow-sm transition-all"
                   title="Generate complete project with name, code, manager, billing type, schedule, and tasks"
+                  aria-label="Generate complete project using AI"
                 >
                   {isGeneratingAI ? (
                     <>
