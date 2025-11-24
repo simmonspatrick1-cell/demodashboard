@@ -15,12 +15,8 @@ const getNewProspectTemplate = () => ({
   name: '',
   entityid: '',
   type: 'Company',
-  industry: '',
-  size: '',
   status: 'CUSTOMER-Closed Won',
   demoDate: '',
-  focus: [],
-  budget: '',
   nsId: null,
   website: '',
   salesRep: 'Will Clark',
@@ -102,6 +98,9 @@ export default function DemoDashboard() {
   const modalRef = useRef(null);
   const settingsModalRef = useRef(null);
   const statusRegionRef = useRef(null);
+  const searchInputRef = useRef(null);
+  const prospectSearchInputRef = useRef(null);
+  const promptSearchInputRef = useRef(null);
   const STATUS_OPTIONS = [
     'LEAD-Unqualified',
     'LEAD-Qualified',
@@ -202,9 +201,59 @@ export default function DemoDashboard() {
     return () => clearTimeout(timer);
   }, [promptSearch]);
 
-  // Keyboard navigation: ESC to close modals
+  // Keyboard navigation: ESC to close modals, Cmd+K for search, Cmd+1-5 for tabs, Cmd+N for new prospect
   useEffect(() => {
     const handleKeyDown = (e) => {
+      // Don't trigger shortcuts when typing in inputs, textareas, or modals are open
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || showAddProspectModal || showSettingsModal) {
+        if (e.key === 'Escape') {
+          if (showAddProspectModal && !isGeneratingAI) {
+            setShowAddProspectModal(false);
+            setFormErrors({});
+          }
+          if (showSettingsModal) {
+            setShowSettingsModal(false);
+          }
+        }
+        return;
+      }
+
+        // Cmd+K or Ctrl+K: Focus search (context-aware)
+        if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+          e.preventDefault();
+          if (activeTab === 'context') {
+            prospectSearchInputRef.current?.focus();
+          } else if (activeTab === 'prompts') {
+            promptSearchInputRef.current?.focus();
+          }
+          return;
+        }
+
+      // Cmd+N or Ctrl+N: New prospect
+      if ((e.metaKey || e.ctrlKey) && e.key === 'n') {
+        e.preventDefault();
+        setShowAddProspectModal(true);
+        return;
+      }
+
+      // Cmd+1-5: Switch tabs
+      if ((e.metaKey || e.ctrlKey) && e.key >= '1' && e.key <= '5') {
+        e.preventDefault();
+        const tabMap = {
+          '1': 'context',
+          '2': 'prompts',
+          '3': 'items',
+          '4': 'projects',
+          '5': 'reference'
+        };
+        const tabId = tabMap[e.key];
+        if (tabId) {
+          setActiveTab(tabId);
+        }
+        return;
+      }
+
+      // ESC: Close modals
       if (e.key === 'Escape') {
         if (showAddProspectModal && !isGeneratingAI) {
           setShowAddProspectModal(false);
@@ -217,7 +266,7 @@ export default function DemoDashboard() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showAddProspectModal, showSettingsModal, isGeneratingAI]);
+  }, [showAddProspectModal, showSettingsModal, isGeneratingAI, activeTab]);
 
   // Auto-focus first input when modal opens
   useEffect(() => {
@@ -338,17 +387,10 @@ export default function DemoDashboard() {
         updates.salesRep = data.salesRep || 'Will Clark';
         if (data.leadSource) updates.leadSource = data.leadSource;
         updates.subsidiary = data.subsidiary || '2';
-        if (data.industry) updates.industry = data.industry;
-        if (data.size) updates.size = data.size;
-        if (data.budget) updates.budget = data.budget;
-        else if (data.revenue) updates.budget = data.revenue;
         if (data.phone) updates.phone = data.phone;
         if (data.email) updates.email = data.email;
         updates.invoiceEmail = data.invoiceEmail || 'ap@netsuite.com';
         updates.paymentEmail = data.paymentEmail || 'ap@netsuite.com';
-        if (data.focus_areas && Array.isArray(data.focus_areas)) {
-          updates.focus = data.focus_areas;
-        }
         
         console.log('Updating prospect with:', updates);
         
@@ -359,6 +401,16 @@ export default function DemoDashboard() {
         
         const fieldsUpdated = Object.keys(updates).filter(k => k !== 'website').length;
         setActionStatus(`✓ Analyzed! ${fieldsUpdated} fields found.`);
+        
+        // Auto-focus the first empty required field after analysis
+        setTimeout(() => {
+          if (!updates.name && nameInputRef.current) {
+            nameInputRef.current.focus();
+          } else if (!updates.entityid) {
+            const entityInput = document.getElementById('entity-id');
+            entityInput?.focus();
+          }
+        }, 100);
       } else if (type === 'summarize_clipboard') {
         // Copy summary to clipboard history as a new item
         const summary = `## AI Summary\n\n${data.summary}`;
@@ -515,6 +567,17 @@ export default function DemoDashboard() {
     setActionStatus('✓ Prospect added to list!');
     setTimeout(() => setActionStatus(null), 3000);
 
+    // Auto-select the newly added prospect
+    setSelectedCustomer(prospectToAdd.id);
+    
+    // Scroll to the new prospect in the list after a brief delay
+    setTimeout(() => {
+      const prospectElement = document.querySelector(`[data-prospect-id="${prospectToAdd.id}"]`);
+      if (prospectElement) {
+        prospectElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }, 100);
+
     // Reset form
     setNewProspect(getNewProspectTemplate());
     
@@ -528,15 +591,6 @@ export default function DemoDashboard() {
     event.preventDefault();
     if (isGeneratingAI) return;
     handleAddProspect();
-  };
-
-  const toggleFocusArea = (area) => {
-    setNewProspect(prev => ({
-      ...prev,
-      focus: prev.focus.includes(area)
-        ? prev.focus.filter(f => f !== area)
-        : [...prev.focus, area]
-    }));
   };
 
   const syncNetsuiteFields = async () => {
@@ -912,9 +966,19 @@ export default function DemoDashboard() {
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider">Quick Actions</h3>
         {actionStatus && (
-          <div className="flex items-center gap-1.5 text-xs font-medium text-green-600 bg-green-50 px-2.5 py-1 rounded-full animate-fade-in">
-             <Check size={12} />
-             {actionStatus}
+          <div className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg shadow-sm transition-all duration-300 animate-fade-in ${
+            actionStatus.startsWith('✓') 
+              ? 'text-green-700 bg-green-50 border border-green-200' 
+              : actionStatus.startsWith('⚠') || actionStatus.startsWith('⚠️')
+              ? 'text-orange-700 bg-orange-50 border border-orange-200'
+              : actionStatus.startsWith('🔄')
+              ? 'text-blue-700 bg-blue-50 border border-blue-200'
+              : 'text-gray-700 bg-gray-50 border border-gray-200'
+          }`}>
+             {actionStatus.startsWith('✓') && <Check size={12} />}
+             {actionStatus.startsWith('⚠') && <AlertCircle size={12} />}
+             {actionStatus.startsWith('🔄') && <Loader size={12} className="animate-spin" />}
+             <span>{actionStatus.replace(/^[✓⚠🔄]+\s*/, '')}</span>
           </div>
         )}
       </div>
@@ -1005,8 +1069,9 @@ export default function DemoDashboard() {
           <div className="relative">
             <Search size={14} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
             <input
+              ref={prospectSearchInputRef}
               type="text"
-              placeholder="Search..."
+              placeholder="Search... (⌘K)"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-9 pr-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
@@ -1020,6 +1085,7 @@ export default function DemoDashboard() {
             return (
               <button
                 key={customer.id}
+                data-prospect-id={customer.id}
                 onClick={() => setSelectedCustomer(customer.id)}
                 className={`w-full text-left px-4 py-3.5 hover:bg-gray-50 transition-all group border-l-4 ${
                   selectedCustomer === customer.id 
@@ -1823,8 +1889,9 @@ export default function DemoDashboard() {
         <div className="relative">
           <Search size={18} className="absolute left-3 top-3 text-gray-400" />
           <input
+            ref={promptSearchInputRef}
             type="text"
-            placeholder="Search prompts..."
+            placeholder="Search prompts... (⌘K)"
             value={promptSearch}
             onChange={(e) => setPromptSearch(e.target.value)}
             className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -1906,6 +1973,33 @@ export default function DemoDashboard() {
       >
         {actionStatus}
       </div>
+
+      {/* Global Toast Notification */}
+      {actionStatus && (
+        <div className="fixed top-4 right-4 z-[60] animate-slide-in-right">
+          <div className={`flex items-center gap-2 text-sm font-medium px-4 py-3 rounded-lg shadow-lg border backdrop-blur-sm max-w-md ${
+            actionStatus.startsWith('✓') 
+              ? 'text-green-800 bg-green-50 border-green-200' 
+              : actionStatus.startsWith('⚠') || actionStatus.startsWith('⚠️')
+              ? 'text-orange-800 bg-orange-50 border-orange-200'
+              : actionStatus.startsWith('🔄')
+              ? 'text-blue-800 bg-blue-50 border-blue-200'
+              : 'text-gray-800 bg-gray-50 border-gray-200'
+          }`}>
+            {actionStatus.startsWith('✓') && <Check size={16} className="flex-shrink-0" />}
+            {actionStatus.startsWith('⚠') && <AlertCircle size={16} className="flex-shrink-0" />}
+            {actionStatus.startsWith('🔄') && <Loader size={16} className="animate-spin flex-shrink-0" />}
+            <span>{actionStatus.replace(/^[✓⚠🔄]+\s*/, '')}</span>
+            <button
+              onClick={() => setActionStatus(null)}
+              className="ml-2 text-gray-400 hover:text-gray-600 transition-colors"
+              aria-label="Dismiss notification"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        </div>
+      )}
       
       {/* Header */}
       <div className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
@@ -1937,10 +2031,10 @@ export default function DemoDashboard() {
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+                    className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2 ${
                       isActive
-                        ? 'bg-white text-blue-700 shadow-sm ring-1 ring-gray-200'
-                        : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200/50'
+                        ? 'bg-white text-blue-700 shadow-sm ring-1 ring-gray-200 scale-105'
+                        : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200/50 hover:scale-102'
                     }`}
                   >
                     <Icon size={16} className={isActive ? 'text-blue-600' : 'text-gray-400'} />
@@ -2108,7 +2202,7 @@ export default function DemoDashboard() {
       {/* Add Prospect Modal */}
       {showAddProspectModal && (
         <div 
-          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+          className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-opacity duration-200"
           onClick={(e) => handleModalClickOutside(e, modalRef, setShowAddProspectModal)}
           aria-modal="true"
           aria-labelledby="modal-title"
@@ -2116,7 +2210,7 @@ export default function DemoDashboard() {
         >
           <div 
             ref={modalRef}
-            className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-xl"
+            className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-xl transform transition-all duration-200 scale-100"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="p-6 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white z-10">
@@ -2504,7 +2598,7 @@ export default function DemoDashboard() {
       {/* Settings Modal (Claude API Key) */}
       {showSettingsModal && (
         <div 
-          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+          className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-opacity duration-200"
           onClick={(e) => handleModalClickOutside(e, settingsModalRef, setShowSettingsModal)}
           aria-modal="true"
           aria-labelledby="settings-modal-title"
@@ -2512,7 +2606,7 @@ export default function DemoDashboard() {
         >
           <div 
             ref={settingsModalRef}
-            className="bg-white rounded-lg max-w-md w-full shadow-xl"
+            className="bg-white rounded-lg max-w-md w-full shadow-xl transform transition-all duration-200 scale-100"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="p-6 border-b border-gray-200 flex items-center justify-between">
