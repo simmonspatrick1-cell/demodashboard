@@ -944,29 +944,8 @@ export default function DemoDashboard() {
   };
 
   const createNewProspect = () => {
-    // Create a new prospect from current selection or use defaults
-    const prospectData = selectedCustData || {
-      name: 'New Prospect',
-      entityid: `PROSPECT-${Date.now()}`,
-      industry: 'Professional Services',
-      size: '50-100',
-      budget: '$100K-200K',
-      focus: ['Resource Planning', 'Billing']
-    };
-
-    // Prepare export data for new customer creation
-    const exportData = createExportData(prospectData, null, {
-      memo: selectedCustData ? (demoNotes[selectedCustData.id] || '') : ''
-    });
-
-    // Export via email - this will create the customer in NetSuite
-    exportViaEmail(exportData, {
-      recipientEmail: 'simmonspatrick1@gmail.com',
-      includeInstructions: true
-    });
-
-    setActionStatus('✓ Creating prospect via email...');
-    setTimeout(() => setActionStatus(null), 3000);
+    // Open the add prospect modal instead of exporting via email
+    setShowAddProspectModal(true);
   };
 
   const quickActions = [
