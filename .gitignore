@@ -44,3 +44,4 @@ vercel-direct-env.json
 
 # Token/Secret Scripts
 scripts/setup-vercel-token.sh
+.env*.local
