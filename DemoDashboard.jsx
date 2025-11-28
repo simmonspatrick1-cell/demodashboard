@@ -805,12 +805,12 @@ export default function DemoDashboard() {
         id: selectedCustData.nsId,
         entityid: selectedCustData.entityid,
         companyname: selectedCustData.name,
-        custentity13: `Leading ${selectedCustData.industry} firm with expertise in complex implementations`,
-        custentity16: selectedCustData.industry,
-        custentity15: selectedCustData.focus.join(', '),
-        custentity_esc_industry: selectedCustData.industry,
-        custentity_esc_annual_revenue: selectedCustData.budget,
-        custentity_esc_no_of_employees: selectedCustData.size,
+        custentity13: `Leading ${selectedCustData.industry || 'Professional Services'} firm with expertise in complex implementations`,
+        custentity16: selectedCustData.industry || 'Professional Services',
+        custentity15: (selectedCustData.focus && Array.isArray(selectedCustData.focus)) ? selectedCustData.focus.join(', ') : '',
+        custentity_esc_industry: selectedCustData.industry || 'Professional Services',
+        custentity_esc_annual_revenue: selectedCustData.budget || '$100K-200K',
+        custentity_esc_no_of_employees: selectedCustData.size || '50-100',
         email: `contact@${selectedCustData.entityid.toLowerCase()}.com`,
         phone: '(555) 123-4567'
       };
@@ -975,7 +975,7 @@ export default function DemoDashboard() {
           endDate: new Date(Date.now() + 90*24*60*60*1000).toISOString().split('T')[0],
           budget: selectedCustData.budget?.split('-')[0]?.replace('$', '').replace('K', '000') || '100000',
           status: 'OPEN',
-          description: `Demo project for ${selectedCustData.industry} - ${selectedCustData.focus?.join(', ')}`
+          description: `Demo project for ${selectedCustData.industry || 'Professional Services'} - ${(selectedCustData.focus && Array.isArray(selectedCustData.focus)) ? selectedCustData.focus.join(', ') : 'General Services'}`
         };
 
         const exportData = createExportData(selectedCustData, projectData, {
@@ -1079,7 +1079,7 @@ export default function DemoDashboard() {
       label: 'Resource Allocation',
       icon: TrendingUp,
       action: () => {
-        const prompt = `Create resource allocation forecast for ${selectedCustData?.name} demo project with these roles: ${selectedCustData?.focus.join(', ')}. Include 10-15 team members with varied utilization rates (60-100%) across 12 weeks.`;
+        const prompt = `Create resource allocation forecast for ${selectedCustData?.name} demo project with these roles: ${(selectedCustData?.focus && Array.isArray(selectedCustData.focus)) ? selectedCustData.focus.join(', ') : 'General Services'}. Include 10-15 team members with varied utilization rates (60-100%) across 12 weeks.`;
         copyToClipboard(prompt, 'action-resource');
         setActionStatus('✓ Resource prompt copied');
         setTimeout(() => setActionStatus(null), 2000);
@@ -1398,17 +1398,21 @@ export default function DemoDashboard() {
                     </div>
                     <div>
                       <h2 className="text-2xl font-bold text-gray-900 leading-none">{selectedCustData.name}</h2>
-                      <p className="text-sm text-gray-500 mt-1 font-medium">{selectedCustData.industry} • {selectedCustData.size} Employees</p>
+                      <p className="text-sm text-gray-500 mt-1 font-medium">
+                        {selectedCustData.industry || 'Not specified'} {selectedCustData.size ? `• ${selectedCustData.size} Employees` : ''}
+                      </p>
                     </div>
                   </div>
                   
-                  <div className="flex flex-wrap gap-2 mt-3">
-                     {selectedCustData.focus.map((area, idx) => (
-                      <span key={idx} className="px-2.5 py-1 bg-blue-50 text-blue-700 text-xs font-medium rounded-md border border-blue-100">
-                        {area}
-                      </span>
-                    ))}
-                  </div>
+                  {selectedCustData.focus && selectedCustData.focus.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-3">
+                      {selectedCustData.focus.map((area, idx) => (
+                        <span key={idx} className="px-2.5 py-1 bg-blue-50 text-blue-700 text-xs font-medium rounded-md border border-blue-100">
+                          {area}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex flex-col items-end gap-2">
@@ -1499,15 +1503,15 @@ export default function DemoDashboard() {
                  <div className="space-y-4">
                    <div>
                      <p className="text-[10px] font-bold uppercase text-gray-400 tracking-wide">Budget</p>
-                     <p className="text-lg font-bold text-green-600">{selectedCustData.budget}</p>
+                     <p className="text-lg font-bold text-green-600">{selectedCustData.budget || 'Not specified'}</p>
                    </div>
                    <div>
                      <p className="text-[10px] font-bold uppercase text-gray-400 tracking-wide">Demo Date</p>
-                     <p className="text-sm font-medium text-gray-900">{selectedCustData.demoDate}</p>
+                     <p className="text-sm font-medium text-gray-900">{selectedCustData.demoDate || 'Not scheduled'}</p>
                    </div>
                    <div>
                      <p className="text-[10px] font-bold uppercase text-gray-400 tracking-wide">Entity ID</p>
-                     <p className="text-sm font-mono text-gray-600">{selectedCustData.entityid}</p>
+                     <p className="text-sm font-mono text-gray-600">{selectedCustData.entityid || 'Not set'}</p>
                    </div>
                  </div>
                </div>
