@@ -583,9 +583,47 @@ export function createGmailComposeUrl(data, options = {}) {
  * @param {Object} options - Export options
  */
 export function exportViaEmail(data, options = {}) {
-  // Use Gmail compose URL instead of mailto: to ensure Gmail is used
-  const gmailUrl = createGmailComposeUrl(data, options);
-  window.open(gmailUrl, '_blank');
+  try {
+    // Prepare email content first to validate
+    const emailContent = prepareEmailContent(data, options);
+    
+    // Check URL length - Gmail has limits (~2000 chars for URL)
+    // If too long, fall back to mailto: or show error
+    const gmailUrl = createGmailComposeUrl(data, options);
+    
+    if (gmailUrl.length > 2000) {
+      console.warn('Gmail URL too long, using mailto: fallback');
+      // Fall back to mailto: which handles long content better
+      const mailtoUrl = createMailtoUrl(data, options);
+      window.location.href = mailtoUrl;
+      return;
+    }
+    
+    // Try to open Gmail - handle popup blockers
+    const newWindow = window.open(gmailUrl, '_blank');
+    
+    // Check if popup was blocked
+    if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
+      // Popup blocked - fall back to mailto:
+      console.warn('Popup blocked, using mailto: fallback');
+      const mailtoUrl = createMailtoUrl(data, options);
+      window.location.href = mailtoUrl;
+      return;
+    }
+    
+    // Success - Gmail opened
+    return newWindow;
+  } catch (error) {
+    console.error('Error in exportViaEmail:', error);
+    // Last resort: try mailto:
+    try {
+      const mailtoUrl = createMailtoUrl(data, options);
+      window.location.href = mailtoUrl;
+    } catch (fallbackError) {
+      console.error('Fallback mailto: also failed:', fallbackError);
+      throw new Error('Failed to open email client: ' + error.message);
+    }
+  }
 }
 
 /**
