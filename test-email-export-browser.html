@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Email Export Test</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        button {
+            background: #0066cc;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        button:hover {
+            background: #0052a3;
+        }
+        .success { color: #28a745; }
+        .error { color: #dc3545; }
+        .info { color: #17a2b8; }
+        pre {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .status.success { background: #d4edda; color: #155724; }
+        .status.error { background: #f8d7da; color: #721c24; }
+        .status.info { background: #d1ecf1; color: #0c5460; }
+    </style>
+</head>
+<body>
+    <h1>📧 Email Export Function Test</h1>
+    
+    <div class="test-section">
+        <h2>Test Data</h2>
+        <p>This will test the email export with sample NetSuite data.</p>
+        <button onclick="testEmailExport()">Test Email Export</button>
+        <button onclick="testGmailUrl()">Test Gmail URL Generation</button>
+        <button onclick="testMailtoUrl()">Test Mailto URL Generation</button>
+        <button onclick="testErrorHandling()">Test Error Handling</button>
+        <div id="results"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Console Output</h2>
+        <pre id="console-output"></pre>
+    </div>
+
+    <script type="module">
+        // Import the email export utilities
+        import { 
+            exportViaEmail, 
+            createGmailComposeUrl, 
+            createMailtoUrl, 
+            prepareEmailContent,
+            createExportData 
+        } from './email-export-utils.js';
+
+        // Make functions available globally for button clicks
+        window.testEmailExport = function() {
+            const resultsDiv = document.getElementById('results');
+            const consoleOutput = document.getElementById('console-output');
+            
+            consoleOutput.textContent = 'Testing email export...\n';
+            
+            const testData = {
+                type: 'project',
+                customer: {
+                    name: 'Test Company Inc',
+                    entityid: 'TEST-001',
+                    email: 'test@example.com',
+                    phone: '555-123-4567'
+                },
+                project: {
+                    name: 'Demo Project',
+                    entityid: 'PRJ-DEMO-001',
+                    customerId: 12345,
+                    startDate: '2025-01-01',
+                    endDate: '2025-12-31',
+                    budget: 100000,
+                    status: 'OPEN',
+                    description: 'Test project for email export'
+                }
+            };
+
+            try {
+                console.log('Starting email export test...');
+                consoleOutput.textContent += '✓ Test data prepared\n';
+                
+                const result = exportViaEmail(testData, {
+                    recipientEmail: 'simmonspatrick1@gmail.com',
+                    includeInstructions: true,
+                    includeValidation: true
+                });
+                
+                consoleOutput.textContent += '✓ exportViaEmail called\n';
+                consoleOutput.textContent += 'Note: Check if Gmail opened or mailto: was used\n';
+                
+                resultsDiv.innerHTML = `
+                    <div class="status success">
+                        ✅ Email export function executed successfully!<br>
+                        Check your browser - Gmail should have opened, or your default email client if popup was blocked.
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Test failed:', error);
+                consoleOutput.textContent += `❌ Error: ${error.message}\n`;
+                resultsDiv.innerHTML = `
+                    <div class="status error">
+                        ❌ Test failed: ${error.message}
+                    </div>
+                `;
+            }
+        };
+
+        window.testGmailUrl = function() {
+            const resultsDiv = document.getElementById('results');
+            const consoleOutput = document.getElementById('console-output');
+            
+            const testData = {
+                type: 'project',
+                customer: { name: 'Test', entityid: 'TEST' }
+            };
+
+            try {
+                const url = createGmailComposeUrl(testData);
+                const urlLength = url.length;
+                
+                consoleOutput.textContent = `Gmail URL generated:\n`;
+                consoleOutput.textContent += `Length: ${urlLength} characters\n`;
+                consoleOutput.textContent += `Status: ${urlLength > 2000 ? '⚠️ Too long (will use fallback)' : '✅ OK'}\n\n`;
+                consoleOutput.textContent += `URL (first 200 chars):\n${url.substring(0, 200)}...\n`;
+                
+                resultsDiv.innerHTML = `
+                    <div class="status ${urlLength > 2000 ? 'error' : 'success'}">
+                        ${urlLength > 2000 ? '⚠️' : '✅'} Gmail URL: ${urlLength} chars
+                        ${urlLength > 2000 ? '<br>URL is too long - will use mailto: fallback' : ''}
+                    </div>
+                `;
+            } catch (error) {
+                consoleOutput.textContent += `❌ Error: ${error.message}\n`;
+                resultsDiv.innerHTML = `<div class="status error">❌ ${error.message}</div>`;
+            }
+        };
+
+        window.testMailtoUrl = function() {
+            const resultsDiv = document.getElementById('results');
+            const consoleOutput = document.getElementById('console-output');
+            
+            const testData = {
+                type: 'project',
+                customer: { name: 'Test', entityid: 'TEST' }
+            };
+
+            try {
+                const url = createMailtoUrl(testData);
+                const urlLength = url.length;
+                
+                consoleOutput.textContent = `Mailto URL generated:\n`;
+                consoleOutput.textContent += `Length: ${urlLength} characters\n`;
+                consoleOutput.textContent += `URL (first 200 chars):\n${url.substring(0, 200)}...\n`;
+                
+                resultsDiv.innerHTML = `
+                    <div class="status success">
+                        ✅ Mailto URL: ${urlLength} chars
+                    </div>
+                `;
+            } catch (error) {
+                consoleOutput.textContent += `❌ Error: ${error.message}\n`;
+                resultsDiv.innerHTML = `<div class="status error">❌ ${error.message}</div>`;
+            }
+        };
+
+        window.testErrorHandling = function() {
+            const resultsDiv = document.getElementById('results');
+            const consoleOutput = document.getElementById('console-output');
+            
+            consoleOutput.textContent = 'Testing error handling...\n';
+            
+            // Test with invalid data
+            const invalidData = null;
+            
+            try {
+                const emailContent = prepareEmailContent(invalidData);
+                consoleOutput.textContent += '⚠️ Should have thrown error with null data\n';
+                resultsDiv.innerHTML = `<div class="status error">❌ Error handling test failed - should have thrown error</div>`;
+            } catch (error) {
+                consoleOutput.textContent += `✅ Correctly caught error: ${error.message}\n`;
+                resultsDiv.innerHTML = `
+                    <div class="status success">
+                        ✅ Error handling works correctly!<br>
+                        Error caught: ${error.message}
+                    </div>
+                `;
+            }
+        };
+
+        // Capture console.log
+        const originalLog = console.log;
+        const originalError = console.error;
+        const originalWarn = console.warn;
+        
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            const output = document.getElementById('console-output');
+            if (output) {
+                output.textContent += args.join(' ') + '\n';
+            }
+        };
+        
+        console.error = function(...args) {
+            originalError.apply(console, args);
+            const output = document.getElementById('console-output');
+            if (output) {
+                output.textContent += '❌ ERROR: ' + args.join(' ') + '\n';
+            }
+        };
+        
+        console.warn = function(...args) {
+            originalWarn.apply(console, args);
+            const output = document.getElementById('console-output');
+            if (output) {
+                output.textContent += '⚠️ WARNING: ' + args.join(' ') + '\n';
+            }
+        };
+    </script>
+</body>
+</html>
+

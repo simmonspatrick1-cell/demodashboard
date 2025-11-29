@@ -8,6 +8,30 @@
  */
 
 /**
+ * Downloads email content as a text file
+ * @param {Object} emailContent - Email content with subject and body
+ * @param {string} filename - Optional filename (defaults to export timestamp)
+ */
+export function downloadEmailAsFile(emailContent, filename = null) {
+  if (typeof window === 'undefined') {
+    throw new Error('downloadEmailAsFile can only be used in a browser environment');
+  }
+
+  const defaultFilename = filename || `netsuite-export-${new Date().toISOString().split('T')[0]}.txt`;
+  const content = `Subject: ${emailContent.subject}\n\n${emailContent.body}`;
+  
+  const blob = new Blob([content], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = defaultFilename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+/**
  * Valid NetSuite field mappings for email export
  * Only these fields are processed by the SuiteScript
  */
@@ -606,11 +630,19 @@ export function createGmailComposeUrl(data, options = {}) {
  * Exports data via email (opens Gmail in browser)
  * @param {Object} data - The data to export
  * @param {Object} options - Export options
+ * @param {Function} options.onSuccess - Callback when email opens successfully
+ * @param {Function} options.onError - Callback when error occurs
+ * @param {Function} options.onFallback - Callback when fallback is used
+ * @param {Function} options.onPopupBlocked - Callback when popup is blocked
+ * @param {boolean} options.fallbackToClipboard - If true, copy to clipboard on failure
+ * @returns {Object} - Result object with status and emailContent
  */
 export function exportViaEmail(data, options = {}) {
   // Check if we're in a browser environment
   if (typeof window === 'undefined') {
-    throw new Error('exportViaEmail can only be used in a browser environment');
+    const error = new Error('exportViaEmail can only be used in a browser environment');
+    if (options.onError) options.onError(error, 'BROWSER_REQUIRED');
+    throw error;
   }
 
   try {
@@ -622,11 +654,22 @@ export function exportViaEmail(data, options = {}) {
     const gmailUrl = createGmailComposeUrl(data, options);
     
     if (gmailUrl.length > 2000) {
-      console.warn('Gmail URL too long, using mailto: fallback');
+      // URL too long - will use mailto: fallback
+      
       // Fall back to mailto: which handles long content better
       const mailtoUrl = createMailtoUrl(data, options);
+      
+      if (options.onFallback) {
+        options.onFallback('Gmail URL too long, using default email client', emailContent);
+      }
+      
       window.location.href = mailtoUrl;
-      return;
+      return {
+        success: true,
+        method: 'mailto',
+        emailContent,
+        message: 'Opening default email client...'
+      };
     }
     
     // Try to open Gmail - handle popup blockers
@@ -634,24 +677,118 @@ export function exportViaEmail(data, options = {}) {
     
     // Check if popup was blocked
     if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
-      // Popup blocked - fall back to mailto:
-      console.warn('Popup blocked, using mailto: fallback');
-      const mailtoUrl = createMailtoUrl(data, options);
-      window.location.href = mailtoUrl;
-      return;
+      // Popup blocked - try fallback
+      
+      if (options.onPopupBlocked) {
+        options.onPopupBlocked('Popup blocked by browser', emailContent);
+      }
+      
+      // Try mailto: as fallback
+      try {
+        const mailtoUrl = createMailtoUrl(data, options);
+        window.location.href = mailtoUrl;
+        
+        if (options.onFallback) {
+          options.onFallback('Popup blocked, using default email client', emailContent);
+        }
+        
+        return {
+          success: true,
+          method: 'mailto',
+          emailContent,
+          message: 'Popup blocked. Opening default email client...'
+        };
+      } catch (mailtoError) {
+        // Last resort: copy to clipboard if enabled
+        if (options.fallbackToClipboard && navigator.clipboard) {
+          try {
+            navigator.clipboard.writeText(emailContent.body);
+            if (options.onFallback) {
+              options.onFallback('Email content copied to clipboard', emailContent);
+            }
+            return {
+              success: true,
+              method: 'clipboard',
+              emailContent,
+              message: 'Email content copied to clipboard'
+            };
+          } catch (clipboardError) {
+            // Clipboard also failed
+            const error = new Error('Failed to open email client or copy to clipboard');
+            if (options.onError) {
+              options.onError(error, 'ALL_METHODS_FAILED', emailContent);
+            }
+            throw error;
+          }
+        } else {
+          const error = new Error('Popup blocked and no fallback available');
+          if (options.onError) {
+            options.onError(error, 'POPUP_BLOCKED', emailContent);
+          }
+          throw error;
+        }
+      }
     }
     
     // Success - Gmail opened
-    return newWindow;
+    if (options.onSuccess) {
+      options.onSuccess('Gmail opened successfully', emailContent);
+    }
+    
+    return {
+      success: true,
+      method: 'gmail',
+      emailContent,
+      message: 'Gmail opened successfully',
+      window: newWindow
+    };
   } catch (error) {
-    console.error('Error in exportViaEmail:', error);
+    // Error logged via onError callback
+    
     // Last resort: try mailto:
     try {
       const mailtoUrl = createMailtoUrl(data, options);
       window.location.href = mailtoUrl;
+      
+      if (options.onFallback) {
+        const emailContent = prepareEmailContent(data, options);
+        options.onFallback('Using default email client as fallback', emailContent);
+      }
+      
+      return {
+        success: true,
+        method: 'mailto',
+        emailContent: prepareEmailContent(data, options),
+        message: 'Opening default email client...'
+      };
     } catch (fallbackError) {
-      console.error('Fallback mailto: also failed:', fallbackError);
-      throw new Error('Failed to open email client: ' + error.message);
+      // Try clipboard as absolute last resort
+      if (options.fallbackToClipboard && navigator.clipboard) {
+        try {
+          const emailContent = prepareEmailContent(data, options);
+          navigator.clipboard.writeText(emailContent.body);
+          if (options.onFallback) {
+            options.onFallback('Email content copied to clipboard', emailContent);
+          }
+          return {
+            success: true,
+            method: 'clipboard',
+            emailContent,
+            message: 'Email content copied to clipboard'
+          };
+        } catch (clipboardError) {
+          const finalError = new Error('Failed to open email client: ' + error.message);
+          if (options.onError) {
+            options.onError(finalError, 'ALL_METHODS_FAILED', prepareEmailContent(data, options));
+          }
+          throw finalError;
+        }
+      } else {
+        if (options.onError) {
+          options.onError(error, 'EXPORT_FAILED', prepareEmailContent(data, options));
+        }
+        throw error;
+      }
     }
   }
 }
@@ -707,5 +844,6 @@ export default {
   exportViaEmail,
   createExportData,
   validateNetSuiteFields,
-  computeIdempotencyKey
+  computeIdempotencyKey,
+  downloadEmailAsFile
 };

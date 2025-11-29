@@ -1,8 +1,8 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-import { Search, Settings, User, Users, Zap, ChevronRight, Copy, Check, BookOpen, ChevronDown, Target, Building2, Mail, Phone, MoreVertical, Play, Plus, FileText, Clock, TrendingUp, AlertCircle, Loader, RefreshCw, Database, Globe, X } from 'lucide-react';
+import { Search, Settings, User, Users, Zap, ChevronRight, Copy, Check, BookOpen, ChevronDown, Target, Building2, Mail, Phone, MoreVertical, Play, Plus, FileText, Clock, TrendingUp, AlertCircle, Loader, RefreshCw, Database, Globe, X, Download, Eye } from 'lucide-react';
 // Import the NetSuite service
 // import NetSuiteService from './netsuite-service';
-import { exportViaEmail, createExportData, validateNetSuiteFields, computeIdempotencyKey } from './email-export-utils';
+import { exportViaEmail, createExportData, validateNetSuiteFields, computeIdempotencyKey, downloadEmailAsFile as downloadEmailFile, prepareEmailContent } from './email-export-utils';
 import { ITEM_CONFIG, ESTIMATE_PRESETS, AVAILABLE_ITEMS } from './src/itemConfig';
 import ReferenceDataManager from './src/ReferenceDataManager';
 import { ClassSelector, DepartmentSelector, LocationSelector } from './src/ReferenceDataSelector';
@@ -60,6 +60,9 @@ export default function DemoDashboard() {
   const [formErrors, setFormErrors] = useState({});
   const [recentItems, setRecentItems] = useState([]); // Track recently viewed/used items
   const [exportHistory, setExportHistory] = useState([]); // Track export history
+  const [showEmailPreview, setShowEmailPreview] = useState(false);
+  const [emailPreviewData, setEmailPreviewData] = useState(null);
+  const [showExportHistory, setShowExportHistory] = useState(false);
   const [showShortcutsModal, setShowShortcutsModal] = useState(false); // Keyboard shortcuts help
   const [quickFilter, setQuickFilter] = useState(null); // Quick filter state: 'lead', 'prospect', 'customer', null
   const [selectedItems, setSelectedItems] = useState(new Set()); // Bulk selection
@@ -841,6 +844,50 @@ export default function DemoDashboard() {
     }
   };
 
+  // Helper function to copy email content to clipboard
+  const copyEmailToClipboard = async (exportData) => {
+    try {
+      const emailContent = prepareEmailContent(exportData, {
+        recipientEmail: 'simmonspatrick1@gmail.com',
+        includeInstructions: true,
+        includeValidation: true
+      });
+      
+      const fullContent = `To: ${emailContent.to}\nSubject: ${emailContent.subject}\n\n${emailContent.body}`;
+      
+      await navigator.clipboard.writeText(fullContent);
+      setActionStatus('✓ Email content copied to clipboard');
+      setTimeout(() => setActionStatus(null), 3000);
+    } catch (error) {
+      if (import.meta.env.DEV) {
+        console.error('Clipboard copy error:', error);
+      }
+      setActionStatus('⚠ Failed to copy to clipboard');
+      setTimeout(() => setActionStatus(null), 3000);
+    }
+  };
+
+  // Helper function to download email content as file
+  const handleDownloadEmail = (exportData) => {
+    try {
+      const emailContent = prepareEmailContent(exportData, {
+        recipientEmail: 'simmonspatrick1@gmail.com',
+        includeInstructions: true,
+        includeValidation: true
+      });
+      
+      downloadEmailFile(emailContent, `netsuite-export-${selectedCustData?.entityid || 'export'}-${new Date().toISOString().split('T')[0]}.txt`);
+      setActionStatus('✓ Email content downloaded');
+      setTimeout(() => setActionStatus(null), 3000);
+    } catch (error) {
+      if (import.meta.env.DEV) {
+        console.error('Download error:', error);
+      }
+      setActionStatus('⚠ Failed to download file');
+      setTimeout(() => setActionStatus(null), 3000);
+    }
+  };
+
   const exportToEmail = () => {
     if (!selectedCustData) {
       setActionStatus('⚠ Please select a customer first');
@@ -885,7 +932,9 @@ export default function DemoDashboard() {
       }
 
     } catch (error) {
-      console.error('Email export error:', error);
+      if (import.meta.env.DEV) {
+        console.error('Email export error:', error);
+      }
       setActionStatus('⚠ Email export failed');
       setTimeout(() => setActionStatus(null), 3000);
     }
@@ -910,14 +959,50 @@ export default function DemoDashboard() {
     }
   }, [exportHistory]);
 
-  const performEmailExport = (exportData) => {
+  // Helper function to create email export options with callbacks
+  const createEmailExportOptions = (customMessage = null) => ({
+    recipientEmail: 'simmonspatrick1@gmail.com',
+    includeInstructions: true,
+    includeValidation: true,
+    fallbackToClipboard: true,
+    onSuccess: (message, emailContent) => {
+      setActionStatus(`✓ ${customMessage || message}`);
+      setTimeout(() => setActionStatus(null), 3000);
+    },
+    onError: (error, errorCode, emailContent) => {
+      let errorMessage = '⚠ Email export failed';
+      
+      switch (errorCode) {
+        case 'POPUP_BLOCKED':
+          errorMessage = '⚠ Popup blocked. Email content copied to clipboard instead.';
+          if (emailContent && navigator.clipboard) {
+            navigator.clipboard.writeText(emailContent.body);
+          }
+          break;
+        case 'ALL_METHODS_FAILED':
+          errorMessage = '⚠ Could not open email. Use "Copy to Clipboard" or "Download" options.';
+          break;
+        default:
+          errorMessage = `⚠ ${error.message || 'Email export failed'}`;
+      }
+      
+      setActionStatus(errorMessage);
+      setTimeout(() => setActionStatus(null), 5000);
+    },
+    onFallback: (message, emailContent) => {
+      setActionStatus(`ℹ️ ${message}`);
+      setTimeout(() => setActionStatus(null), 3000);
+    },
+    onPopupBlocked: (message, emailContent) => {
+      setActionStatus('⚠ Popup blocked. Trying alternative method...');
+      setTimeout(() => setActionStatus(null), 2000);
+    }
+  });
+
+  const performEmailExport = (exportData, customMessage = null) => {
     try {
-      // Export via email
-      exportViaEmail(exportData, {
-        recipientEmail: 'simmonspatrick1@gmail.com',
-        includeInstructions: true,
-        includeValidation: true
-      });
+      // Export via email with callbacks for better user feedback
+      const result = exportViaEmail(exportData, createEmailExportOptions(customMessage));
 
       // Track export history
       const exportRecord = {
@@ -926,6 +1011,7 @@ export default function DemoDashboard() {
         customer: selectedCustData?.name || 'Unknown',
         customerId: selectedCustData?.id || null,
         type: 'email',
+        method: result?.method || 'unknown',
         data: {
           projectName: exportData.projectName || 'N/A',
           estimateType: exportData.estimate?.type || 'N/A',
@@ -934,12 +1020,12 @@ export default function DemoDashboard() {
       };
       setExportHistory(prev => [exportRecord, ...prev.slice(0, 49)]); // Keep last 50
 
-      setActionStatus('✓ Opening email client...');
-      setTimeout(() => setActionStatus(null), 3000);
     } catch (error) {
-      console.error('Email export error:', error);
-      setActionStatus('⚠ Email export failed');
-      setTimeout(() => setActionStatus(null), 3000);
+      if (import.meta.env.DEV) {
+        console.error('Email export error:', error);
+      }
+      setActionStatus('⚠ Email export failed. Try "Copy to Clipboard" or "Download" options.');
+      setTimeout(() => setActionStatus(null), 5000);
     }
   };
 
@@ -982,13 +1068,7 @@ export default function DemoDashboard() {
           memo: demoNotes[selectedCustData.id] || ''
         });
 
-        exportViaEmail(exportData, {
-          recipientEmail: 'simmonspatrick1@gmail.com',
-          includeInstructions: true
-        });
-
-        setActionStatus('✓ Creating project via email...');
-        setTimeout(() => setActionStatus(null), 3000);
+        performEmailExport(exportData, 'Creating project via email...');
       }
     },
     {
@@ -1065,13 +1145,7 @@ export default function DemoDashboard() {
           idempotencyKey: idKey
         });
 
-        exportViaEmail(exportData, {
-          recipientEmail: 'simmonspatrick1@gmail.com',
-          includeInstructions: true
-        });
-
-        setActionStatus('✓ Creating estimate via email...');
-        setTimeout(() => setActionStatus(null), 3000);
+        performEmailExport(exportData, 'Creating estimate via email...');
       }
     },
     {
@@ -1096,6 +1170,108 @@ export default function DemoDashboard() {
       label: 'Export to Email',
       icon: Mail,
       action: exportToEmail
+    },
+    {
+      id: 'copy-email',
+      label: 'Copy to Clipboard',
+      icon: Copy,
+      action: () => {
+        if (!selectedCustData) {
+          setActionStatus('⚠ Please select a customer first');
+          setTimeout(() => setActionStatus(null), 2000);
+          return;
+        }
+        try {
+          const nsResponse = nsData[selectedCustData.id];
+          const customerData = nsResponse ? {
+            ...selectedCustData,
+            ...nsResponse,
+            custentity_esc_industry: nsResponse.custentity_esc_industry || selectedCustData.industry,
+            custentity_esc_annual_revenue: nsResponse.custentity_esc_annual_revenue || selectedCustData.budget,
+            custentity_esc_no_of_employees: nsResponse.custentity_esc_no_of_employees || selectedCustData.size
+          } : selectedCustData;
+          const exportData = createExportData(customerData, null, {
+            memo: demoNotes[selectedCustData.id] || ''
+          });
+          copyEmailToClipboard(exportData);
+        } catch (error) {
+          if (import.meta.env.DEV) {
+            console.error('Copy error:', error);
+          }
+          setActionStatus('⚠ Failed to copy to clipboard');
+          setTimeout(() => setActionStatus(null), 3000);
+        }
+      }
+    },
+    {
+      id: 'download-email',
+      label: 'Download as File',
+      icon: Download,
+      action: () => {
+        if (!selectedCustData) {
+          setActionStatus('⚠ Please select a customer first');
+          setTimeout(() => setActionStatus(null), 2000);
+          return;
+        }
+        try {
+          const nsResponse = nsData[selectedCustData.id];
+          const customerData = nsResponse ? {
+            ...selectedCustData,
+            ...nsResponse,
+            custentity_esc_industry: nsResponse.custentity_esc_industry || selectedCustData.industry,
+            custentity_esc_annual_revenue: nsResponse.custentity_esc_annual_revenue || selectedCustData.budget,
+            custentity_esc_no_of_employees: nsResponse.custentity_esc_no_of_employees || selectedCustData.size
+          } : selectedCustData;
+          const exportData = createExportData(customerData, null, {
+            memo: demoNotes[selectedCustData.id] || ''
+          });
+          handleDownloadEmail(exportData);
+        } catch (error) {
+          if (import.meta.env.DEV) {
+            console.error('Download error:', error);
+          }
+          setActionStatus('⚠ Failed to download file');
+          setTimeout(() => setActionStatus(null), 3000);
+        }
+      }
+    },
+    {
+      id: 'preview-email',
+      label: 'Preview Email',
+      icon: Eye,
+      action: () => {
+        if (!selectedCustData) {
+          setActionStatus('⚠ Please select a customer first');
+          setTimeout(() => setActionStatus(null), 2000);
+          return;
+        }
+        try {
+          const nsResponse = nsData[selectedCustData.id];
+          const customerData = nsResponse ? {
+            ...selectedCustData,
+            ...nsResponse,
+            custentity_esc_industry: nsResponse.custentity_esc_industry || selectedCustData.industry,
+            custentity_esc_annual_revenue: nsResponse.custentity_esc_annual_revenue || selectedCustData.budget,
+            custentity_esc_no_of_employees: nsResponse.custentity_esc_no_of_employees || selectedCustData.size
+          } : selectedCustData;
+          const exportData = createExportData(customerData, null, {
+            memo: demoNotes[selectedCustData.id] || ''
+          });
+          const emailContent = prepareEmailContent(exportData, {
+            recipientEmail: 'simmonspatrick1@gmail.com',
+            includeInstructions: true,
+            includeValidation: true
+          });
+          setEmailPreviewData({ emailContent, exportData });
+          setShowEmailPreview(true);
+        } catch (error) {
+          if (import.meta.env.DEV) {
+            console.error('Preview error:', error);
+          }
+          setActionStatus('⚠ Failed to preview email');
+          setTimeout(() => setActionStatus(null), 3000);
+        }
+      }
     }
   ];
 
@@ -2286,14 +2462,7 @@ export default function DemoDashboard() {
         billingSchedule
       });
 
-      exportViaEmail(exportData, {
-        recipientEmail: 'simmonspatrick1@gmail.com',
-        includeInstructions: true,
-        includeValidation: true
-      });
-
-      setActionStatus('✓ Project export opened in email');
-      setTimeout(() => setActionStatus(null), 2500);
+      performEmailExport(exportData, 'Project export opened in email');
     };
 
     return (
@@ -3600,17 +3769,25 @@ export default function DemoDashboard() {
                   </div>
                 )}
                 {exportHistory.length > 0 && (
-                  <button
-                    onClick={() => {
-                      setExportHistory([]);
-                      localStorage.removeItem('demodashboard_export_history');
-                      setActionStatus('✓ Export history cleared');
-                      setTimeout(() => setActionStatus(null), 2000);
-                    }}
-                    className="mt-2 text-xs text-gray-500 hover:text-red-600"
-                  >
-                    Clear History
-                  </button>
+                  <div className="flex gap-2 mt-2">
+                    <button
+                      onClick={() => setShowExportHistory(true)}
+                      className="text-xs text-blue-600 hover:text-blue-700 font-medium"
+                    >
+                      View All ({exportHistory.length})
+                    </button>
+                    <button
+                      onClick={() => {
+                        setExportHistory([]);
+                        localStorage.removeItem('demodashboard_export_history');
+                        setActionStatus('✓ Export history cleared');
+                        setTimeout(() => setActionStatus(null), 2000);
+                      }}
+                      className="text-xs text-gray-500 hover:text-red-600"
+                    >
+                      Clear History
+                    </button>
+                  </div>
                 )}
               </div>
 
@@ -3759,6 +3936,269 @@ export default function DemoDashboard() {
           </div>
         </div>
       )}
+
+      {/* Email Preview Modal */}
+      {showEmailPreview && emailPreviewData && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-opacity duration-200"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowEmailPreview(false);
+              setEmailPreviewData(null);
+            }
+          }}
+          aria-modal="true"
+          aria-labelledby="email-preview-title"
+          role="dialog"
+        >
+          <div 
+            className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden shadow-xl transform transition-all duration-200 scale-100 flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-6 border-b border-gray-200 flex items-center justify-between">
+              <h2 id="email-preview-title" className="text-xl font-bold text-gray-900">Email Preview</h2>
+              <button
+                onClick={() => {
+                  setShowEmailPreview(false);
+                  setEmailPreviewData(null);
+                }}
+                className="text-gray-400 hover:text-gray-600 p-1 rounded hover:bg-gray-100 transition-colors"
+                aria-label="Close preview modal"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-6 space-y-4">
+              <div>
+                <label className="text-sm font-semibold text-gray-700 mb-1 block">To:</label>
+                <p className="text-sm text-gray-900">{emailPreviewData.emailContent.to}</p>
+              </div>
+              <div>
+                <label className="text-sm font-semibold text-gray-700 mb-1 block">Subject:</label>
+                <p className="text-sm text-gray-900">{emailPreviewData.emailContent.subject}</p>
+              </div>
+              <div>
+                <label className="text-sm font-semibold text-gray-700 mb-1 block">Body:</label>
+                <pre className="text-xs text-gray-800 bg-gray-50 p-4 rounded-lg border border-gray-200 overflow-x-auto whitespace-pre-wrap font-mono leading-relaxed max-h-96 overflow-y-auto">
+                  {emailPreviewData.emailContent.body}
+                </pre>
+              </div>
+            </div>
+            
+            <div className="p-6 border-t border-gray-200 flex gap-3 bg-gray-50">
+              <button
+                onClick={() => {
+                  setShowEmailPreview(false);
+                  setEmailPreviewData(null);
+                }}
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(
+                      `To: ${emailPreviewData.emailContent.to}\nSubject: ${emailPreviewData.emailContent.subject}\n\n${emailPreviewData.emailContent.body}`
+                    );
+                    setActionStatus('✓ Email content copied to clipboard');
+                    setTimeout(() => setActionStatus(null), 3000);
+                  } catch (error) {
+                    setActionStatus('⚠ Failed to copy to clipboard');
+                    setTimeout(() => setActionStatus(null), 3000);
+                  }
+                }}
+                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium flex items-center gap-2"
+              >
+                <Copy size={16} />
+                Copy
+              </button>
+              <button
+                onClick={() => {
+                  downloadEmailFile(emailPreviewData.emailContent, `netsuite-export-${selectedCustData?.entityid || 'export'}-${new Date().toISOString().split('T')[0]}.txt`);
+                  setActionStatus('✓ Email content downloaded');
+                  setTimeout(() => setActionStatus(null), 3000);
+                }}
+                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium flex items-center gap-2"
+              >
+                <Download size={16} />
+                Download
+              </button>
+              <button
+                onClick={() => {
+                  setShowEmailPreview(false);
+                  performEmailExport(emailPreviewData.exportData);
+                  setEmailPreviewData(null);
+                }}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center justify-center gap-2"
+              >
+                <Mail size={16} />
+                Send Email
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Export History Modal */}
+      {showExportHistory && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-opacity duration-200"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowExportHistory(false);
+            }
+          }}
+          aria-modal="true"
+          aria-labelledby="export-history-title"
+          role="dialog"
+        >
+          <div 
+            className="bg-white rounded-lg max-w-3xl w-full max-h-[90vh] overflow-hidden shadow-xl transform transition-all duration-200 scale-100 flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-6 border-b border-gray-200 flex items-center justify-between">
+              <h2 id="export-history-title" className="text-xl font-bold text-gray-900">Export History</h2>
+              <button
+                onClick={() => setShowExportHistory(false)}
+                className="text-gray-400 hover:text-gray-600 p-1 rounded hover:bg-gray-100 transition-colors"
+                aria-label="Close export history modal"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-6">
+              {exportHistory.length === 0 ? (
+                <div className="text-center py-12 text-gray-400">
+                  <Mail size={48} className="mx-auto mb-4 opacity-20" />
+                  <p className="text-sm">No export history yet</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {exportHistory.map((exportItem) => (
+                    <div key={exportItem.id} className="p-4 bg-gray-50 rounded-lg border border-gray-200 hover:border-gray-300 transition-colors">
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-semibold text-gray-900">{exportItem.customer}</span>
+                            <span className={`text-xs px-2 py-0.5 rounded ${
+                              exportItem.method === 'gmail' ? 'bg-blue-100 text-blue-700' :
+                              exportItem.method === 'mailto' ? 'bg-green-100 text-green-700' :
+                              exportItem.method === 'clipboard' ? 'bg-purple-100 text-purple-700' :
+                              'bg-gray-100 text-gray-700'
+                            }`}>
+                              {exportItem.method || 'email'}
+                            </span>
+                          </div>
+                          <p className="text-xs text-gray-600">
+                            {exportItem.data.projectName} • {exportItem.data.itemCount} items
+                            {exportItem.data.estimateType && ` • ${exportItem.data.estimateType}`}
+                          </p>
+                        </div>
+                        <span className="text-xs text-gray-500 whitespace-nowrap ml-4">
+                          {new Date(exportItem.timestamp).toLocaleDateString()} {new Date(exportItem.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                        </span>
+                      </div>
+                      <div className="flex gap-2 mt-3">
+                        <button
+                          onClick={() => {
+                            // Re-export the same data
+                            const customer = prospects.find(p => p.id === exportItem.customerId);
+                            if (customer) {
+                              const nsResponse = nsData[customer.id];
+                              const customerData = nsResponse ? {
+                                ...customer,
+                                ...nsResponse
+                              } : customer;
+                              const exportData = createExportData(customerData, null, {
+                                memo: demoNotes[customer.id] || ''
+                              });
+                              performEmailExport(exportData, 'Re-exporting...');
+                              setShowExportHistory(false);
+                            } else {
+                              setActionStatus('⚠ Customer not found');
+                              setTimeout(() => setActionStatus(null), 3000);
+                            }
+                          }}
+                          className="text-xs px-3 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors flex items-center gap-1"
+                        >
+                          <Mail size={12} />
+                          Re-export
+                        </button>
+                        <button
+                          onClick={() => {
+                            const customer = prospects.find(p => p.id === exportItem.customerId);
+                            if (customer) {
+                              const nsResponse = nsData[customer.id];
+                              const customerData = nsResponse ? {
+                                ...customer,
+                                ...nsResponse
+                              } : customer;
+                              const exportData = createExportData(customerData, null, {
+                                memo: demoNotes[customer.id] || ''
+                              });
+                              copyEmailToClipboard(exportData);
+                              setShowExportHistory(false);
+                            }
+                          }}
+                          className="text-xs px-3 py-1.5 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors flex items-center gap-1"
+                        >
+                          <Copy size={12} />
+                          Copy
+                        </button>
+                        <button
+                          onClick={() => {
+                            const customer = prospects.find(p => p.id === exportItem.customerId);
+                            if (customer) {
+                              const nsResponse = nsData[customer.id];
+                              const customerData = nsResponse ? {
+                                ...customer,
+                                ...nsResponse
+                              } : customer;
+                              const exportData = createExportData(customerData, null, {
+                                memo: demoNotes[customer.id] || ''
+                              });
+                              handleDownloadEmail(exportData);
+                              setShowExportHistory(false);
+                            }
+                          }}
+                          className="text-xs px-3 py-1.5 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors flex items-center gap-1"
+                        >
+                          <Download size={12} />
+                          Download
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            
+            {exportHistory.length > 0 && (
+              <div className="p-6 border-t border-gray-200 bg-gray-50 flex justify-between items-center">
+                <span className="text-sm text-gray-600">
+                  {exportHistory.length} export{exportHistory.length !== 1 ? 's' : ''} total
+                </span>
+                <button
+                  onClick={() => {
+                    setExportHistory([]);
+                    localStorage.removeItem('demodashboard_export_history');
+                    setActionStatus('✓ Export history cleared');
+                    setShowExportHistory(false);
+                    setTimeout(() => setActionStatus(null), 2000);
+                  }}
+                  className="text-sm text-red-600 hover:text-red-700 font-medium"
+                >
+                  Clear All
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
