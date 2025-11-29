@@ -64,6 +64,11 @@ export function validateNetSuiteFields(data) {
     }
   };
 
+  // Handle null/undefined input
+  if (!data || typeof data !== 'object') {
+    return results;
+  }
+
   // Flatten data for validation (supports nested objects like { customer: { entityid } } -> customerEntityid)
   const flatData = flattenData(data);
 
@@ -97,9 +102,19 @@ export function validateNetSuiteFields(data) {
  * @returns {Object} - Flattened key-value pairs with proper prefixes
  */
 function flattenData(data) {
+  // Handle null/undefined input
+  if (!data || typeof data !== 'object') {
+    return {};
+  }
+
   const result = {};
 
   function processObject(obj, prefix = '') {
+    // Safety check
+    if (!obj || typeof obj !== 'object' || Array.isArray(obj)) {
+      return;
+    }
+
     for (const [key, value] of Object.entries(obj)) {
       if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
         // For nested objects, add prefix
@@ -486,10 +501,15 @@ export function formatDataWithHashtags(data, options = {}) {
  * @returns {string} - Email subject
  */
 export function createEmailSubject(data) {
+  // Handle null/undefined data
+  if (!data || typeof data !== 'object') {
+    return 'NetSuite Data Export';
+  }
+
   const parts = [];
 
   if (data.type) {
-    parts.push(data.type.toUpperCase());
+    parts.push(String(data.type).toUpperCase());
   }
 
   if (data.project?.name) {
@@ -524,6 +544,11 @@ export function prepareEmailContent(data, options = {}) {
     includeValidation = true,
     includeJsonFiltered = true
   } = options;
+
+  // Handle null/undefined data
+  if (!data || typeof data !== 'object') {
+    throw new Error('Data is required and must be an object');
+  }
 
   const subject = createEmailSubject(data);
   const hashtagContent = formatDataWithHashtags(data, { includeValidation, includeJsonFiltered });
@@ -583,6 +608,11 @@ export function createGmailComposeUrl(data, options = {}) {
  * @param {Object} options - Export options
  */
 export function exportViaEmail(data, options = {}) {
+  // Check if we're in a browser environment
+  if (typeof window === 'undefined') {
+    throw new Error('exportViaEmail can only be used in a browser environment');
+  }
+
   try {
     // Prepare email content first to validate
     const emailContent = prepareEmailContent(data, options);

@@ -594,11 +594,11 @@ export default function DemoDashboard() {
       .replace(/\[Customer Name\]/gi, customer.name)
       .replace(/\[Customer\]/gi, customer.name)
       .replace(/\[Client\]/gi, customer.name)
-      .replace(/\[Vertical\]/gi, customer.industry)
-      .replace(/\[Industry\]/gi, customer.industry)
-      .replace(/\[company size\]/gi, customer.size)
-      .replace(/\[amount\]/gi, customer.budget)
-      .replace(/\[Budget\]/gi, customer.budget)
+      .replace(/\[Vertical\]/gi, customer.industry || 'Professional Services')
+      .replace(/\[Industry\]/gi, customer.industry || 'Professional Services')
+      .replace(/\[company size\]/gi, customer.size || 'Not specified')
+      .replace(/\[amount\]/gi, customer.budget || 'Not specified')
+      .replace(/\[Budget\]/gi, customer.budget || 'Not specified')
       .replace(/\[Project Name\]/gi, `${customer.name} Implementation`)
       .replace(/\[PRJ####\]/gi, `PRJ-${customer.entityid}-${Math.floor(Math.random() * 1000)}`)
       .replace(/\[Date\]/gi, today)
@@ -1359,7 +1359,7 @@ export default function DemoDashboard() {
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-gray-500">{customer.industry}</span>
+                  <span className="text-xs text-gray-500">{customer.industry || 'Not specified'}</span>
                   {!customer.nsId && (
                     <span className="text-[10px] font-bold text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded border border-orange-100">
                       LOCAL
